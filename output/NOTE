@@ -1,0 +1,10 @@
+The 0.44/0.56 split for CSS_content is derived from the composite jury weights
+# defined in §9.2 by normalizing only the reasoning and factual components:
+#   normalized_reasoning = 0.35 / (0.35 + 0.45) = 0.35 / 0.80 = 0.4375 ≈ 0.44
+#   normalized_factual   = 0.45 / (0.35 + 0.45) = 0.45 / 0.80 = 0.5625 ≈ 0.56
+# This makes the content-only weights fully derivable from JURY_WEIGHTS and verifiable.
+
+CSS_content: float = 0.44 * (pass_R / n_R) + 0.56 * (pass_F / n_F)
+CSS_style:   float = pass_S / n_S
+
+# Range: [0.0

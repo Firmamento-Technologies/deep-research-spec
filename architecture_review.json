@@ -1,0 +1,302 @@
+{
+  "review_summary": "The DRS specification is architecturally ambitious and largely well-structured, with strong cross-referencing, explicit priority ordering in routing functions, and consistent dependency injection patterns. However, several critical inconsistencies exist between files — notably conflicting routing return values in 13_oscillation_detector.md versus 12_reflector.md and 04_architecture.md, threshold values that drift across files, and an agent (SourceSynthesizer) whose output field name is inconsistent across consuming agents. The spec would benefit from a single canonical routing function registry and stricter field-name alignment across the DocumentState schema.",
+  "issues": [
+    {
+      "type": "INCONSISTENCY",
+      "severity": "CRITICAL",
+      "files_affected": [
+        "13_oscillation_detector.md",
+        "04_architecture.md",
+        "05_agents.md",
+        "12_reflector.md"
+      ],
+      "description": "In 13_oscillation_detector.md §13.6, route_after_oscillation() returns Literal['continue', 'escalate_human'], where 'continue' maps to the writer node. However, in 04_architecture.md §4.5 and 05_agents.md §12.5, the canonical route_after_oscillation() returns Literal['span_editor', 'writer', 'escalate_human'] with no 'continue' literal. The LangGraph graph in §4.5 registers edges for 'span_editor', 'writer', and 'escalate_human' — a node returning 'continue' would cause a LangGraph KeyError at runtime because no edge is registered for that key.",
+      "fix_suggestion": "Delete the route_after_oscillation() definition in 13_oscillation_detector.md §13.6 entirely and replace it with a cross-reference to the canonical definition in §12.5 / §4.5. The canonical function must return only 'span_editor', 'writer', or 'escalate_human'."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "CRITICAL",
+      "files_affected": [
+        "13_oscillation_detector.md",
+        "04_architecture.md",
+        "09_css_aggregator.md"
+      ],
+      "description": "In 13_oscillation_detector.md §13.6, route_after_oscillation() contains a branch: 'if result[\"severity\"] == \"EARLY_WARNING\": return \"continue\"', meaning early-warning oscillation routes to the writer without interruption. However, 04_architecture.md §4.5 route_after_oscillation() and 05_agents.md §12.5 have no early-warning branch — they route solely on oscillation_detected bool and dominant_scope. The two implementations are mutually incompatible: one always routes on detection level, the other only on boolean detected. The LangGraph graph can only compile one edge map.",
+      "fix_suggestion": "Remove the severity-based branching logic from 13_oscillation_detector.md and declare that EARLY_WARNING is handled by writing an OscillationWarning to WriterMemory (already described in §13.6 prose) without changing the graph route. The route_after_oscillation() function should remain solely in §12.5 and §4.5."
+    },
+    {
+      "type": "LOGIC_ERROR",
+      "severity": "CRITICAL",
+      "files_affected": [
+        "05_agents.md",
+        "04_architecture.md"
+      ],
+      "description": "In §4.5 build_graph(), the edge after researcher_targeted is 'researcher_targeted → citation_manager'. citation_manager then routes to citation_verifier, which was already defined with an outbound edge to source_sanitizer. However, source_synthesizer has an outbound edge to writer already registered. LangGraph does not allow duplicate edge registrations for the same source node — registering 'citation_manager → citation_verifier' twice (once for the initial research path and once for the researcher_targeted path) raises a graph compilation error. The spec text says 'shared edges reused' but LangGraph's add_edge is idempotent only if the same (src, dst) pair is registered; the comment implies re-registration rather than true reuse.",
+      "fix_suggestion": "Verify that LangGraph allows the same edge to be declared twice without error (it does in recent versions); if so, add an explicit note in §4.5 confirming this. If not, replace the shared-edge approach with a dedicated sub-graph or a router node that dispatches both the initial and targeted research paths to the same downstream chain."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "CRITICAL",
+      "files_affected": [
+        "05_agents.md",
+        "04_architecture.md"
+      ],
+      "description": "In 05_agents.md §5.6 SourceSynthesizer, the PRODUCES field states it produces 'compressed_corpus' into DocumentState. However, 05_agents.md §5.7 Writer CONSUMES 'compressed_corpus' from DocumentState. But 04_architecture.md §4.6 DocumentState schema does not contain a field named 'compressed_corpus' — the schema contains 'synthesized_sources: str' (§4.6) and 'compressed_context: str' (from ContextCompressor). This means SourceSynthesizer writes to a field that does not exist in the canonical State schema, and Writer reads from a non-existent field.",
+      "fix_suggestion": "Add 'compressed_corpus: str' to DocumentState in §4.6 as the output of SourceSynthesizer (distinct from 'synthesized_sources' and 'compressed_context'), or rename SourceSynthesizer's output to match an existing field and update all CONSUMES/PRODUCES references consistently."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "CRITICAL",
+      "files_affected": [
+        "09_css_aggregator.md",
+        "08_jury_system.md",
+        "10_minority_veto.md"
+      ],
+      "description": "In 09_css_aggregator.md §9.4 route_after_aggregator(), the L2 veto check (Priority 3) only checks R and F mini-juries (r_verdicts and f_verdicts). The Style mini-jury (s_verdicts) is explicitly excluded from L2 veto. However, 10_minority_veto.md §10.2 table states 'S (Style)' unanimous fail routes to 'style_fixer'. The routing function in §9.4 does not implement this — a unanimous Style FAIL (0/3 pass_s) falls through to the CSS content gate logic, which may then route to 'approved' if CSS_content is high enough. This means a 0/3 Style unanimous FAIL does not reliably route to style_fixer.",
+      "fix_suggestion": "Add an S-jury L2 check in route_after_aggregator() after the R/F L2 check: if all s_verdicts have pass_fail=False, return 'fail_style' (which routes to style_fixer). This aligns §9.4 with the §10.2 behavior table."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "HIGH",
+      "files_affected": [
+        "01_vision.md",
+        "09_css_aggregator.md",
+        "19_budget_controller.md",
+        "04_architecture.md"
+      ],
+      "description": "01_vision.md §1.4.1 DerivedParams states css_content_threshold for Premium is >=0.78, while 09_css_aggregator.md §9.3 THRESHOLD_TABLE has 'premium': {'css_content_threshold': 0.78}. However, 04_architecture.md §4.6 BudgetState docstring says '0.65 (Economy) | 0.70 (Balanced) | 0.78 (Premium)' which matches. The inconsistency is in 03_input_config.md ConvergenceConfig where css_content_threshold default is 0.65 (Economy floor) but the docstring says 'Runtime value is always set from §9.3 THRESHOLD_TABLE by BudgetController' — an implementer might use the Pydantic default of 0.65 for Balanced/Premium runs if the BudgetController call is missed.",
+      "fix_suggestion": "Add a Pydantic validator in ConvergenceConfig that raises ValueError if css_content_threshold is set to a value inconsistent with quality_preset at config load time, and add a preflight assertion that BudgetController has been called before any jury invocation."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "HIGH",
+      "files_affected": [
+        "11_panel_discussion.md",
+        "09_css_aggregator.md",
+        "04_architecture.md"
+      ],
+      "description": "In 11_panel_discussion.md §11.3, route_after_panel() returns Literal['panel_discussion', 'aggregator', 'await_human', 'publisher'] and the graph edge is registered with all four targets. However, 09_css_aggregator.md §9.5 defines route_after_panel_internal() returning only Literal['panel_discussion', 'aggregator'], with no 'await_human' or 'publisher' exits. The §4.5 graph in 04_architecture.md registers only {'panel_discussion': 'panel_discussion', 'aggregator': 'aggregator'} matching §9.5. This means the 'await_human' and 'publisher' returns defined in §11.3 have no registered LangGraph edges and will raise a KeyError at runtime.",
+      "fix_suggestion": "Reconcile by adopting the §11.3 version as canonical (it handles more exit conditions correctly) and updating §9.5 and §4.5 build_graph() to register all four edge targets: panel_discussion, aggregator, await_human, and publisher."
+    },
+    {
+      "type": "LOGIC_ERROR",
+      "severity": "HIGH",
+      "files_affected": [
+        "05_agents.md",
+        "15_coherence_guard.md"
+      ],
+      "description": "In 15_coherence_guard.md §15.3 FormatValidator, the Length Routing Sub-Rule states 'delta > 0.10 → routing = style_fixer' for documents that are too long. However, 05_agents.md §5.22 LengthAdjuster is defined to handle documents that are 'more than 10% shorter than target (delta < -0.10)'. The style_fixer (§5.10) CONSTRAINTS state it 'corrects L1/L2 violations without altering content' — it is not designed to compress word count. There is no specified agent that reduces word count when delta > 0.10 via the 'style_fixer' path, making this routing logically incoherent.",
+      "fix_suggestion": "Replace 'style_fixer' with a dedicated 'length_compressor' path or extend LengthAdjuster to handle both expansion (delta < -0.10) and compression (delta > 0.10) cases, and update §15.3 routing table accordingly."
+    },
+    {
+      "type": "LOGIC_ERROR",
+      "severity": "HIGH",
+      "files_affected": [
+        "07_mixture_of_writers.md",
+        "08_jury_system.md"
+      ],
+      "description": "In 07_mixture_of_writers.md §7.5, the internal MoW jury evaluation uses 'all 9 judges (same mini-jury composition as standard jury: 3 × Reasoning, 3 × Factual, 3 × Style)' and states '27 total LLM calls (9 judges × 3 drafts)'. However, the CSS formula in §9.1 requires n_R, n_F, n_S as denominator counts. When computing css_individual per draft (scoped to that draft's 9-judge panel), the css_individual formula is undefined — §9.1 defines CSS_content = 0.44*(pass_R/n_R) + 0.56*(pass_F/n_F) and CSS_style = pass_S/n_S, but 'css_individual' is described as a single float synthesizing all three juries. There is no specified formula for computing a single css_individual from three separate CSS sub-scores.",
+      "fix_suggestion": "Define css_individual explicitly in §7.5 as CSS_composite (§9.1): 0.35*(pass_R/3) + 0.45*(pass_F/3) + 0.20*(pass_S/3) evaluated per draft, and add this formula to the PerDraftVerdict schema."
+    },
+    {
+      "type": "UNREACHABLE_STATE",
+      "severity": "HIGH",
+      "files_affected": [
+        "05_agents.md",
+        "04_architecture.md"
+      ],
+      "description": "In §4.5, the graph edge after diff_merger is 'diff_merger → style_linter'. After style_linter, route_style_lint() returns 'violation' → style_fixer or 'clean' → metrics_collector. If style_fixer runs after diff_merger and produces violations again, it routes back to style_linter, then to style_fixer in a loop. However, §5.10 StyleFixer CONSTRAINTS state 'if 2 passes fail → escalate to Reflector', but there is no graph edge from style_fixer to reflector in the surgical-edit path (diff_merger → style_linter → style_fixer). The escalation to Reflector from StyleFixer is specified but has no corresponding graph edge.",
+      "fix_suggestion": "Add a conditional edge from style_fixer that routes to reflector when style_fix_iterations >= 2, or add a counter-based guard in route_style_lint() that routes to reflector instead of style_fixer when the fix iteration cap is reached."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "HIGH",
+      "files_affected": [
+        "03_input_config.md",
+        "26_style_profiles.md"
+      ],
+      "description": "In 03_input_config.md §3.1, StyleProfile includes 'software_spec' as a valid literal. However, in 26_style_profiles.md §26.3, the ProfileName literal only lists: 'scientific_report', 'business_report', 'technical_documentation', 'journalistic', 'narrative_essay', 'ai_instructions', 'blog'. The 'software_spec' profile is referenced throughout (§3.3 YAML examples, §29.1 user section, §30.5) but never defined with L1/L2/L3 rules in §26. An implementer cannot enforce style rules for software_spec documents.",
+      "fix_suggestion": "Add a §26.3.8 software_spec profile section in 26_style_profiles.md with appropriate L1/L2/L3 rules (e.g., forbidding TBD, requiring typed contracts), and add 'software_spec' to the ProfileName Literal in §26.3."
+    },
+    {
+      "type": "LOGIC_ERROR",
+      "severity": "HIGH",
+      "files_affected": [
+        "05_agents.md",
+        "04_architecture.md"
+      ],
+      "description": "In §5.11 PostDraftAnalyzer, the CONSTRAINT states 'MUST run only on iteration == 1'. The graph routes post_draft_analyzer via route_post_draft_gap() which has an iteration guard ('state.get(\"current_iteration\", 1) == 1'). However, after the researcher_targeted → citation_manager → ... → writer cycle completes on iteration 1, current_iteration is incremented by the Writer node ('PRODUCES: [current_draft, current_iteration+1]'). This means when the post_draft_targeted path rejoins at the writer node, the writer increments current_iteration to 2, and the subsequent post_draft_analyzer call would see iteration == 2 and skip — but the graph still routes through post_draft_analyzer unconditionally after every writer call. The gap analysis on the second writer pass (after targeted research) is silently skipped, which is correct behavior but contradicts the 'triggers targeted Researcher if gap_found=True' PRODUCES description implying it could loop.",
+      "fix_suggestion": "Add an explicit note in §5.11 and §4.5 clarifying that post_draft_analyzer is a no-op (returns gap_found=False) on iteration >= 2, and that the route_post_draft_gap iteration guard at the graph level is the sole enforcement mechanism — no internal agent check is needed."
+    },
+    {
+      "type": "AMBIGUITY",
+      "severity": "HIGH",
+      "files_affected": [
+        "12_reflector.md",
+        "05_agents.md"
+      ],
+      "description": "In §12.2, the SURGICAL scope condition requires 'all affected_text in distinct paragraphs'. The paragraph boundary definition states: 'A paragraph is a text block delimited by two or more consecutive newline characters (\\n\\n)'. However, §5.12 SpanEditor CONSTRAINTS state 'NEVER run on iteration >= 3' and 'NEVER run if span count > 4'. There is no specification for what happens when SURGICAL scope is determined by Reflector at iteration 2 with 4 spans, but SpanEditor then discovers that two affected_text spans appear in the same paragraph (violating SURGICAL condition post-hoc). The DiffMerger would still run, potentially making content-altering edits.",
+      "fix_suggestion": "Add a validation step in the SpanEditor node that re-validates SURGICAL conditions before executing edits; if any condition is violated, demote to PARTIAL scope and route to Writer instead of executing span edits."
+    },
+    {
+      "type": "MISSING_COMPONENT",
+      "severity": "HIGH",
+      "files_affected": [
+        "04_architecture.md",
+        "05_agents.md"
+      ],
+      "description": "In §4.3 Phase C, the post_qa node runs 'contradiction_detector (cross-section)' as an internal sub-step. However, §4.5 NODES list does not include 'contradiction_detector' as a registered graph node — it is listed as an internal step of 'post_qa'. The spec states the ContradictionDetector (§15.2) runs 'as part of post_qa node', but §15.4 defines route_post_qa() as a standalone function that reads from 'state[\"post_qa_contradiction_report\"]' — implying ContradictionDetector writes to DocumentState before route_post_qa() is called. There is no specification of how the post_qa node internally sequences ContradictionDetector and FormatValidator calls, or whether they share a single LangGraph super-step.",
+      "fix_suggestion": "Add an explicit post_qa node implementation contract in §15.4 or §4.3 specifying the exact execution sequence (ContradictionDetector first, then FormatValidator, then route_post_qa()) within a single LangGraph node, with clear field write/read ordering."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "HIGH",
+      "files_affected": [
+        "19_budget_controller.md",
+        "09_css_aggregator.md"
+      ],
+      "description": "In §19.4 apply_dynamic_savings(), when 90% budget threshold is hit, css_content_threshold is set to 0.65 and css_style_threshold to 0.75 (Economy floor values from §9.3). However, the BudgetController CONSTRAINTS in §19.5 state 'NEVER reduce css_content_threshold below 0.45' and 'NEVER reduce css_style_threshold below 0.60'. These floor constraints are inconsistent with the 90% alarm hardcoded values of 0.65/0.75 — the floors are more permissive than the alarm values, meaning the floor constraints are unreachable dead code given the 90% alarm always sets values above the floors.",
+      "fix_suggestion": "Either lower the 90% alarm threshold values to approach the floor values (e.g., css_content_threshold=0.50, css_style_threshold=0.65) to make the floor constraints meaningful, or remove the floor constraints and document that 0.65/0.75 are the hard minimums enforced by the 90% alarm."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "08_jury_system.md",
+        "03_input_config.md",
+        "29_yaml_config.md"
+      ],
+      "description": "In 08_jury_system.md §8.3 Mini-Jury Style (S), the model assignment is tier1='meta/llama-3.3-70b-instruct', tier2='mistral/mistral-large-2411', tier3='openai/gpt-4.5'. However, 03_input_config.md JuryModelsConfig shows style tier3='openai/gpt-4.5', and 03b_style_calibration.md §3B.2 StyleCalibrationJury uses SCJ-1='openai/gpt-4.5', SCJ-2='mistral/mistral-large-2411', SCJ-3='meta/llama-3.3-70b-instruct' — the order is reversed. While the spec notes the StyleCalibrationJury uses the 'same family' as production Mini-Jury S, reversed ordering may cause different models to be called first in calibration vs production, violating the 'same family' equivalence claim.",
+      "fix_suggestion": "Align the StyleCalibrationJury slot assignments in §3B.2 to match the production Mini-Jury S tier ordering (tier1=meta/llama, tier2=mistral, tier3=gpt-4.5), or explicitly document that ordering differs between calibration and production and explain why this is intentional."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "06_run_companion.md",
+        "04_architecture.md"
+      ],
+      "description": "In 06_run_companion.md §6.4, the css_threshold_cumulative_delta field is described as being stored in DocumentState. However, 04_architecture.md §4.6 DocumentState TypedDict does not include 'css_threshold_cumulative_delta' as a field. §6.6.1 adds it as an addendum ('DocumentState fields added by §6.4'), but it is absent from the canonical schema in §4.6. An implementer using only §4.6 as the State schema would miss this field and the cumulative delta cap would be unenforced.",
+      "fix_suggestion": "Add 'css_threshold_cumulative_delta: float' to the canonical DocumentState TypedDict in §4.6 with an inline comment referencing §6.4 for the enforcement contract."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "02_design_principles.md",
+        "01_vision.md",
+        "04_architecture.md"
+      ],
+      "description": "In §2.6, the compression distance formula defines 'the immediately preceding approved section has distance=1 (NOT distance=0)'. §14.1 repeats this correctly. However, §2.6 CONSTRAINT states 'distance 1 or 2 (i.e. the last 2 approved sections): verbatim' and 'distance >= 6 (i.e. sections[:-5]): thematic extract'. The boundary condition at distance=5 is ambiguous: §2.6 says 'distance 3 to 5: structured summary' and 'distance >= 6: thematic extract', but §14.1 POSITION_TO_TIER dict maps (3,5) to structured_summary and 'distance >= 6' to thematic_extract. The boundary value distance=5 is included in structured_summary by §14.1 but the §2.6 prose 'distance 3 to 5' is ambiguous about whether 5 is inclusive.",
+      "fix_suggestion": "Replace the prose range descriptions in §2.6 with explicit Python-style inclusive ranges: 'distance in [1,2]: verbatim; distance in [3,5]: structured_summary; distance >= 6: thematic_extract', matching §14.1 exactly."
+    },
+    {
+      "type": "AMBIGUITY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "10_minority_veto.md",
+        "09_css_aggregator.md"
+      ],
+      "description": "In §10.2, the L2 veto detection function check_l2_veto() accepts verdicts_s (Style jury) as a parameter and includes it in the for-loop iteration, meaning a unanimous Style FAIL would also trigger L2 veto. However, §9.4 route_after_aggregator() only checks r_verdicts and f_verdicts for L2 (Priority 3), and does not call check_l2_veto() with s_verdicts. The §10.2 table explicitly lists 'S (Style)' as routing to 'style_fixer' on unanimous fail, but the canonical routing function does not implement this. This is an inconsistency between the spec of what L2 veto means and its actual implementation in the routing function.",
+      "fix_suggestion": "In §9.4 route_after_aggregator(), add a separate check for s_verdicts after the R/F L2 check: if all s_verdicts pass_fail=False, return 'fail_style' before the panel trigger check. Update the split_verdicts_by_jury helper to be called with all three jury groups."
+    },
+    {
+      "type": "UNREACHABLE_STATE",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "11_panel_discussion.md",
+        "09_css_aggregator.md"
+      ],
+      "description": "In §9.4 route_after_aggregator() Priority 4 (Panel Discussion Trigger), panel is triggered when 'css_content < thresholds[\"css_panel_trigger\"] AND state[\"panel_round\"] < panel_max_rounds'. After a panel completes (panel_round == panel_max_rounds), the panel routes to aggregator via route_after_panel(). The aggregator then re-evaluates and may find css_content still below css_panel_trigger. At this point panel_round >= panel_max_rounds so the panel condition is False, and the check falls through to the CSS content gate. If CSS_content is still below css_content_threshold but above css_panel_trigger, it routes to fail_reflector. But if CSS_content is below css_panel_trigger AND panel rounds exhausted, the §11.3 spec says route to await_human — however, this routing is done by route_after_panel(), not by route_after_aggregator(). The aggregator re-evaluation post-panel never routes to await_human for exhausted panels; that path only exists in route_after_panel().",
+      "fix_suggestion": "Add a state flag 'panel_exhausted: bool' set by route_after_panel() when rounds are exhausted, and check this flag in route_after_aggregator() Priority 4 to route directly to await_human if panel is exhausted and CSS is still below panel_trigger."
+    },
+    {
+      "type": "AMBIGUITY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "05_agents.md",
+        "07_mixture_of_writers.md"
+      ],
+      "description": "In §7.1, MoW activation requires 'NOT human_escalation_occurred_this_section'. However, 'human_escalation_occurred_this_section' is not defined as a DocumentState field in §4.6. There is no specification of how this boolean is set, when it is reset (per section? per run?), or which node writes it. An implementer cannot implement this condition without inventing a field not in the canonical State schema.",
+      "fix_suggestion": "Add 'human_escalation_occurred_this_section: bool' to DocumentState §4.6, specify that it is set to True by the await_human node and reset to False by section_checkpoint when advancing to the next section, and add it to the MoW activation condition documentation."
+    },
+    {
+      "type": "INCONSISTENCY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "03_input_config.md",
+        "29_yaml_config.md"
+      ],
+      "description": "In 03_input_config.md §3.1, StyleProfile includes 8 values: the 7 standard profiles plus 'software_spec'. In 29_yaml_config.md §29.1 UserConfig, style_profile is Literal with 8 values including 'software_spec'. However, the UserConfig in §29.6 uses different names than §3.1: §29.1 uses 'academic', 'business', 'technical' while §3.1 DRSConfig uses 'scientific_report', 'business_report', 'technical_documentation'. These are different string values — a YAML config using 'academic' would fail Pydantic validation if the field expects 'scientific_report'.",
+      "fix_suggestion": "Standardize all style profile literal values across §3.1, §26.3, §29.1, §29.6, and §32.1 to use the same string set. Choose one canonical set (e.g., the §26.3 ProfileName values: 'scientific_report', 'business_report', etc.) and update all other files to match."
+    },
+    {
+      "type": "AMBIGUITY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "19_budget_controller.md",
+        "05_agents.md"
+      ],
+      "description": "In §19.5 BudgetController, when current_iteration >= max_iterations, the system sets force_approve=True. The §9.4 route_after_aggregator() checks force_approve at Priority 0 (highest). However, §19.5 code shows 'run_jury()' setting force_approve=True and returning early without actually running jury evaluation. This means when force_approve is triggered, jury_verdicts for that iteration are empty (no jury ran), but coherence_guard still runs on the draft. The spec does not define whether coherence_guard can block a force-approved section — if it finds a HARD conflict, it routes to await_human, which contradicts the purpose of force_approve as an override.",
+      "fix_suggestion": "Specify explicitly in §19.5 and §9.4 whether coherence_guard is bypassed for force-approved sections (e.g., by checking force_approve flag in route_after_coherence() and routing directly to context_compressor), or document that force_approve + hard coherence conflict escalates to human."
+    },
+    {
+      "type": "MISSING_COMPONENT",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "04_architecture.md",
+        "05_agents.md"
+      ],
+      "description": "In §4.2 Phase B diagram, a 'source_synthesizer' node is listed in the research pipeline and referenced in agent routing. However, 'source_synthesizer' does not appear in the NODES list in §4.5 build_graph(), and no g.add_edge() calls reference 'source_synthesizer'. The §5.6 SourceSynthesizer agent spec exists, but it has no corresponding LangGraph node registration or graph edges. An implementer cannot include this agent in the graph without specification of its exact position in the edge chain.",
+      "fix_suggestion": "Add 'source_synthesizer' to the NODES list in §4.5, and add explicit edges: 'source_sanitizer → source_synthesizer' and 'source_synthesizer → writer', replacing the current 'source_sanitizer → writer' implicit chain."
+    },
+    {
+      "type": "AMBIGUITY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "08_jury_system.md",
+        "02_design_principles.md"
+      ],
+      "description": "In §2.5 Economic-Cascading and §8.5, cascading is 'DISABLED entirely' when jury_size < 3, with 'Tier1 results are final'. However, in Economy regime jury_size=1, meaning only 1 of 3 judges runs per mini-jury. The spec does not define which specific judge slot (R1, R2, or R3 for Reasoning; F1/F2/F3; S1/S2/S3) is called when jury_size=1. JURY_SLOTS[:jury_size] is referenced in §19.5 code but JURY_SLOTS ordering is never defined. An implementer cannot determine which judge model is called in Economy mode.",
+      "fix_suggestion": "Define JURY_SLOTS explicitly in §8.5 or §19.5 as an ordered list for each mini-jury (e.g., REASONING_SLOTS = ['judge_r1', 'judge_r2', 'judge_r3'] ordered by cost ascending), specifying that jury_size=1 always calls the first (cheapest) slot."
+    },
+    {
+      "type": "MISSING_COMPONENT",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "04_architecture.md",
+        "03b_style_calibration.md"
+      ],
+      "description": "The Style Calibration Gate (§3B) runs before Phase A and produces style_exemplar and frozen_ruleset stored in DocumentState. However, §4.5 build_graph() and the NODES list do not include any node for the Style Calibration Gate. There is no 'style_calibration_gate' node, no entry point for it, and no edge connecting it to the 'preflight' or 'planner' nodes. The gate is described as a UI wizard interaction (§32.1) but its integration into the LangGraph graph is completely unspecified.",
+      "fix_suggestion": "Either add 'style_calibration_gate' as a LangGraph node between 'preflight' and 'budget_estimator' with a conditional edge based on style_calibration_gate_enabled config, or explicitly document that the Style Calibration Gate runs as a synchronous API call outside the LangGraph graph before graph invocation."
+    },
+    {
+      "type": "AMBIGUITY",
+      "severity": "MEDIUM",
+      "files_affected": [
+        "16_writer_memory.md",
+        "05_agents.md"
+      ],
+      "description": "In §16.3, update_writer_memory() receives 'draft_embedding: list[float]' computed by MetricsCollector. The constraint states 'MetricsCollector MUST include draft_embedding: list[float] in its OUTPUT schema'. However, §5.8 MetricsCollector OUTPUT is described as 'metrics: dict' with specific keys listed — draft_embedding is mentioned in CONSTRAINTS ('MUST compute sentence embedding...and append to DocumentState.draft_embeddings list') but is not listed as a key in the OUTPUT dict schema. An implementer reading only §5.8 would not know to include draft_embedding in the metrics dict vs. as a separate DocumentState field.",
+      "fix_suggestion": "Add 'draft_embedding: list[float]' explicitly to the §5.8 MetricsCollector OUTPUT dict schema, and clarify whether it is part of the metrics dict or written directly to DocumentState.draft_embeddings as a separate operation."
+    }
+  ],
+  "missing_components": [
+    "source_synthesizer LangGraph node registration and graph edges in §4.5",
+    "style_calibration_gate LangGraph node or explicit out-of-graph invocation contract",
+    "human_escalation_occurred_this_section field in DocumentState §4.6",
+    "compressed_corpus field in DocumentState §4.6 (SourceSynthesizer output)",
+    "software_spec style profile L1/L2/L3 rules in §26",
+    "JURY_SLOTS ordered list definition for jury_size < 3 dispatch in §8.5 or §19.5",
+    "panel_exhausted state flag for post-panel aggregator re-evaluation routing",
+    "css_threshold_cumulative_delta field in canonical DocumentState §4.6",
+    "route_after_aggregator S-jury L2 unanimous fail → fail_style branch",
+    "post_qa node internal sequencing contract (ContradictionDetector → FormatValidator ordering)",
+    "LengthAdjuster compression path for delta > 0.10 (currently routed to style_fixer which cannot compress)"
+  ],
+  "positive_observations": [
+    "The priority ordering in route_after_aggregator() (§9.4) is exceptionally well-specified with force_approve > budget_hard_stop > veto > panel > missing_ev > approved > fail_style > fail_reflector, preventing entire classes of routing ambiguity that plague multi-condition state machines.",
+    "The THRESHOLD_TABLE in §9.3 as a single source of truth with explicit cross-references from §1.4.1, §4.6, §19.2, and runtime population via populate_budget_thresholds() is a strong consistency pattern that, if enforced by CI, eliminates threshold drift across files.",
+    "The dependency injection architecture (§38.5, §25.10) with MockLLMClient as a first-class citizen, enforced by CI linting against direct imports in src/agents/, is production-grade and makes the entire 20-agent system testable at zero API cost."
+  ]
+}

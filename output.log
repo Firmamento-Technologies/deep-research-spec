@@ -1,0 +1,72 @@
+nohup: ignoring input
+
+============================================================
+  DEEP RESEARCH SYSTEM — Generatore Specifiche v2.0
+  Modello: anthropic/claude-sonnet-4-6 | Max tokens: 32000
+============================================================
+
+📚 Carico file sorgente...
+  📄 Carico sorgente: Analisi Critica del Deep Research System (1).md
+  📄 Carico sorgente: Analisi Critica del Deep Research System.md
+  📄 Carico sorgente: Analisi Critica — Deep Research System v1.0.md
+  📄 Carico sorgente: deep_compressed.md
+  📄 Carico sorgente: scheletro_completo.md
+  📄 Carico sorgente: valuta attentamente la proposta di progetto e fai (1).md
+  📄 Carico sorgente: valuta attentamente la proposta di progetto e fai.md
+  ✅ Sorgenti caricati (221,091 caratteri)
+  📐 Scheletro: scheletro_completo.md (50,077 caratteri)
+
+🚀 Inizio generazione — 40 file totali
+
+[10:26:59] (01/40) 01_visione_obiettivi.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (02/40) 02_principi_design.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (03/40) 03_input_configurazione.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (04/40) 03b_style_calibration_gate.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (05/40) 04_architettura_flusso.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (06/40) 05_agenti_produzione.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (07/40) 06_run_companion.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (08/40) 07_mixture_of_writers.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (09/40) 08_sistema_valutazione.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (10/40) 09_aggregatore_css.md
+    ⏭️  Già completo — salto
+
+[10:26:59] (11/40) 10_minority_veto.md
+    🤖 Chiamata API (tentativo 1/3)...
+    ✅ Salvato (27,622 caratteri)
+
+[10:29:44] (12/40) 11_panel_discussion.md
+    🤖 Chiamata API (tentativo 1/3)...
+    ✅ Salvato (24,131 caratteri)
+
+[10:32:08] (13/40) 12_reflector.md
+    🤖 Chiamata API (tentativo 1/3)...
+    ✅ Salvato (23,340 caratteri)
+
+[10:34:12] (14/40) 13_oscillation_detector.md
+    🤖 Chiamata API (tentativo 1/3)...
+    ✅ Salvato (24,739 caratteri)
+
+[10:36:33] (15/40) 14_context_compressor.md
+    🤖 Chiamata API (tentativo 1/3)...
+    ✅ Salvato (21,908 caratteri)
+
+[10:38:45] (16/40) 15_coherence_guard_qa.md
+    🤖 Chiamata API (tentativo 1/3)...
