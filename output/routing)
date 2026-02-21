@@ -1,0 +1,16 @@
+nCSS_composite: float = 0.35 * (pass_R / n_R) + 0.45 * (pass_F / n_F) + 0.20 * (pass_S / n_S)
+```
+
+> **Cross-reference — coefficient derivation:** The coefficients 0.44 and 0.56 in
+> `CSS_content` are **not independent constants**. They are derived at runtime from
+> `jury_weights` and MUST NOT be hardcoded independently of those weights. Compute
+> them as:
+>
+> ```python
+> w_R_content = jury_weights["reasoning"] / (jury_weights["reasoning"] + jury_weights["factual"])
+> w_F_content = jury_weights["factual"]   / (jury_weights["reasoning"] + jury_weights["factual"])
+> CSS_content = w_R_content * (pass_R / n_R) + w_F_content * (pass_F / n_F)
+> ```
+>
+> The literal values 0.44/0.56 shown above are the resolved defaults for the
+> standard `JURY_WEIGHTS` (`reasoning=0.35

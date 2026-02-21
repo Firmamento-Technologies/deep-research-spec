@@ -1,0 +1,11 @@
+n
+| Symbol | Type | Source |
+|--------|------|--------|
+| `pass_R` | `int` | Count of PASS verdicts from mini-jury R (Reasoning) |
+| `n_R` | `int` | Active judges in R after circuit-breaker exclusions; min=1 |
+| `pass_F` | `int` | Count of PASS verdicts from mini-jury F (Factual) |
+| `n_F` | `int` | Active judges in F; min=1 |
+| `pass_S` | `int` | Count of PASS verdicts from mini-jury S (Style) |
+| `n_S` | `int` | Active judges in S; min=1 |
+
+If a judge is excluded by circuit-breaker
