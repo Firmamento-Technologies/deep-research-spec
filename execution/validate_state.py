@@ -18,64 +18,71 @@ from typing import Any
 # Type substrings are checked loosely to accommodate Annotated[], Optional[], etc.
 
 DOCUMENT_STATE_FIELDS: list[tuple[str, str]] = [
-    # Identity & lifecycle
+    # Identity & lifecycle — §4.6
     ("doc_id", "str"),
     ("thread_id", "str"),
     ("user_id", "str"),
     ("status", "Literal"),
     ("config", "dict"),
+    ("style_profile", "dict"),
+    ("style_exemplar", ""),
+    ("quality_preset", "Literal"),
     # Outline
     ("outline", "list"),
     ("outline_approved", "bool"),
-    # Section tracking
+    # Section loop control
     ("current_section_idx", "int"),
-    ("current_iteration", "int"),
     ("total_sections", "int"),
-    # Draft
-    ("current_draft", "str"),
-    ("draft_history", "list"),
-    # Sources
-    ("sources", "list"),
-    ("ghost_citations", "list"),
+    # Current section state
+    ("current_sources", "list"),
     ("synthesized_sources", "str"),
-    # Jury
+    ("current_draft", "str"),
+    ("current_iteration", "int"),
+    ("post_draft_gaps", "list"),
+    ("style_lint_violations", "list"),
     ("jury_verdicts", "list"),
-    ("css_content", "float"),
-    ("css_style", "float"),
+    ("all_verdicts_history", "list"),
+    ("aggregator_verdict", ""),
+    ("reflector_output", ""),
     ("css_history", "list"),
-    # Reflector
-    ("reflector_output", ""),   # can be dict or ReflectorOutput
-    ("oscillation_detected", "bool"),
-    ("oscillation_count", "int"),
-    # Style
-    ("style_violations", "list"),
-    # Coherence
-    ("coherence_conflicts", "list"),
-    # WriterMemory
-    ("writer_memory", "dict"),
-    # Budget
-    ("budget", ""),  # BudgetState or dict
+    ("draft_embeddings", "list"),
+    # Aggregator CSS outputs — §9.7
+    ("css_content_current", "float"),
+    ("css_style_current", "float"),
+    ("css_composite_current", "float"),
+    # Force-approve — §19.5
+    ("force_approve", "bool"),
+    # Targeted research
+    ("targeted_research_active", "bool"),
+    # MoW state — §7.1
+    ("mow_drafts", "list"),
+    ("mow_css_per_draft", "list"),
+    ("fusor_draft", ""),
     # Approved sections
     ("approved_sections", "list"),
-    # Force approve
-    ("force_approve", "bool"),
-    # Context
-    ("context_window", "str"),
+    ("compressed_context", "str"),
+    # Writer Memory — §5.18
+    ("writer_memory", "dict"),
+    # Budget — §19
+    ("budget", ""),
+    # Oscillation — §13
+    ("oscillation_detected", "bool"),
+    ("oscillation_type", ""),
+    # Panel — §11
+    ("panel_active", "bool"),
+    ("panel_round", "int"),
+    ("panel_anonymized_log", "list"),
+    # Coherence / Post-QA
+    ("coherence_conflicts", "list"),
+    ("format_validated", "bool"),
+    # HITL
+    ("human_intervention_required", "bool"),
+    ("active_escalation", ""),
+    # Run Companion — §6
+    ("companion_messages", ""),
     # Output
-    ("export_urls", "dict"),
-    # Companion
-    ("companion_messages", ""),  # Annotated[list, add_messages]
-    # Warnings
-    ("warnings", "list"),
-    # Metrics
-    ("section_metrics", "dict"),
-    # Run report
-    ("run_report", "dict"),
-    # Research control
-    ("targeted_research_active", "bool"),
-    # Rogue judge
-    ("rogue_judge_flags", "list"),
-    ("circuit_breaker_states", "dict"),
+    ("output_paths", "dict"),
+    ("run_metrics", "dict"),
 ]
 
 REQUIRED_SUB_TYPEDICTS = [
@@ -90,19 +97,19 @@ REQUIRED_SUB_TYPEDICTS = [
 ]
 
 BUDGET_STATE_FIELDS: list[tuple[str, str]] = [
-    ("max_budget_dollars", "float"),
-    ("accumulated_cost", "float"),
-    ("budget_per_section", "float"),
-    ("quality_preset", ""),
-    ("max_iterations", "int"),
-    ("jury_size", "int"),
-    ("mow_enabled", "bool"),
+    ("max_dollars", "float"),
+    ("spent_dollars", "float"),
+    ("projected_final", "float"),
+    ("regime", "Literal"),
     ("css_content_threshold", "float"),
     ("css_style_threshold", "float"),
     ("css_panel_threshold", "float"),
+    ("max_iterations", "int"),
+    ("jury_size", "int"),
+    ("mow_enabled", "bool"),
+    ("alarm_70_fired", "bool"),
+    ("alarm_90_fired", "bool"),
     ("hard_stop_fired", "bool"),
-    ("alarms_fired", "list"),
-    ("regime_changes", "list"),
 ]
 
 
