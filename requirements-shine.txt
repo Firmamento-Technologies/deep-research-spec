@@ -1,0 +1,21 @@
+# SHINE Integration — additional dependencies
+# Install with: pip install -r requirements-shine.txt
+#
+# These are NOT required for the core DRS pipeline.
+# Only needed on nodes that run the SHINE local inference stack.
+# In production: install on the GPU worker node only.
+#
+# Hardware: CUDA GPU with ≥18GB VRAM (BF16) or ≥10GB (8-bit)
+# See docs/30_shine_integration.md §30.2 for hardware options.
+
+# Core inference stack
+transformers>=4.45.0
+peft>=0.13.0
+torch>=2.2.0
+accelerate>=0.30.0
+
+# Optional: quantisation for reduced VRAM usage
+# bitsandbytes>=0.43.0
+
+# HuggingFace Hub (auto-download weights from Yewei-Liu/SHINE-ift_mqa)
+huggingface_hub>=0.23.0
