@@ -4,6 +4,15 @@ from typing import TypedDict, Annotated, Any, Literal
 from langgraph.graph.message import add_messages
 
 
+# ── §29.5 Bounded reducers ───────────────────────────────────────────────────
+
+def _max_len_reducer(window: int):
+    """Create a LangGraph reducer that keeps only the last *window* items."""
+    def reducer(existing: list, new: list) -> list:
+        return (existing + new)[-window:]
+    return reducer
+
+
 # ── Sub-TypedDicts ───────────────────────────────────────────────────────────
 
 class BudgetState(TypedDict):
@@ -158,8 +167,8 @@ class DocumentState(TypedDict):
     all_verdicts_history: list[list[JudgeVerdict]]
     aggregator_verdict: AggregatorVerdict
     reflector_output: ReflectorOutput | None
-    css_history: list[float]
-    draft_embeddings: list[list[float]]
+    css_history: Annotated[list[float], _max_len_reducer(8)]          # §29.5: keep last 8
+    draft_embeddings: Annotated[list[list[float]], _max_len_reducer(4)]  # §29.5: keep last 4
 
     # ── Aggregator CSS outputs (§9.7) ────────────────────────────────────
     css_content_current: float
@@ -206,6 +215,12 @@ class DocumentState(TypedDict):
 
     # ── Run Companion (§6) ───────────────────────────────────────────────
     companion_messages: Annotated[list, add_messages]
+
+    # ── RAG + SHINE integration (§RAG_SHINE_INTEGRATION) ─────────────────
+    shine_active: bool                  # True if SHINE generated LoRA
+    shine_lora: Any | None              # LoRA adapter from ShineAdapter
+    context_lora: Any | None            # LoRA from ContextCompressor (future)
+    rag_local_sources: list[Source]      # Sources from memvid_local connector
 
     # ── Output ───────────────────────────────────────────────────────────
     output_paths: dict[str, str]

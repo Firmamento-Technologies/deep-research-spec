@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from src.connectors.base import SourceConnector, SourceRanker, DiversityAnalyzer
+from src.connectors.memvid_connector import MemvidConnector
 
 logger = logging.getLogger(__name__)
 
@@ -12,10 +13,30 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_SOURCES = 15
 
 
+# ── Default connector cascade (§RAG_SHINE_INTEGRATION §1) ────────────────────
+# memvid_local is checked FIRST; external connectors cascade after.
+
+def get_default_connectors(
+    knowledge_path: str = "drs_knowledge.mp4",
+) -> list[SourceConnector]:
+    """Build the default connector cascade.
+
+    Order matters — local knowledge base is queried first to reduce
+    external API calls and improve accuracy.
+
+    Additional connectors (sonar-pro, tavily, brave) will be appended
+    here as they are implemented (Tasks 1.x+).
+    """
+    return [
+        MemvidConnector(knowledge_path=knowledge_path),  # LOCAL first
+        # TODO (Task 0.2+): add sonar-pro, tavily, brave connectors
+    ]
+
+
 class ResearcherNode:
     """§5.2 — Retrieve and rank sources for a single section.
 
-    Connector cascade: academic → institutional → web → social (opt-in).
+    Connector cascade: memvid_local → academic → institutional → web → social.
     Uses SourceRanker (§17.9) for scoring/dedup and DiversityAnalyzer (§17.8).
     """
 
@@ -25,7 +46,7 @@ class ResearcherNode:
         ranker: SourceRanker | None = None,
         diversity_analyzer: DiversityAnalyzer | None = None,
     ):
-        self.connectors = connectors or []
+        self.connectors = connectors if connectors is not None else get_default_connectors()
         self.ranker = ranker or SourceRanker()
         self.diversity = diversity_analyzer or DiversityAnalyzer()
 

@@ -21,8 +21,19 @@ from src.graph.routers.post_draft_gap import route_post_draft_gap
 from src.graph.routers.post_qa import route_post_qa
 from src.graph.routers.panel_loop import route_after_panel_internal
 
+# ── Real node implementations (Phase 0 + Phase 1 + Phase 2 + Phase 3) ────────
+from src.graph.nodes.shine_adapter import shine_adapter_node
+from src.graph.nodes.planner import planner_node
+from src.graph.nodes.writer import writer_node
+from src.graph.nodes.jury import jury_node
+from src.graph.nodes.aggregator import aggregator_node
+from src.graph.nodes.reflector import reflector_node
+from src.graph.nodes.style_linter import style_linter_node
+from src.graph.nodes.style_fixer import style_fixer_node
+from src.graph.nodes.oscillation_check import oscillation_check_node
+
 # ── Node list — §4.5 ────────────────────────────────────────────────────────
-# 31 nodes. MoW nodes (writer_a, writer_b, writer_c, jury_multi_draft, fusor)
+# 32 nodes. MoW nodes (writer_a, writer_b, writer_c, jury_multi_draft, fusor)
 # are NOT graph nodes — they are internal to the writer node (§7.6 authoritative).
 
 NODES: list[str] = [
@@ -35,6 +46,7 @@ NODES: list[str] = [
     "citation_verifier",
     "source_sanitizer",
     "source_synthesizer",
+    "shine_adapter",              # RAG+SHINE: LoRA generation (§RAG_SHINE_INTEGRATION §2)
     "writer",                   # MoW is internal (§7.6)
     "post_draft_analyzer",
     "researcher_targeted",
@@ -58,6 +70,19 @@ NODES: list[str] = [
     "publisher",
     "feedback_collector",
 ]
+
+# ── Map of nodes with real implementations (overrides stubs) ─────────────────
+_REAL_NODES: dict[str, callable] = {
+    "planner": planner_node,
+    "shine_adapter": shine_adapter_node,
+    "writer": writer_node,
+    "jury": jury_node,
+    "aggregator": aggregator_node,
+    "reflector": reflector_node,          # Phase 3
+    "style_linter": style_linter_node,    # Phase 3
+    "style_fixer": style_fixer_node,      # Phase 3
+    "oscillation_check": oscillation_check_node,  # Phase 3
+}
 
 
 # ── Stub node factory ────────────────────────────────────────────────────────
@@ -88,9 +113,10 @@ def build_graph(checkpointer=None):
     """
     g = StateGraph(DocumentState)
 
-    # ── Register all nodes with stubs ────────────────────────────────────
+    # ── Register nodes: real implementations override stubs ──────────────
     for node_name in NODES:
-        g.add_node(node_name, _make_stub(node_name))
+        fn = _REAL_NODES.get(node_name, _make_stub(node_name))
+        g.add_node(node_name, fn)
 
     # ── Entry point ──────────────────────────────────────────────────────
     g.set_entry_point("preflight")
@@ -115,7 +141,8 @@ def build_graph(checkpointer=None):
     g.add_edge("citation_manager", "citation_verifier")
     g.add_edge("citation_verifier", "source_sanitizer")
     g.add_edge("source_sanitizer", "source_synthesizer")
-    g.add_edge("source_synthesizer", "writer")
+    g.add_edge("source_synthesizer", "shine_adapter")   # → SHINE LoRA generation
+    g.add_edge("shine_adapter", "writer")               # → Writer (with or without LoRA)
 
     # Writer → post_draft_analyzer (always; MoW is internal to writer §7.6)
     g.add_edge("writer", "post_draft_analyzer")
