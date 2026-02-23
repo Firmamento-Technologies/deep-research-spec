@@ -82,6 +82,8 @@ Only return EDIT blocks, nothing else.""",
             }],
             temperature=0.1,
             max_tokens=4096,
+            agent="span_editor",
+            preset=quality_preset,
         )
 
         return _parse_edits(response["text"])

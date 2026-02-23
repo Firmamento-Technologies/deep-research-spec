@@ -64,6 +64,8 @@ Return ONLY valid JSON (no markdown fences, no commentary):
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=4096,
+            agent="planner",
+            preset=quality_preset,
         )
 
         outline_data = _parse_json_response(response["text"])

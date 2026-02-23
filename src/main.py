@@ -22,6 +22,11 @@ import yaml  # type: ignore
 from src.config.schema import DRSYAMLConfig
 from src.graph.graph import build_graph
 from src.graph.state import DocumentState
+from src.observability.metrics import (
+    start_metrics_server,
+    update_budget_gauge,
+    DRS_PIPELINE_DURATION,
+)
 
 logger = logging.getLogger("drs")
 
@@ -227,6 +232,9 @@ async def run_pipeline(
         topic, target_words, quality_preset, thread_id,
     )
 
+    import time
+    t0 = time.perf_counter()
+
     try:
         result = await graph.ainvoke(
             initial_state,
@@ -236,12 +244,20 @@ async def run_pipeline(
         logger.error("Pipeline failed: %s", exc, exc_info=True)
         raise
 
+    duration_s = time.perf_counter() - t0
+    DRS_PIPELINE_DURATION.observe(duration_s)
+
     # Summary
     sections = result.get("approved_sections", [])
-    cost = result.get("budget", {}).get("spent_dollars", 0)
+    budget_data = result.get("budget", {})
+    cost = budget_data.get("spent_dollars", 0)
+    max_budget_val = budget_data.get("max_dollars", max_budget)
+
+    update_budget_gauge(thread_id, cost, max_budget_val)
+
     logger.info(
-        "Pipeline complete — %d sections approved, $%.4f spent, thread=%s",
-        len(sections), cost, thread_id,
+        "Pipeline complete — %d sections, $%.4f spent, %.1fs elapsed, thread=%s",
+        len(sections), cost, duration_s, thread_id,
     )
 
     return result
@@ -304,6 +320,9 @@ def main(argv: list[str] | None = None) -> None:
     """CLI entrypoint."""
     args = _parse_args(argv)
     _setup_logging(level=args.log_level, fmt=args.log_format)
+
+    # Start Prometheus metrics endpoint
+    start_metrics_server(port=9090)
 
     # Graceful shutdown
     loop = asyncio.new_event_loop()

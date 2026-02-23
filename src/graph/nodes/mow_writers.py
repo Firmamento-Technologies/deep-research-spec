@@ -167,6 +167,8 @@ Constraints:
             }],
             temperature=angle["temperature"],
             max_tokens=8192,
+            agent="writer",
+            preset=state.get("quality_preset", "balanced"),
         )
 
         draft = response["text"]

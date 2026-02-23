@@ -103,6 +103,8 @@ Return the COMPLETE revised draft with violations fixed.""",
             }],
             temperature=0.1,
             max_tokens=8192,
+            agent="style_fixer",
+            preset=state.get("quality_preset", "balanced"),
         )
 
         revised = response["text"].strip()

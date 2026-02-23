@@ -99,6 +99,8 @@ Return JSON:
             }],
             temperature=0.1,
             max_tokens=2048,
+            agent="jury_multidraft",
+            preset=state.get("quality_preset", "balanced"),
         )
 
         return _parse_evaluation(response["text"], len(drafts))

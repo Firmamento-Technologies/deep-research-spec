@@ -95,6 +95,8 @@ INSTRUCTIONS:
             }],
             temperature=0.2,
             max_tokens=8192,
+            agent="fusor",
+            preset=state.get("quality_preset", "balanced"),
         )
 
         fused = response["text"].strip()

@@ -1,5 +1,5 @@
 # DRS Infrastructure — Docker Compose
-# PostgreSQL 16, Redis 7, MinIO (S3-compatible)
+# PostgreSQL 16, Redis 7, MinIO, Prometheus, Grafana
 
 services:
   postgres:
@@ -54,7 +54,37 @@ services:
     command: server /data --console-address ":9001"
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: drs-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: drs-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/drs.json
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config/grafana_dashboard.json:/var/lib/grafana/dashboards/drs.json:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   pg_data:
   redis_data:
   minio_data:
+  prometheus_data:
+  grafana_data:

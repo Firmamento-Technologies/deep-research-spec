@@ -99,6 +99,8 @@ def writer_node(state: dict) -> dict:
         messages=messages,
         temperature=0.3,
         max_tokens=8192,
+        agent="writer",
+        preset=state.get("quality_preset", "balanced"),
     )
 
     draft = response["text"]

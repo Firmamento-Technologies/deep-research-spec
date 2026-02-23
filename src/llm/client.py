@@ -2,7 +2,7 @@
 
 Wraps Anthropic, OpenAI, and Google (Gemini) APIs behind a single
 ``call()`` interface.  Automatically tracks cost via ``cost_usd()``
-from ``src.llm.pricing``.
+from ``src.llm.pricing`` and reports Prometheus metrics.
 
 Client objects are initialised lazily so importing this module never
 crashes — failures surface only when a call is actually made without
@@ -31,9 +31,11 @@ Usage::
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from src.llm.pricing import cost_usd
+from src.observability.metrics import observe_llm_call
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +79,8 @@ class LLMClient:
         system: str | list[dict] | None = None,
         temperature: float = 0.3,
         max_tokens: int = 4096,
+        agent: str = "unknown",
+        preset: str = "balanced",
         **kwargs: Any,
     ) -> dict:
         """Unified LLM call with automatic cost tracking.
@@ -88,22 +92,41 @@ class LLMClient:
                          (§29.1, Anthropic only).
             temperature: Sampling temperature.
             max_tokens:  Max output tokens.
+            agent:       Agent slot name (for metrics labeling).
+            preset:      Quality preset (for metrics labeling).
 
         Returns:
             Dict with keys: ``text``, ``tokens_in``, ``tokens_out``,
             ``cost_usd``, ``cache_creation_tokens``, ``cache_read_tokens``,
-            ``model``.
+            ``model``, ``latency_s``.
         """
         provider = model.split("/")[0]
+        t0 = time.perf_counter()
 
         if provider == "anthropic":
-            return self._call_anthropic(model, messages, system, temperature, max_tokens, **kwargs)
+            result = self._call_anthropic(model, messages, system, temperature, max_tokens, **kwargs)
         elif provider == "openai":
-            return self._call_openai(model, messages, system, temperature, max_tokens, **kwargs)
+            result = self._call_openai(model, messages, system, temperature, max_tokens, **kwargs)
         elif provider == "google":
-            return self._call_google(model, messages, system, temperature, max_tokens, **kwargs)
+            result = self._call_google(model, messages, system, temperature, max_tokens, **kwargs)
         else:
             raise ValueError(f"Unsupported model provider: {provider!r} (model={model!r})")
+
+        latency_s = time.perf_counter() - t0
+        result["latency_s"] = round(latency_s, 3)
+
+        # Prometheus metrics
+        observe_llm_call(
+            agent=agent,
+            model=model,
+            preset=preset,
+            tokens_in=result["tokens_in"],
+            tokens_out=result["tokens_out"],
+            cost_usd=result["cost_usd"],
+            latency_s=latency_s,
+        )
+
+        return result
 
     # ── Provider implementations ─────────────────────────────────────────
 
@@ -224,3 +247,4 @@ class LLMClient:
 
 # ── Singleton instance ───────────────────────────────────────────────────────
 llm_client = LLMClient()
+

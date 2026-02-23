@@ -197,6 +197,8 @@ Each suggestion should be actionable (what to change and where).""",
             }],
             temperature=0.2,
             max_tokens=1024,
+            agent="reflector",
+            preset=quality_preset,
         )
 
         # Parse numbered list into feedback items

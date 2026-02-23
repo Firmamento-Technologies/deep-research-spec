@@ -32,7 +32,8 @@ class Judge(ABC):
         ...
 
     def _call_llm_with_cache(
-        self, system_blocks: list[dict], user_prompt: str
+        self, system_blocks: list[dict], user_prompt: str,
+        quality_preset: str = "balanced",
     ) -> dict:
         """§29.1: Reuse cached system prompt (verdict schema + rubric)."""
         return llm_client.call(
@@ -41,6 +42,8 @@ class Judge(ABC):
             messages=[{"role": "user", "content": user_prompt}],
             temperature=0.1,
             max_tokens=2048,
+            agent=f"jury_{self.slot}",
+            preset=quality_preset,
         )
 
     def _parse_verdict(self, response_text: str) -> dict:

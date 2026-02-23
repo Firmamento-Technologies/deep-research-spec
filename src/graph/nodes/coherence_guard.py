@@ -128,6 +128,8 @@ Report any contradictions or inconsistencies.""",
             }],
             temperature=0.1,
             max_tokens=1024,
+            agent="coherence_guard",
+            preset=quality_preset,
         )
 
         return _parse_coherence_response(

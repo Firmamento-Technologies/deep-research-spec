@@ -117,6 +117,8 @@ Return your evaluation as the JSON structure specified in the system prompt."""
                     }],
                     temperature=0.0,
                     max_tokens=512,
+                    agent="judge_f",
+                    preset="balanced",
                 )
                 consulted.append(f"[sonar] Claim: {claim[:80]}… → {response['text'][:200]}")
                 logger.info("JudgeF micro-search: verified claim '%.60s…'", claim)

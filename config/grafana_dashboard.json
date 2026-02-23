@@ -1,0 +1,221 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "description": "Deep Research System — Pipeline Observability",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "title": "LLM Calls per Agent",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "targets": [
+        {
+          "expr": "rate(drs_llm_calls_total[5m])",
+          "legendFormat": "{{agent}} ({{model}})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
+    },
+    {
+      "title": "Cumulative Cost ($)",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+      "targets": [
+        {
+          "expr": "sum(drs_llm_cost_dollars_total)",
+          "legendFormat": "Total"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "thresholds": {
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 10},
+              {"color": "red", "value": 40}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Budget Remaining (%)",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0},
+      "targets": [
+        {
+          "expr": "drs_budget_remaining_pct",
+          "legendFormat": "{{doc_id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "yellow", "value": 20},
+              {"color": "green", "value": 50}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "LLM Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(drs_llm_latency_seconds_bucket[5m]))",
+          "legendFormat": "p50 {{agent}}"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(drs_llm_latency_seconds_bucket[5m]))",
+          "legendFormat": "p95 {{agent}}"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(drs_llm_latency_seconds_bucket[5m]))",
+          "legendFormat": "p99 {{agent}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Token Throughput",
+      "type": "timeseries",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "targets": [
+        {
+          "expr": "rate(drs_tokens_in_total[5m])",
+          "legendFormat": "Input {{model}}"
+        },
+        {
+          "expr": "rate(drs_tokens_out_total[5m])",
+          "legendFormat": "Output {{model}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "tokens/s"
+        }
+      }
+    },
+    {
+      "title": "CSS Quality Scores",
+      "type": "gauge",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 16},
+      "targets": [
+        {
+          "expr": "drs_jury_css_score",
+          "legendFormat": "{{dimension}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              {"color": "red", "value": null},
+              {"color": "orange", "value": 0.6},
+              {"color": "yellow", "value": 0.75},
+              {"color": "green", "value": 0.85}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Pipeline Progress",
+      "type": "stat",
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 16},
+      "targets": [
+        {
+          "expr": "drs_sections_completed_total",
+          "legendFormat": "Sections"
+        },
+        {
+          "expr": "drs_iterations_total",
+          "legendFormat": "Iterations"
+        }
+      ]
+    },
+    {
+      "title": "Pipeline Duration",
+      "type": "histogram",
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 16},
+      "targets": [
+        {
+          "expr": "drs_pipeline_duration_seconds_bucket",
+          "legendFormat": "{{le}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      }
+    },
+    {
+      "title": "Cost by Agent",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+      "targets": [
+        {
+          "expr": "sum by (agent) (drs_llm_cost_dollars_total)",
+          "legendFormat": "{{agent}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      }
+    },
+    {
+      "title": "Cost by Model",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+      "targets": [
+        {
+          "expr": "sum by (model) (drs_llm_cost_dollars_total)",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["drs", "llm", "observability"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "DRS Pipeline Dashboard",
+  "uid": "drs-pipeline-v1",
+  "version": 1
+}

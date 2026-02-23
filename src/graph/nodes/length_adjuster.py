@@ -122,6 +122,8 @@ Return the trimmed text only, no commentary.""",
             }],
             temperature=0.1,
             max_tokens=8192,
+            agent="length_adjuster",
+            preset=quality_preset,
         )
         trimmed = response["text"].strip()
         if len(trimmed) > len(content) * 0.3:  # Sanity check

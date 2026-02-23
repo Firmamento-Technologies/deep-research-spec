@@ -124,6 +124,8 @@ If no violations, return: NO_VIOLATIONS""",
             }],
             temperature=0.1,
             max_tokens=1024,
+            agent="style_linter",
+            preset=quality_preset,
         )
 
         violations = []

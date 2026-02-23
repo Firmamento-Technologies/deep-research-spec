@@ -105,6 +105,8 @@ EVIDENCE_GAPS:
             }],
             temperature=0.1,
             max_tokens=2048,
+            agent="post_draft_analyzer",
+            preset=state.get("quality_preset", "balanced"),
         )
 
         return _parse_analysis(response["text"])

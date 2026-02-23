@@ -159,6 +159,8 @@ Facilitate the panel discussion and provide your structured analysis.""",
             }],
             temperature=0.3,
             max_tokens=2048,
+            agent="panel_discussion",
+            preset=state.get("quality_preset", "balanced"),
         )
 
         return _parse_panel_response(response["text"])
