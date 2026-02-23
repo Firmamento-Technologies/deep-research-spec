@@ -12,6 +12,7 @@ import re
 from typing import Any
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ Return ONLY valid JSON (no markdown fences, no commentary):
 
     try:
         response = llm_client.call(
-            model="google/gemini-2.5-pro",  # §28 assignment
+            model=route_model("planner", quality_preset),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.3,
             max_tokens=4096,

@@ -16,6 +16,7 @@ import re
 from typing import Any
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def writer_node(state: dict) -> dict:
     messages = [{"role": "user", "content": user_prompt}]
 
     response = llm_client.call(
-        model="anthropic/claude-sonnet-4",  # §28 model assignment
+        model=route_model("writer", state.get("quality_preset", "balanced")),
         system=system_blocks,
         messages=messages,
         temperature=0.3,

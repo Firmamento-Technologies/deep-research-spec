@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def fusor_node(state: dict) -> dict:
 
     try:
         response = llm_client.call(
-            model="google/gemini-2.5-flash",
+            model=route_model("fusor", state.get("quality_preset", "balanced")),
             system=[{
                 "type": "text",
                 "text": (

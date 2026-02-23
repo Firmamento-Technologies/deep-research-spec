@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def length_adjuster_node(state: dict) -> dict:
         )
 
     # Adjust each section proportionally
-    adjusted = _adjust_sections(approved, target_words, total_words, action)
+    adjusted = _adjust_sections(approved, target_words, total_words, action, state.get("quality_preset", "balanced"))
 
     return {
         "approved_sections": adjusted,
@@ -75,6 +76,7 @@ def length_adjuster_node(state: dict) -> dict:
 
 def _adjust_sections(
     sections: list[dict], target_words: int, current_words: int, action: str,
+    quality_preset: str = "balanced",
 ) -> list[dict]:
     """Adjust section lengths proportionally."""
     if not sections:
@@ -89,7 +91,7 @@ def _adjust_sections(
 
         # Only adjust sections that are significantly off
         if action == "trim" and section_words > target_per_section * 1.3:
-            content = _trim_section(content, target_per_section)
+            content = _trim_section(content, target_per_section, quality_preset)
         elif action == "expand" and section_words < target_per_section * 0.7:
             # Expansion is risky — just flag it, don't auto-expand
             pass
@@ -101,11 +103,11 @@ def _adjust_sections(
     return adjusted
 
 
-def _trim_section(content: str, target_words: int) -> str:
+def _trim_section(content: str, target_words: int, quality_preset: str = "balanced") -> str:
     """Trim a section to approximately target word count."""
     try:
         response = llm_client.call(
-            model="google/gemini-2.5-flash",
+            model=route_model("length_adjuster", quality_preset),
             messages=[{
                 "role": "user",
                 "content": f"""\

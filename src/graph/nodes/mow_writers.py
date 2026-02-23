@@ -14,6 +14,7 @@ import asyncio
 import logging
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -136,7 +137,7 @@ def _generate_draft(
     """Generate a single draft with a specific angle."""
     try:
         response = llm_client.call(
-            model="anthropic/claude-opus-4-5",
+            model=route_model("writer", state.get("quality_preset", "balanced")),
             system=[{
                 "type": "text",
                 "text": (

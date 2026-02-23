@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,8 @@ def span_editor_node(state: dict) -> dict:
         if item.get("priority") in ("high", "medium")
     ][:5]  # Cap at 5 edits per pass
 
-    edits = _generate_edits(draft, surgical_items)
+    preset = state.get("quality_preset", "balanced")
+    edits = _generate_edits(draft, surgical_items, preset)
 
     logger.info(
         "SpanEditor: generated %d edits from %d feedback items",
@@ -47,7 +49,7 @@ def span_editor_node(state: dict) -> dict:
     return {"span_edits": edits}
 
 
-def _generate_edits(draft: str, items: list[dict]) -> list[dict]:
+def _generate_edits(draft: str, items: list[dict], quality_preset: str = "balanced") -> list[dict]:
     """Use LLM to generate specific edit operations."""
     try:
         feedback_text = "\n".join(
@@ -57,7 +59,7 @@ def _generate_edits(draft: str, items: list[dict]) -> list[dict]:
         )
 
         response = llm_client.call(
-            model="google/gemini-2.5-flash",
+            model=route_model("span_editor", quality_preset),
             messages=[{
                 "role": "user",
                 "content": f"""\

@@ -14,6 +14,7 @@ import logging
 from typing import Any
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,7 @@ REVISED_SCORES: only if consensus changes scores, format: SLOT=NEW_SCORE""",
         prior_ctx = f"\n\nPrior discussion:\n{prior_discussion}" if prior_discussion else ""
 
         response = llm_client.call(
-            model="google/gemini-2.5-flash",
+            model=route_model("panel_discussion", state.get("quality_preset", "balanced")),
             system=system_blocks,
             messages=[{
                 "role": "user",

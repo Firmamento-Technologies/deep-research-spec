@@ -1,0 +1,18 @@
+{
+  "doc_id": "default",
+  "topic": "Test",
+  "sections": 1,
+  "total_words": 6,
+  "published_at": "2026-02-23T19:15:40.863855+00:00",
+  "quality_preset": "balanced",
+  "total_cost": 0,
+  "qa_passed": false,
+  "output_formats": [
+    "markdown",
+    "docx"
+  ],
+  "generated_files": [
+    "output/default/document.md",
+    "output/default/document.docx"
+  ]
+}

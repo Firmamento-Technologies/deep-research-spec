@@ -14,6 +14,7 @@ import logging
 from typing import Any
 
 from src.llm.client import llm_client
+from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def coherence_guard_node(state: dict) -> dict:
             section_b_idx=section_idx,
             section_b_title=current_title,
             section_b_content=current_draft,
+            quality_preset=state.get("quality_preset", "balanced"),
         )
 
         conflicts.extend(result)
@@ -85,6 +87,7 @@ def _check_pair_coherence(
     section_b_idx: int,
     section_b_title: str,
     section_b_content: str,
+    quality_preset: str = "balanced",
 ) -> list[dict]:
     """Check coherence between two sections via LLM."""
     try:
@@ -108,7 +111,7 @@ If no conflicts found, return: NO_CONFLICTS""",
         ]
 
         response = llm_client.call(
-            model="google/gemini-2.5-flash",
+            model=route_model("coherence_guard", quality_preset),
             system=system_blocks,
             messages=[{
                 "role": "user",
