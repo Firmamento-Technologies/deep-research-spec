@@ -35,19 +35,28 @@ import time
 from typing import Any
 
 from src.llm.pricing import cost_usd
+from src.llm.resilience import default_rate_limiter, retry_with_backoff
 from src.observability.metrics import observe_llm_call
 
 logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    """Unified LLM wrapper — Anthropic, OpenAI, Google."""
+    """Unified LLM wrapper — Anthropic, OpenAI, Google.
 
-    def __init__(self) -> None:
+    Features:
+    - Automatic retry with exponential backoff on transient errors
+    - Token bucket rate limiting (default 60 RPM)
+    - Prometheus metrics (cost, latency, tokens)
+    - Provider-prefixed model routing
+    """
+
+    def __init__(self, rate_limiter=None) -> None:
         # Lazy-init: SDK clients created on first use
         self._anthropic: Any = None
         self._openai: Any = None
         self._google: Any = None
+        self._rate_limiter = rate_limiter or default_rate_limiter
 
     # ── Lazy SDK accessors ───────────────────────────────────────────────
 
@@ -83,7 +92,7 @@ class LLMClient:
         preset: str = "balanced",
         **kwargs: Any,
     ) -> dict:
-        """Unified LLM call with automatic cost tracking.
+        """Unified LLM call with retry, rate limiting, and cost tracking.
 
         Args:
             model:       Provider-prefixed model id (e.g. ``"anthropic/claude-sonnet-4"``).
@@ -101,16 +110,16 @@ class LLMClient:
             ``model``, ``latency_s``.
         """
         provider = model.split("/")[0]
+
+        # Rate limiting
+        if not self._rate_limiter.acquire(timeout=60.0):
+            raise RuntimeError(f"Rate limiter timeout for {agent}/{model}")
+
         t0 = time.perf_counter()
 
-        if provider == "anthropic":
-            result = self._call_anthropic(model, messages, system, temperature, max_tokens, **kwargs)
-        elif provider == "openai":
-            result = self._call_openai(model, messages, system, temperature, max_tokens, **kwargs)
-        elif provider == "google":
-            result = self._call_google(model, messages, system, temperature, max_tokens, **kwargs)
-        else:
-            raise ValueError(f"Unsupported model provider: {provider!r} (model={model!r})")
+        result = self._dispatch_with_retry(
+            provider, model, messages, system, temperature, max_tokens, **kwargs
+        )
 
         latency_s = time.perf_counter() - t0
         result["latency_s"] = round(latency_s, 3)
@@ -127,6 +136,22 @@ class LLMClient:
         )
 
         return result
+
+    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=60.0)
+    def _dispatch_with_retry(
+        self, provider: str, model: str, messages: list[dict],
+        system: str | list[dict] | None,
+        temperature: float, max_tokens: int, **kwargs: Any,
+    ) -> dict:
+        """Dispatch to provider with automatic retry on transient errors."""
+        if provider == "anthropic":
+            return self._call_anthropic(model, messages, system, temperature, max_tokens, **kwargs)
+        elif provider == "openai":
+            return self._call_openai(model, messages, system, temperature, max_tokens, **kwargs)
+        elif provider == "google":
+            return self._call_google(model, messages, system, temperature, max_tokens, **kwargs)
+        else:
+            raise ValueError(f"Unsupported model provider: {provider!r} (model={model!r})")
 
     # ── Provider implementations ─────────────────────────────────────────
 

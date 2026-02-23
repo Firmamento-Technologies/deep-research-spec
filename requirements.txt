@@ -19,6 +19,11 @@ minio>=7.2
 # Observability
 prometheus-client>=0.21.0
 
+# API Server
+fastapi>=0.115.0
+uvicorn>=0.32.0
+httpx>=0.27.0
+
 # Document Generation
 python-docx>=1.1.0
 
