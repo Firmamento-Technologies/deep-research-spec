@@ -5,6 +5,44 @@
 
 ---
 
+## 📌 STATO IMPLEMENTAZIONE (Aggiornato: Feb 23, 2026)
+
+Questo documento descrive ottimizzazioni **già integrate in AI_CODING_PLAN.md** e **COST_OPTIMIZATION_ROADMAP.md**.
+
+### Ottimizzazioni per Timeline
+
+| Optimization | Section | Week Implementazione | Status | Task Riferimento | Risparmio Atteso |
+|--------------|---------|---------------------|--------|------------------|------------------|
+| **Prompt Caching** | §29.1 | Week 3-4 | ✅ Pianificato | Task 2.1 `jury_base.py` | **-50-90%** costi LLM |
+| **Speculative Decoding** | §29.2 | Week 7-8 | 🔄 Optional | Task 4.x | **2-3×** speedup |
+| **Model Tiering** | §29.3 | Week 5-6 | ✅ Pianificato | Task 2.5 `jury.py` | **-55-60%** costi jury |
+| **Batch Processing** | §29.4 | N/A | ⚠️ Multi-tenant only | - | **3.6×** throughput |
+| **State Optimization** | §29.5 | Week 2 | ✅ Pianificato | Task 1.6 `state.py` | **-93%** state size, -40% latency |
+| **Parallel Execution** | §29.6 | Week 5-6 | ✅ Pianificato | Existing `citation_verifier.py` | **18×** speedup Phase B |
+| **Model Distillation** | §29.7 | Week 7-8 | 🔄 Optional | Task 4.x | **-70%** Economy preset |
+
+### Risparmio Atteso per Layer (Integrato con Development)
+
+**Riferimento completo:** [`docs/COST_OPTIMIZATION_ROADMAP.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/COST_OPTIMIZATION_ROADMAP.md)
+
+| Layer | Week | Ottimizzazioni Attive | Risparmio Cumulativo | Costo/Documento |
+|-------|------|----------------------|---------------------|------------------|
+| **Baseline** | 1-3 | Nessuna (measurement) | 0% | **$13.70** |
+| **Layer 1** | 3-4 | Caching (§29.1) + State (§29.5) | **-50%** | **$2.58** |
+| **Layer 2** | 5-6 | + Tiering (§29.3) + Parallel (§29.6) | **-77%** | **$1.28** |
+| **Layer 3** | 7-8 | + Distillation (§29.7) | **-85%** | **$0.80** |
+
+### Task References in AI_CODING_PLAN.md
+
+- **Task 1.6** (`state.py`): Implementa §29.5 bounded fields
+- **Task 2.1** (`jury_base.py`): Implementa §29.1 prompt caching
+- **Task 2.5** (`jury.py`): Integra §29.3 model tiering (Week 5-6)
+- **Task 3.x** (`citation_verifier.py`): Applica §29.6 parallelization
+
+**IMPORTANTE:** Le ottimizzazioni sono **progressive**. Non implementare Layer 2 prima di completare Layer 1. Baseline (Week 1-3) serve per misurare l'impatto reale.
+
+---
+
 ## 29.1 Prompt Caching: 50-90% riduzione costi immediata
 
 ### Problema attuale
@@ -48,6 +86,8 @@ response = anthropic.messages.create(
 
 **Costo implementazione:** 15 righe di codice per agente. Priorità: **IMMEDIATA**.
 
+**Implementazione:** Task 2.1 `jury_base.py` (Week 3-4) già include caching. Vedere [`docs/AI_CODING_PLAN.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/AI_CODING_PLAN.md) Task 2.1.
+
 ---
 
 ## 29.2 Speculative Decoding per Writer/Jury: 2-3× speedup
@@ -79,7 +119,8 @@ Jury:   Gemini 2.5 Flash (draft) → o3 (verify) per Judge R/F
 - Zero compromessi su qualità (output matematicamente identico)
 
 **Infra richiesta:** SGLang, vLLM, o BentoML.  
-**Costo implementazione:** ~3 giorni dev + testing. Priorità: **Settimana 3**.
+**Costo implementazione:** ~3 giorni dev + testing. Priorità: **Settimana 3**.  
+**Status:** 🔄 Optional (Week 7-8, Task 4.x) — ROI inferiore a Caching + Tiering.
 
 ---
 
@@ -102,13 +143,44 @@ DRS usa modelli top-tier per **tutti** i task, anche quelli banali. `CitationMan
 | Jury F1-F3 (factual) | o3 | Gemini 2.5 Pro | 80% |
 | Panel Discussion §11 | Gemini 2.5 Pro | Llama 3.3 70B self-hosted | 95% |
 
+### Cascading Logic (Implementato in Task 2.5)
+
+```python
+# src/agents/jury/jury.py (Week 5-6)
+async def call_mini_jury(self, dimension: str) -> list[Verdict]:
+    # Step 1: tier1 (cheap) for all 3 judges
+    verdicts_t1 = await asyncio.gather(*[
+        self.call_judge(slot=f"{dimension}{i+1}", tier=1)
+        for i in range(3)
+    ])
+    
+    # Step 2: If unanimous → DONE (60% cases)
+    if all_pass(verdicts_t1) or all_fail(verdicts_t1):
+        return verdicts_t1  # Cost: $0.0003 (tier1 only)
+    
+    # Step 3: Re-call ONLY minority with tier2
+    minority = [v for v in verdicts_t1 if v != majority]
+    verdicts_t2 = await asyncio.gather(*[
+        self.call_judge(slot=m.slot, tier=2) for m in minority
+    ])
+    
+    # Step 4: If still disagree → tier3 tiebreaker
+    if still_disagree(verdicts_t2):
+        verdict_t3 = await self.call_judge(tiebreaker_slot, tier=3)
+        return resolve(verdicts_t1, verdicts_t2, verdict_t3)
+    
+    return verdicts_t2
+```
+
 ### Impatto concreto
 
 - Economy preset passa a Sonnet 4: mantiene 97% qualità, costa 70% meno
 - Panel Discussion (raro, <5% dei run) diventa quasi gratis con Llama 70B
 - **Risparmio complessivo: 55-60%** su budget totale
+- **60% runs hanno unanimità tier1** → costo giuria: $0.0009 (vs $0.09 all-tier3)
 
-**Costo implementazione:** 2 giorni config routing + 1 settimana testing qualità. Priorità: **Settimana 2**.
+**Costo implementazione:** 2 giorni config routing + 1 settimana testing qualità. Priorità: **Settimana 5-6**.  
+**Implementazione:** Task 2.5 `jury.py` include cascading logic. Vedere [`docs/COST_OPTIMIZATION_ROADMAP.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/COST_OPTIMIZATION_ROADMAP.md) Layer 2.
 
 > **Patch §28:** aggiornare `MODEL_ROUTING_TABLE` con le colonne `economy_model` e `cost_saving_pct` per ogni agent.
 
@@ -148,7 +220,8 @@ result = batch_writer.generate(batch_inputs, shared_cache="scientific_report")
 - Multi-LoRA agents (MoW W-A/W-B/W-C): BaseShared cache riduce memoria a **1/N + ε**
 - Utile solo per **deployment multi-tenant** (non per singolo utente)
 
-**Costo implementazione:** Alto — refactor orchestrator + Halo-like scheduler (~3 settimane). Priorità: **Solo se multi-tenant**.
+**Costo implementazione:** Alto — refactor orchestrator + Halo-like scheduler (~3 settimane). Priorità: **Solo se multi-tenant**.  
+**Status:** ⚠️ Non pianificato (ROI basso per single-user deployment).
 
 ---
 
@@ -189,7 +262,8 @@ class DocumentState(TypedDict):
 - Checkpoint latency: da ~850ms a ~120ms (serialization overhead)
 - LangGraph transition: da ~200ms a ~120ms
 
-**Costo implementazione:** 1 giorno per bounded reducers + migration PostgreSQL fetch. Priorità: **IMMEDIATA**.
+**Costo implementazione:** 1 giorno per bounded reducers + migration PostgreSQL fetch. Priorità: **IMMEDIATA**.  
+**Implementazione:** Task 1.6 `state.py` (Week 2) già include bounded fields. Vedere [`docs/AI_CODING_PLAN.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/AI_CODING_PLAN.md) Task 1.6.
 
 > **Patch §4:** aggiornare `DocumentState` TypedDict con `Annotated[..., MaxLen(...)]` per tutti i campi unbounded.
 
@@ -244,7 +318,8 @@ async def citation_verifier_node(state: DocumentState):
 - Panel Discussion: da 90s (3 judges × 30s) a 32s
 - **Phase B complessiva: -40% latency media**
 
-**Costo implementazione:** 1 giorno per async refactor + exception handling. Priorità: **IMMEDIATA**.
+**Costo implementazione:** 1 giorno per async refactor + exception handling. Priorità: **IMMEDIATA**.  
+**Implementazione:** Week 5-6, applicato a `citation_verifier.py` esistente. Vedere [`docs/COST_OPTIMIZATION_ROADMAP.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/COST_OPTIMIZATION_ROADMAP.md) Layer 2.
 
 ---
 
@@ -286,7 +361,8 @@ student_judge_R = distill(
 - Latency jury: da 8s/verdetto a 1.2s/verdetto
 - Accuracy: 95-97% retention confermata su GLUE-style benchmark
 
-**Costo implementazione:** Alto — 2 settimane training + validation + deployment infra. Priorità: **Mese 2**.
+**Costo implementazione:** Alto — 2 settimane training + validation + deployment infra. Priorità: **Mese 2**.  
+**Status:** 🔄 Optional (Week 7-8, Task 4.x) — ROI alto ma time-intensive. Implementare dopo Layer 1-2 validate.
 
 > **Patch §28:** aggiungere `DistilJudge-R-3B`, `DistilJudge-F-3B`, `DistilJudge-S-3B` alla `MODEL_PRICING` table con `preset: "economy"`.
 
@@ -294,17 +370,20 @@ student_judge_R = distill(
 
 ## 29.8 Priorità implementazione (ROI × Effort)
 
-| Ottimizzazione | Risparmio | Effort | ROI | Priorità |
-| :-- | :-- | :-- | :-- | :-- |
-| **29.1 Prompt Caching** | 50-90% costi | Basso (1d) | ★★★★★ | **IMMEDIATA** |
-| **29.5 State Optimization** | 40% latency | Basso (1d) | ★★★★★ | **IMMEDIATA** |
-| **29.6 Parallel Verifier** | 40% Phase B | Basso (1d) | ★★★★★ | **IMMEDIATA** |
-| **29.3 Model Tiering** | 55% costi | Medio (1w) | ★★★★☆ | Settimana 2 |
-| **29.2 Speculative Decoding** | 2-3× speed | Medio (3d) | ★★★☆☆ | Settimana 3 |
-| **29.7 Distilled Judges** | 70% Economy | Alto (2w) | ★★★☆☆ | Mese 2 |
-| **29.4 Batch Processing** | 3.6× multi-user | Alto (3w) | ★★☆☆☆ | Solo se multi-tenant |
+| Ottimizzazione | Risparmio | Effort | ROI | Priorità | Week Implementazione |
+| :-- | :-- | :-- | :-- | :-- | :-- |
+| **29.1 Prompt Caching** | 50-90% costi | Basso (1d) | ★★★★★ | **IMMEDIATA** | **Week 3-4** |
+| **29.5 State Optimization** | 40% latency | Basso (1d) | ★★★★★ | **IMMEDIATA** | **Week 2** |
+| **29.6 Parallel Verifier** | 40% Phase B | Basso (1d) | ★★★★★ | **IMMEDIATA** | **Week 5-6** |
+| **29.3 Model Tiering** | 55% costi | Medio (1w) | ★★★★☆ | Settimana 5-6 | **Week 5-6** |
+| **29.2 Speculative Decoding** | 2-3× speed | Medio (3d) | ★★★☆☆ | Optional | Week 7-8 |
+| **29.7 Distilled Judges** | 70% Economy | Alto (2w) | ★★★☆☆ | Optional | Week 7-8 |
+| **29.4 Batch Processing** | 3.6× multi-user | Alto (3w) | ★★☆☆☆ | Solo se multi-tenant | N/A |
 
-> **Target sprint 1 (3 giorni totali):** implementare §29.1 + §29.5 + §29.6 → atteso **-60% costi operativi + -40% latency Phase B**.
+> **Target sprint 1 (Week 3-4):** implementare §29.1 + §29.5 → atteso **-50% costi operativi**.
+> **Target sprint 2 (Week 5-6):** aggiungere §29.3 + §29.6 → atteso **-77% costi cumulativi**.
+
+**Riferimento completo timeline:** [`docs/COST_OPTIMIZATION_ROADMAP.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/COST_OPTIMIZATION_ROADMAP.md)
 
 ---
 
