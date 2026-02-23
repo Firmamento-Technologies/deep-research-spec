@@ -3,7 +3,7 @@
 > **Target audience:** AI coding assistants (Cline, Cursor, Aider, Continue, etc.)  
 > **Repository:** [lucadidomenicodopehubs/deep-research-spec](https://github.com/lucadidomenicodopehubs/deep-research-spec/tree/struct)  
 > **Branch:** `struct`  
-> **Last updated:** 2026-02-23 (RAG + SHINE integration)  
+> **Last updated:** 2026-02-23 (RAG + SHINE integration + Cost Optimization)  
 
 ---
 
@@ -1247,6 +1247,170 @@ def aggregator_node(state: DocumentState) -> dict:
 
 ---
 
+## 🔗 INTEGRAZIONE CON COST OPTIMIZATION ROADMAP
+
+Questo piano di sviluppo è **sincronizzato** con [`docs/COST_OPTIMIZATION_ROADMAP.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/COST_OPTIMIZATION_ROADMAP.md).
+
+### Ottimizzazioni per Phase
+
+| Phase | Week | Ottimizzazioni Integrate | Riferimento | Risparmio Cumulativo |
+|-------|------|-------------------------|-------------|---------------------|
+| **Phase 0** | 1 | RAG (memvid_local) + SHINE | Task 0.1-0.6 | Baseline |
+| **Phase 1** | 2-3 | NESSUNA (baseline measurements) | - | 0% |
+| **Phase 2** | 4-5 | ✅ Prompt Caching (§29.1)<br>✅ State Optimization (§29.5) | Task 2.1, 1.6 | **-50%** |
+| **Phase 3** | 6-7 | ✅ Model Tiering (§29.3)<br>✅ Parallel Verifier (§29.6) | Task 3.x | **-77%** |
+| **Phase 4** | 8+ | 🔄 Distillation (§29.7) — Optional | Task 4.x | **-85%** |
+
+### Task Modificati con Ottimizzazioni
+
+#### ✅ Task 2.1: `jury_base.py` (Week 4) — Layer 1 Caching
+**OTTIMIZZAZIONE ATTIVA:** Implementa con **Prompt Caching** fin dall'inizio (§29.1).
+
+```python
+class Judge(ABC):
+    def _call_llm_with_cache(self, system_blocks: list[dict], user_prompt: str) -> dict:
+        # §29.1 Prompt Caching: verdict schema + rubric cached (5min TTL)
+        return llm_client.call(
+            model=self.model,
+            system=system_blocks,  # ← Cached blocks
+            messages=[{"role": "user", "content": user_prompt}],
+            temperature=0.1,
+            max_tokens=2048
+        )
+```
+
+**Expected Result:**
+- Cache hit rate: 50%+ on second section
+- Cost reduction: -50% vs naive implementation
+- Verify in logs: `cache_read_tokens > 0`
+
+---
+
+#### ✅ Task 1.6: `state.py` (Week 2-3) — Layer 1 State Optimization
+**OTTIMIZZAZIONE ATTIVA:** Usa **bounded fields** per evitare state bloat (§29.5).
+
+```python
+from langgraph.graph.state import Annotated, MaxLen
+
+class DocumentState(TypedDict):
+    # Bounded ring buffer (keeps only last 4)
+    draft_embeddings: Annotated[list[list[float]], MaxLen(window=4)]
+    all_verdicts_history: Annotated[list[list[dict]], MaxLen(window=2)]
+```
+
+**Expected Result:**
+- State size: <200KB (vs 2.5MB unbounded)
+- Checkpoint latency: <150ms
+- Verify: `sys.getsizeof(state) < 200_000`
+
+---
+
+#### ✅ Task 2.5: `jury.py` (Week 4-5) — Layer 2 Model Tiering
+**OTTIMIZZAZIONE ATTIVA (Week 6-7):** Implementa **Model Tiering con Cascading** (§29.3).
+
+```python
+async def call_mini_jury(self, dimension: str) -> list[Verdict]:
+    # Step 1: tier1 unanimous check
+    verdicts_t1 = await asyncio.gather(*[
+        self.call_judge(slot=f"{dimension}{i+1}", tier=1)
+        for i in range(3)
+    ])
+    
+    if all_pass(verdicts_t1) or all_fail(verdicts_t1):
+        return verdicts_t1  # Cost: $0.0003 (tier1 only)
+    
+    # Step 2: tier2 for minority only
+    # Step 3: tier3 tiebreaker if needed
+    # (full implementation in §29.3)
+```
+
+**Expected Result:**
+- 60% runs stop at tier1 (unanimous)
+- Average jury cost: $0.006 (vs $0.09 all-tier3)
+- Verify: track `tier_used` metric per mini-jury
+
+---
+
+### Success Criteria Aggiornati
+
+**Phase 0 (Week 1):**
+- ✅ RAG + SHINE infrastructure operativa
+- ✅ Local sources used: >80% quando KB populated
+- ✅ SHINE activation: 100% Premium, 0% Economy
+
+**Phase 1 (Week 2-3):**
+- ✅ Single-section run completes end-to-end
+- ✅ State size <500KB
+- ✅ **Cost: $2-5/section (baseline measurement)**
+- ⚠️ Cache hit rate: 0% (no caching yet)
+
+**Phase 2 (Week 4-5):**
+- ✅ Real jury with 3×3 judges works
+- ✅ **Cache hit rate: 50%+** (§29.1 active)
+- ✅ **Cost: $0.20-0.50/section (-81%)**
+- ✅ State size: <200KB (§29.5 active)
+
+**Phase 3 (Week 6-7):**
+- ✅ Full reflector + oscillation detection
+- ✅ **Cache hit rate: 80%+**
+- ✅ **Cost: $0.10-0.20/section (-91%)**
+- ✅ CitationVerifier: <5s for 12 sources (§29.6 parallel)
+
+**Phase 4 (Week 8+):**
+- ✅ Production-ready UI + observability
+- ✅ **Cache hit rate: 90%+**
+- ✅ **Cost: $0.05-0.15/section (Economy with distillation)**
+
+---
+
+### Measurement Commands
+
+**Track cache hit rate:**
+```bash
+python -c "
+from src.llm.client import llm_client
+stats = llm_client.get_cache_stats()
+print(f'Cache hit rate: {stats["cache_read_tokens"] / stats["total_input_tokens"]:.2%}')
+"
+```
+
+**Measure state size:**
+```bash
+python -c "
+import sys
+from src.graph.state import DocumentState
+state = {...}  # load from checkpoint
+print(f'State size: {sys.getsizeof(state) / 1024:.2f} KB')
+"
+```
+
+**Cost per section (PostgreSQL query):**
+```sql
+SELECT 
+    section_idx,
+    SUM(cost_usd) as total_cost,
+    COUNT(DISTINCT iteration) as iterations
+FROM costs
+WHERE doc_id = 'doc_abc123'
+GROUP BY section_idx;
+```
+
+**Cache metrics per agent:**
+```bash
+python -c "
+from src.llm.client import llm_client
+for agent in ['writer', 'jury_r', 'jury_f', 'jury_s']:
+    stats = llm_client.get_cache_stats(agent)
+    print(f'{agent}: {stats["cache_hit_rate"]:.1%}')
+"
+```
+
+---
+
+**IMPORTANTE:** Le ottimizzazioni sono **integrate nel codice nuovo**, non aggiunte dopo. Questo elimina refactoring costoso in seguito.
+
+---
+
 ## 🛠️ AI Agent Usage Tips
 
 ### For Cline/Cursor/Aider:
@@ -1262,6 +1426,7 @@ Test the implementation with a simple unit test before marking complete."
 **Context files da fornire:**
 - Sempre: `docs/AI_CODING_PLAN.md` (questo file)
 - Per RAG + SHINE: `docs/RAG_SHINE_INTEGRATION.md`
+- Per cost optimization: `docs/COST_OPTIMIZATION_ROADMAP.md` ← NEW
 - Per agent nodes: `docs/05_agents.md` (sezione specifica, es. §5.7 per Writer)
 - Per jury: `docs/08_jury_system.md`, `docs/09_css_aggregator.md`
 - Per state: `docs/04_architecture.md` (§4.6 DocumentState)
@@ -1308,25 +1473,31 @@ python -c "from src.connectors.memvid_connector import MemvidConnector; c = Memv
 
 **After Phase 1 (MVP):**
 - [ ] Single-section run completes end-to-end
-- [ ] §29.1 prompt caching active (cache hit rate ≥50%)
+- [ ] **Baseline cost measured: $2-5/section** ← NEW
 - [ ] §29.5 state size < 500KB after 1 section
-- [ ] Cost: ~$2-5 per section (depends on length)
+- [ ] Cache hit rate: 0% (baseline, no caching yet)
 - [ ] SHINE activation rate: 100% Premium, 0% Economy
 
-**After Phase 2 (Jury):**
+**After Phase 2 (Jury + Layer 1):**
 - [ ] Real jury approves/rejects correctly
 - [ ] CSS formula matches §9 spec
-- [ ] Cache hit rate ≥70%
+- [ ] **§29.1 cache hit rate ≥50%** ← NEW
+- [ ] **Cost: $0.20-0.50/section (-81%)** ← NEW
+- [ ] **§29.5 state size <200KB** ← NEW
 
-**After Phase 3 (Iteration):**
+**After Phase 3 (Iteration + Layer 2):**
 - [ ] Reflector → Writer loop works
 - [ ] Max 4 iterations before force-approve
 - [ ] Oscillation detector prevents infinite loops
+- [ ] **§29.3 model tiering active: 60% runs tier1 only** ← NEW
+- [ ] **§29.6 CitationVerifier <5s for 12 sources** ← NEW
+- [ ] **Cost: $0.10-0.20/section (-91%)** ← NEW
 
-**After Phase 4 (Advanced):**
+**After Phase 4 (Advanced + Layer 3):**
 - [ ] MoW generates 3 diverse drafts
 - [ ] Panel Discussion activates on CSS < 0.50
-- [ ] Model tiering reduces Economy preset costs by 55%
+- [ ] **§29.7 distillation active (Economy): 95% accuracy retention** ← NEW
+- [ ] **Cost: $0.05-0.15/section Economy (-94%)** ← NEW
 
 ---
 
@@ -1352,8 +1523,12 @@ python -c "from src.connectors.memvid_connector import MemvidConnector; c = Memv
 
 10. **Cache metrics:** Track `cache_read_tokens` / `total_input_tokens` ratio to verify §29.1 working.
 
+11. **Cost optimization is progressive:** Layer 1 (Week 4) → Layer 2 (Week 6) → Layer 3 (Week 8). Don't skip baseline (Week 1-3). ← NEW
+
+12. **Measure everything:** Cost, cache hit rate, state size. Use measurement commands dopo ogni Phase. ← NEW
+
 ---
 
-**Last updated:** 2026-02-23 (RAG + SHINE integration)  
+**Last updated:** 2026-02-23 (RAG + SHINE integration + Cost Optimization Roadmap)  
 **Maintainer:** Auto-generated by Perplexity AI  
-**Specs version:** DRS v3.0 + §29 optimizations + RAG + SHINE
+**Specs version:** DRS v3.0 + §29 optimizations + RAG + SHINE + Cost Roadmap
