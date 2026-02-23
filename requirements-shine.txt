@@ -1,14 +1,14 @@
-# SHINE Integration — additional dependencies
+# SHINE Integration + RAG — additional dependencies
 # Install with: pip install -r requirements-shine.txt
 #
 # These are NOT required for the core DRS pipeline.
-# Only needed on nodes that run the SHINE local inference stack.
+# Only needed on nodes that run the SHINE local inference stack + RAG.
 # In production: install on the GPU worker node only.
 #
 # Hardware: CUDA GPU with ≥18GB VRAM (BF16) or ≥10GB (8-bit)
-# See docs/30_shine_integration.md §30.2 for hardware options.
+# See docs/RAG_SHINE_INTEGRATION.md for complete setup.
 
-# Core inference stack
+# Core SHINE inference stack
 transformers>=4.45.0
 peft>=0.13.0
 torch>=2.2.0
@@ -19,3 +19,22 @@ accelerate>=0.30.0
 
 # HuggingFace Hub (auto-download weights from Yewei-Liu/SHINE-ift_mqa)
 huggingface_hub>=0.23.0
+
+# RAG Dependencies
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-community>=0.0.20
+langchain-memvid>=0.1.0  # Video-based vector database
+
+# Embeddings
+FlagEmbedding>=1.2.10  # bge-m3 multilingual embeddings
+sentence-transformers>=2.2.0  # fallback for legacy code
+
+# Vector store backends (choose one or more)
+# faiss-cpu>=1.7.4  # CPU-only vector similarity
+# faiss-gpu>=1.7.4  # GPU-accelerated (requires CUDA)
+
+# Document loaders and splitters
+unstructured>=0.10.0  # PDF/DOCX parsing
+python-magic>=0.4.27  # File type detection
+tiktoken>=0.5.0  # Token counting for chunk sizing
