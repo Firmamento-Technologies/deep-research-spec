@@ -3,7 +3,7 @@
 > **Target audience:** AI coding assistants (Cline, Cursor, Aider, Continue, etc.)  
 > **Repository:** [lucadidomenicodopehubs/deep-research-spec](https://github.com/lucadidomenicodopehubs/deep-research-spec/tree/struct)  
 > **Branch:** `struct`  
-> **Last updated:** 2026-02-23  
+> **Last updated:** 2026-02-23 (RAG + SHINE integration)  
 
 ---
 
@@ -38,11 +38,17 @@ src/
 
 ### ❌ Missing Critical Components
 
-**Phase A agents:**
+**Phase 0 (NEW — RAG + SHINE):**
+- `connectors/memvid_connector.py` — local RAG (§RAG_SHINE_INTEGRATION.md §1)
+- `nodes/shine_adapter.py` — LoRA generation (§RAG_SHINE_INTEGRATION.md §2)
+- Update `nodes/metrics_collector.py` — swap to bge-m3 embeddings
+- `scripts/build_memvid_kb.py` — knowledge base builder ✅ CREATED
+
+**Phase 1 agents:**
 - `planner.py` — outline generation (§5.1)
 - `budget_estimator.py` — pre-flight cost check (§19.1)
 
-**Phase B core agents:**
+**Phase 2 core agents:**
 - `writer.py` — draft generation (§5.7) — **CRITICAL**
 - `jury.py` — 3 mini-juries R/F/S (§8) — **CRITICAL**
 - `aggregator.py` — CSS + routing (§9) — **CRITICAL**
@@ -53,7 +59,7 @@ src/
 - `post_draft_analyzer.py` — gap detection (§5.11)
 - `oscillation_detector.py` — CSS/semantic oscillation (§5.15)
 
-**Phase B advanced:**
+**Phase 3 advanced:**
 - `mow_writers.py` — 3 parallel writers (§7)
 - `jury_multidraft.py` — MoW jury (§7.5)
 - `fusor.py` — draft fusion (§5.13)
@@ -62,7 +68,7 @@ src/
 - `coherence_guard.py` — cross-section conflicts (§5.17)
 - `writer_memory.py` — error accumulator (§5.18)
 
-**Phase C/D:**
+**Phase 4 finalization:**
 - `post_qa.py` — final QA (§4.3)
 - `length_adjuster.py` — word count fix (§5.22)
 - `publisher.py` — DOCX/PDF output (§5.19)
@@ -79,7 +85,355 @@ src/
 
 ## 🎯 Implementation Priority (ROI-Optimized)
 
-### 🔥 Phase 1: Minimum Viable Pipeline (Settimana 1-2)
+### 🔥 **Phase 0: RAG + SHINE Infrastructure (Week 1) — NEW PRIORITY**
+
+**Goal:** Integrate local knowledge retrieval (Memvid) + parametric compression (SHINE) as foundation for all subsequent phases. Questo riduce i costi del 40% e accelera Writer 5x.
+
+**Reference:** [`docs/RAG_SHINE_INTEGRATION.md`](https://github.com/lucadidomenicodopehubs/deep-research-spec/blob/struct/docs/RAG_SHINE_INTEGRATION.md)
+
+---
+
+#### Task 0.1: MemvidConnector — Local RAG Retrieval
+
+**File:** `src/connectors/memvid_connector.py` (NEW)
+
+**Context:** Prima di chiamare connettori esterni (sonar-pro/Tavily), Researcher deve cercare in knowledge base locale (specs, PDFs, SHINE paper). Questo migliora accuratezza e riduce costi API.
+
+**Specs reference:** `docs/RAG_SHINE_INTEGRATION.md` §1
+
+**Implementation:**
+```python
+"""MemvidConnector — RAG on local knowledge base (§RAG_SHINE_INTEGRATION §1)."""
+
+from FlagEmbedding import FlagModel
+from langchain.vectorstores import Memvid
+from typing import TypedDict
+
+class Source(TypedDict):
+    sourceid: str
+    url: str | None
+    title: str
+    sourcetype: str  # "uploaded" for local
+    reliabilityscore: float
+    content: str
+
+class MemvidConnector:
+    """RAG on local knowledge base (specs, uploaded PDFs, SHINE paper)."""
+    
+    def __init__(self, knowledge_path: str = "drs_knowledge.mp4"):
+        self.encoder = FlagModel('BAAI/bge-m3', use_fp16=True)
+        self.store = Memvid.load(knowledge_path)
+    
+    def search(self, query: str, k: int = 5) -> list[Source]:
+        """Search local knowledge base.
+        
+        Args:
+            query: Search query (section scope or targeted query)
+            k: Max results to return
+        
+        Returns:
+            List of Source dicts with sourcetype='uploaded'
+        """
+        try:
+            chunks = self.store.similarity_search(query, k=k)
+            return [self._to_source(c) for c in chunks]
+        except FileNotFoundError:
+            # KB not built yet — return empty (cascade to external connectors)
+            return []
+    
+    def _to_source(self, chunk) -> Source:
+        """Convert Memvid chunk to Source TypedDict."""
+        return Source(
+            sourceid=f"local:{chunk.metadata['doc_id']}:{chunk.metadata['chunk_id']}",
+            url=chunk.metadata.get('url'),
+            title=chunk.metadata.get('title', 'Local Document'),
+            sourcetype="uploaded",
+            reliabilityscore=0.90,  # Local sources trusted
+            content=chunk.page_content
+        )
+```
+
+**Instructions for AI agent:**
+1. Create `src/connectors/memvid_connector.py` with code above
+2. Install dependencies: `pip install FlagEmbedding langchain langchain-memvid`
+3. Build test KB: `python scripts/build_memvid_kb.py --input docs/ --output test_kb.mp4`
+4. Test:
+   ```python
+   from src.connectors.memvid_connector import MemvidConnector
+   connector = MemvidConnector("test_kb.mp4")
+   results = connector.search("What is LoRA?")
+   assert len(results) > 0
+   assert results[0]["sourcetype"] == "uploaded"
+   ```
+
+**Acceptance criteria:**
+- [ ] `MemvidConnector.search()` returns list of Source dicts
+- [ ] Graceful fallback if KB file missing (returns `[]`)
+- [ ] Uses bge-m3 embeddings (multilingual support)
+- [ ] Integration with Researcher: add to ENABLED_CONNECTORS list
+
+---
+
+#### Task 0.2: Update Researcher — Add memvid_local Priority
+
+**File:** `src/graph/nodes/researcher.py` (UPDATE existing)
+
+**Context:** Researcher attualmente usa solo connettori esterni. Aggiungi `memvid_local` come **prima priorità** nella cascade.
+
+**Instructions:**
+1. Open existing `src/graph/nodes/researcher.py`
+2. Import `MemvidConnector`:
+   ```python
+   from src.connectors.memvid_connector import MemvidConnector
+   ```
+3. Update `ENABLED_CONNECTORS` list:
+   ```python
+   ENABLED_CONNECTORS = [
+       "memvid_local",  # ← NEW: local knowledge base FIRST
+       "sonar-pro",
+       "tavily",
+       "brave"
+   ]
+   ```
+4. Update `get_connector()` function to handle `memvid_local`:
+   ```python
+   def get_connector(connector_name: str):
+       if connector_name == "memvid_local":
+           return MemvidConnector(knowledge_path="drs_knowledge.mp4")
+       elif connector_name == "sonar-pro":
+           # ... existing logic
+   ```
+5. Test: Run researcher with query "What is SHINE?", verify local results prioritized
+
+**Acceptance criteria:**
+- [ ] `memvid_local` checked first in cascade
+- [ ] Falls back to `sonar-pro` if local returns 0 results
+- [ ] Deduplication works across local + external sources
+
+---
+
+#### Task 0.3: ShineAdapter Node — LoRA Generation (Optional but High ROI)
+
+**File:** `src/graph/nodes/shine_adapter.py` (NEW)
+
+**Context:** SHINE converte il corpus compresso in LoRA adapter (parametric memory) invece di passarlo come testo nel prompt. Questo riduce i token da 4000-8000 a 200-500 (95%), accelerando Writer 5x e riducendo costi 40%.
+
+**Specs reference:** `docs/RAG_SHINE_INTEGRATION.md` §2
+
+**Implementation:**
+```python
+"""ShineAdapter — Convert compressedCorpus to LoRA adapter (§RAG_SHINE_INTEGRATION §2)."""
+
+from src.graph.state import DocumentState
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Lazy import SHINE (fallback gracefully if not installed)
+try:
+    from shine import ShineHypernet
+    SHINE_AVAILABLE = True
+except ImportError:
+    logger.warning("SHINE not installed — fallback to text corpus mode")
+    SHINE_AVAILABLE = False
+
+class ShineAdapter:
+    """Generate LoRA from compressed corpus using SHINE hypernetwork."""
+    
+    def __init__(self):
+        if SHINE_AVAILABLE:
+            self.shine = ShineHypernet(
+                backbone="Qwen/Qwen2.5-7B",
+                device="cuda"  # fallback to CPU if unavailable
+            )
+        else:
+            self.shine = None
+    
+    def run(self, state: DocumentState) -> dict:
+        """Generate LoRA or fallback to text corpus.
+        
+        Fallback conditions (§RAG_SHINE_INTEGRATION fallback rules):
+        - SHINE not installed
+        - Quality preset = Economy
+        - Section < 400 words
+        - Iteration > 1 (retry)
+        """
+        
+        # Skip conditions
+        if not SHINE_AVAILABLE:
+            logger.info("SHINE unavailable — using text corpus")
+            return {"shine_active": False}
+        
+        if state["config"]["quality_preset"] == "Economy":
+            logger.info("Economy preset — skipping SHINE")
+            return {"shine_active": False}
+        
+        section = state["outline"][state["current_section_idx"]]
+        if section["target_words"] < 400:
+            logger.info("Section <400 words — skipping SHINE (overhead not worth it)")
+            return {"shine_active": False}
+        
+        if state.get("current_iteration", 1) > 1:
+            logger.info("Iteration >1 — skipping SHINE (use RAG corpus only)")
+            return {"shine_active": False}
+        
+        # Generate LoRA
+        corpus = state.get("compressed_corpus", "")
+        if not corpus:
+            logger.warning("Empty corpus — skipping SHINE")
+            return {"shine_active": False}
+        
+        try:
+            lora = self.shine.generate_lora(corpus, max_length=1150)  # ~0.3s on GPU
+            logger.info(f"✅ SHINE LoRA generated for section {state['current_section_idx']}")
+            return {
+                "shine_lora": lora,
+                "shine_active": True
+            }
+        except Exception as e:
+            logger.error(f"SHINE failed: {e} — falling back to text corpus")
+            return {"shine_active": False}
+
+# Node function for LangGraph
+def shine_adapter_node(state: DocumentState) -> dict:
+    adapter = ShineAdapter()
+    return adapter.run(state)
+```
+
+**Instructions for AI agent:**
+1. Create `src/graph/nodes/shine_adapter.py`
+2. Install SHINE (optional, GPU required): `git clone https://github.com/Yewei-Liu/SHINE.git && pip install -e SHINE/`
+3. Test fallback mode (without SHINE installed):
+   ```python
+   from src.graph.nodes.shine_adapter import shine_adapter_node
+   state = {"config": {"quality_preset": "Premium"}, "compressed_corpus": "test"}
+   result = shine_adapter_node(state)
+   assert result["shine_active"] is False  # Expected without SHINE
+   ```
+4. Test with SHINE (if available):
+   ```python
+   # Same test, but verify shine_active=True and shine_lora is not None
+   ```
+
+**Acceptance criteria:**
+- [ ] Graceful fallback when SHINE not installed
+- [ ] Skips on Economy preset
+- [ ] Skips on sections <400 words
+- [ ] Generates LoRA successfully on Premium preset (if SHINE installed)
+- [ ] Returns `shine_active` boolean flag
+
+---
+
+#### Task 0.4: Update DocumentState — Add RAG + SHINE Fields
+
+**File:** `src/graph/state.py` (UPDATE existing)
+
+**Instructions:**
+1. Open `src/graph/state.py`
+2. Add new fields to `DocumentState` TypedDict:
+   ```python
+   class DocumentState(TypedDict):
+       # ... existing fields ...
+       
+       # RAG + SHINE integration (§RAG_SHINE_INTEGRATION)
+       shine_active: bool               # True if SHINE generated LoRA
+       shine_lora: Any | None          # LoRA adapter from SHINE
+       context_lora: Any | None        # LoRA from ContextCompressor (future)
+       rag_local_sources: list[Source] # Sources from memvid_local
+   ```
+
+**Acceptance criteria:**
+- [ ] New fields added without breaking existing code
+- [ ] Default values: `shine_active=False`, `shine_lora=None`
+
+---
+
+#### Task 0.5: Update MetricsCollector — Swap to bge-m3 Embeddings
+
+**File:** `src/graph/nodes/metrics_collector.py` (UPDATE existing)
+
+**Context:** Current implementation uses `all-MiniLM-L6-v2` for draft embeddings. Swap to `bge-m3` (multilingual, 2x context, MTEB #1 <500M).
+
+**Specs reference:** `docs/RAG_SHINE_INTEGRATION.md` §3
+
+**Instructions:**
+1. Open existing `src/graph/nodes/metrics_collector.py`
+2. Replace SentenceTransformer import:
+   ```python
+   # BEFORE:
+   # from sentence_transformers import SentenceTransformer
+   # embedder = SentenceTransformer('all-MiniLM-L6-v2')
+   
+   # AFTER:
+   from FlagEmbedding import FlagModel
+   embedder = FlagModel('BAAI/bge-m3', use_fp16=True)
+   ```
+3. Update `compute_embedding()` method (interface unchanged):
+   ```python
+   def compute_embedding(self, draft: str) -> list[float]:
+       return self.embedder.encode(draft).tolist()
+   ```
+4. Test: Verify OscillationDetector (§5.15) still works (uses cosine similarity on embeddings)
+
+**Acceptance criteria:**
+- [ ] Embedding model swapped to bge-m3
+- [ ] Interface unchanged (returns `list[float]`)
+- [ ] OscillationDetector works without modifications
+
+---
+
+#### Task 0.6: Update Graph — Add ShineAdapter Node
+
+**File:** `src/graph/graph.py` (UPDATE existing)
+
+**Instructions:**
+1. Open `src/graph/graph.py`
+2. Import ShineAdapter:
+   ```python
+   from src.graph.nodes.shine_adapter import shine_adapter_node
+   ```
+3. Add node to graph:
+   ```python
+   g.add_node("shine_adapter", shine_adapter_node)
+   ```
+4. **CRITICAL:** Update edge topology:
+   ```python
+   # BEFORE:
+   # g.add_edge("source_synthesizer", "writer")
+   
+   # AFTER:
+   g.add_edge("source_synthesizer", "shine_adapter")  # Synthesizer → SHINE
+   g.add_edge("shine_adapter", "writer")               # SHINE → Writer
+   ```
+5. Test: Compile graph without errors
+
+**Acceptance criteria:**
+- [ ] Graph compiles with new node
+- [ ] Edge topology: `source_synthesizer → shine_adapter → writer`
+- [ ] Graph still works with `shine_active=False` (fallback path)
+
+---
+
+### Deliverable Phase 0
+
+✅ **RAG + SHINE Infrastructure operativa:**
+- Local knowledge base (Memvid) interrogabile
+- Researcher prioritizza fonti locali
+- ShineAdapter integrato con fallback graceful
+- bge-m3 embeddings attivi in MetricsCollector
+
+✅ **Performance baseline:**
+- Measure: % local sources used (target: >80% quando KB populated)
+- Measure: SHINE activation rate (target: 100% on Premium, 0% on Economy)
+- Measure: Token reduction (target: 4000→500 quando SHINE active)
+
+✅ **Documentazione:**
+- `docs/RAG_SHINE_INTEGRATION.md` è la reference completa
+- Tests in `tests/test_memvid_connector.py`, `tests/test_shine_adapter.py`
+
+---
+
+### 🔥 Phase 1: Minimum Viable Pipeline (Week 2-3)
 
 **Goal:** End-to-end single-section run senza jury (mock approval).
 
@@ -193,28 +547,33 @@ llm_client = LLMClient()
 
 ---
 
-#### Task 1.2: Writer Agent (§5.7) con §29.1 Caching
+#### Task 1.2: Writer Agent (§5.7) con §29.1 Caching + SHINE Support
 
 **File:** `src/graph/nodes/writer.py` (NEW)
 
-**Context:** Writer è il bottleneck costi. Deve usare prompt caching per style rules + exemplar (§29.1).
+**Context:** Writer è il bottleneck costi. Deve:
+1. Usare prompt caching per style rules + exemplar (§29.1)
+2. Supportare SHINE LoRA quando `shine_active=True`
+3. Fallback a `compressed_corpus` quando SHINE inactive
 
-**Specs reference:** `docs/05_agents.md` §5.7
+**Specs reference:** `docs/05_agents.md` §5.7 + `docs/RAG_SHINE_INTEGRATION.md` §2
 
 **Implementation skeleton:**
 ```python
-"""Writer agent (§5.7) with §29.1 prompt caching."""
+"""Writer agent (§5.7) with §29.1 prompt caching + SHINE support."""
 
 from src.llm.client import llm_client
 from src.graph.state import DocumentState
+import logging
+
+logger = logging.getLogger(__name__)
 
 def writer_node(state: DocumentState) -> dict:
-    """Generate section draft from compressed corpus."""
+    """Generate section draft from compressed corpus or SHINE LoRA."""
     
     # Extract inputs from state
     section_scope = state["outline"][state["current_section_idx"]]["scope"]
     target_words = state["outline"][state["current_section_idx"]]["target_words"]
-    compressed_corpus = state["compressed_corpus"]
     citation_map = state["citation_map"]
     style_exemplar = state.get("style_exemplar", "")
     writer_memory = state.get("writer_memory", {})
@@ -238,8 +597,34 @@ def writer_node(state: DocumentState) -> dict:
         }
     ]
     
-    # User prompt: section scope + compressed corpus
-    user_prompt = f"""
+    # SHINE path check
+    shine_active = state.get("shine_active", False)
+    
+    if shine_active:
+        # §RAG_SHINE_INTEGRATION: use LoRA, no corpus in prompt
+        logger.info("Writer using SHINE LoRA (no corpus in context)")
+        user_prompt = f"""
+Write a section for a {state['style_profile']} document.
+
+Section: {section_scope}
+Target word count: {target_words} (±15% acceptable)
+
+Sources (use ONLY citations from this map):
+{format_citation_map(citation_map)}
+
+Constraints:
+- Use ONLY facts from your knowledge (LoRA adapter active)
+- Cite sources using [source_id] format
+- Word count: {target_words} ± 15%
+- No markdown formatting
+"""
+        # TODO: Apply LoRA to LLM call (requires SHINE integration in llm_client)
+        # For now: proceed with normal call (LoRA application is SHINE-specific)
+    else:
+        # Fallback: standard text corpus path
+        compressed_corpus = state.get("compressed_corpus", "")
+        logger.info("Writer using text corpus (SHINE inactive)")
+        user_prompt = f"""
 Write a section for a {state['style_profile']} document.
 
 Section: {section_scope}
@@ -276,8 +661,7 @@ Constraints:
     import re
     citations_used = list(set(re.findall(r"\[(\w+)\]", draft)))
     
-    # Track cost in state
-    # TODO: add cost tracking to budget controller
+    logger.info(f"Draft generated: {word_count} words, {len(citations_used)} citations")
     
     return {
         "current_draft": draft,
@@ -307,12 +691,15 @@ def format_writer_memory(writer_memory: dict) -> str:
 3. Import `llm_client` from `src/llm/client.py`
 4. Import `DocumentState` from `src/graph/state.py`
 5. **CRITICAL:** System prompt MUST be `list[dict]` with `cache_control` for §29.1
-6. TODO markers: `get_style_profile_rules()` needs actual implementation from §26 spec (for now return placeholder)
+6. **CRITICAL:** Check `shine_active` flag to choose LoRA vs corpus path
+7. TODO markers: `get_style_profile_rules()` needs actual implementation from §26 spec (for now return placeholder)
 
 **Acceptance criteria:**
 - [ ] `writer_node(mock_state)` returns draft with ~target_words ±20%
 - [ ] System prompt uses cached blocks (verify in LLM API logs)
 - [ ] Citations extracted correctly from draft
+- [ ] Works with `shine_active=True` (no corpus in prompt)
+- [ ] Works with `shine_active=False` (corpus in prompt)
 
 ---
 
@@ -444,6 +831,7 @@ Return ONLY valid JSON:
    from src.graph.nodes.planner import planner_node
    from src.graph.nodes.writer import writer_node
    from src.graph.nodes.jury_mock import jury_mock_node
+   from src.graph.nodes.shine_adapter import shine_adapter_node
    ```
 3. In `build_graph()` function, add MVP nodes:
    ```python
@@ -453,6 +841,7 @@ Return ONLY valid JSON:
    g.add_node("citation_verifier", citation_verifier_node)  # Already exists
    g.add_node("source_sanitizer", source_sanitizer_node)  # Already exists
    g.add_node("source_synthesizer", source_synthesizer_node)  # Already exists
+   g.add_node("shine_adapter", shine_adapter_node)  # NEW from Phase 0
    g.add_node("writer", writer_node)
    g.add_node("jury_mock", jury_mock_node)
    g.add_node("section_checkpoint", section_checkpoint_node)  # Already exists
@@ -465,7 +854,8 @@ Return ONLY valid JSON:
    g.add_edge("citation_manager", "citation_verifier")
    g.add_edge("citation_verifier", "source_sanitizer")
    g.add_edge("source_sanitizer", "source_synthesizer")
-   g.add_edge("source_synthesizer", "writer")
+   g.add_edge("source_synthesizer", "shine_adapter")  # NEW
+   g.add_edge("shine_adapter", "writer")              # NEW
    g.add_edge("writer", "jury_mock")
    g.add_edge("jury_mock", "section_checkpoint")
    g.add_edge("section_checkpoint", END)  # For MVP: single section only
@@ -475,6 +865,7 @@ Return ONLY valid JSON:
 - [ ] Graph compiles without errors
 - [ ] Can invoke `graph.invoke({"topic": "test", "target_words": 1000, ...})`
 - [ ] Produces 1 approved section in `approved_sections`
+- [ ] SHINE adapter runs (fallback OK if SHINE not installed)
 
 ---
 
@@ -522,26 +913,30 @@ Return ONLY valid JSON:
 ```
 Topic "machine learning" 
 → Planner (outline)
-→ Researcher (sources)
+→ Researcher (sources) ← memvid_local FIRST
 → Citation* (verified)
 → Sanitizer + Synthesizer (corpus)
-→ Writer (draft) ← §29.1 PROMPT CACHING ACTIVE
+→ ShineAdapter (LoRA gen or fallback) ← NEW
+→ Writer (draft) ← §29.1 PROMPT CACHING + SHINE SUPPORT
 → Jury Mock (auto-approve)
 → SectionCheckpoint (PostgreSQL)
 → Output: 1 approved section
 ```
 
-✅ **§29 optimizations attive:**
+✅ **§29 + RAG + SHINE optimizations attive:**
 - §29.1 Prompt Caching su Writer (system blocks cached)
 - §29.5 State Optimization (bounded fields)
+- RAG: memvid_local priority in Researcher
+- SHINE: LoRA generation (if available) or graceful fallback
 
 ✅ **Cost baseline:**
 - Track cache hit rate in logs
-- Measure: costo single-section run con/senza caching
+- Track SHINE activation rate
+- Measure: costo single-section run con/senza caching + SHINE
 
 ---
 
-## 🔥 Phase 2: Jury System + Aggregator (Settimana 3-4)
+## 🔥 Phase 2: Jury System + Aggregator (Week 4-5)
 
 **Goal:** Sostituire mock jury con vero sistema §8 (3 mini-juries + aggregator).
 
@@ -830,7 +1225,7 @@ def aggregator_node(state: DocumentState) -> dict:
 
 ---
 
-## 🔥 Phase 3: Reflector + StyleLinter + Iteration Loop (Settimana 5-6)
+## 🔥 Phase 3: Reflector + StyleLinter + Iteration Loop (Week 6-7)
 
 *(Implementation details truncated for brevity — follow same pattern as Phase 1-2)*
 
@@ -842,7 +1237,7 @@ def aggregator_node(state: DocumentState) -> dict:
 
 ---
 
-## 🔥 Phase 4: MoW + Panel + Advanced (Settimana 7-8)
+## 🔥 Phase 4: MoW + Panel + Advanced (Week 8+)
 
 **Priority tasks:**
 - Task 4.1: `mow_writers.py` + `jury_multidraft.py` + `fusor.py` (§7)
@@ -866,13 +1261,14 @@ Test the implementation with a simple unit test before marking complete."
 
 **Context files da fornire:**
 - Sempre: `docs/AI_CODING_PLAN.md` (questo file)
+- Per RAG + SHINE: `docs/RAG_SHINE_INTEGRATION.md`
 - Per agent nodes: `docs/05_agents.md` (sezione specifica, es. §5.7 per Writer)
 - Per jury: `docs/08_jury_system.md`, `docs/09_css_aggregator.md`
 - Per state: `docs/04_architecture.md` (§4.6 DocumentState)
 - Per ottimizzazioni: `docs/29_performance_optimizations.md`
 
 **Workflow incrementale:**
-1. Start with Phase 1 Task 1.1
+1. Start with Phase 0 Task 0.1 (RAG foundation)
 2. Run test dopo ogni task
 3. Commit dopo ogni task completato: `git commit -m "feat(task-X.Y): implement [component]"`
 4. Se test fallisce: "Debug Task X.Y. Check error log: [paste error]. Fix and retest."
@@ -895,15 +1291,27 @@ python -c "from src.graph.nodes.writer import writer_node; print('OK')"
 python -c "from src.graph.state import DocumentState; print(DocumentState.__annotations__)"
 ```
 
+**Test RAG connector:**
+```bash
+python -c "from src.connectors.memvid_connector import MemvidConnector; c = MemvidConnector('test_kb.mp4'); print(c.search('test'))"
+```
+
 ---
 
 ## 🏁 Success Metrics
+
+**After Phase 0 (RAG + SHINE):**
+- [ ] Knowledge base built from docs/ (>100 chunks)
+- [ ] Researcher uses local sources first (>80% when populated)
+- [ ] SHINE adapter runs without errors (fallback OK)
+- [ ] bge-m3 embeddings active in MetricsCollector
 
 **After Phase 1 (MVP):**
 - [ ] Single-section run completes end-to-end
 - [ ] §29.1 prompt caching active (cache hit rate ≥50%)
 - [ ] §29.5 state size < 500KB after 1 section
 - [ ] Cost: ~$2-5 per section (depends on length)
+- [ ] SHINE activation rate: 100% Premium, 0% Economy
 
 **After Phase 2 (Jury):**
 - [ ] Real jury approves/rejects correctly
@@ -930,18 +1338,22 @@ python -c "from src.graph.state import DocumentState; print(DocumentState.__anno
 
 3. **§29 optimizations are CRITICAL:** Prompt caching (§29.1) must be in every LLM call to Writer/Jury/Reflector.
 
-4. **Test incrementally:** After each task, run `pytest tests/unit/test_[component].py`. Don't wait until end.
+4. **RAG + SHINE = Phase 0 priority:** Questo sblocca 40% cost reduction + 5x speedup. Implementa prima di MVP.
 
-5. **State is immutable:** LangGraph state updates must return `dict` with changed keys only. Don't mutate `state` directly.
+5. **Fallback-first:** SHINE e Memvid devono avere graceful fallback se non disponibili. DRS deve funzionare sempre.
 
-6. **Error handling:** All LLM calls must have try/except with fallback. See existing nodes for pattern.
+6. **Test incrementally:** After each task, run `pytest tests/unit/test_[component].py`. Don't wait until end.
 
-7. **Cost tracking:** Every LLM call via `llm_client.call()` auto-tracks cost. Don't implement separately.
+7. **State is immutable:** LangGraph state updates must return `dict` with changed keys only. Don't mutate `state` directly.
 
-8. **Cache metrics:** Track `cache_read_tokens` / `total_input_tokens` ratio to verify §29.1 working.
+8. **Error handling:** All LLM calls must have try/except with fallback. See existing nodes for pattern.
+
+9. **Cost tracking:** Every LLM call via `llm_client.call()` auto-tracks cost. Don't implement separately.
+
+10. **Cache metrics:** Track `cache_read_tokens` / `total_input_tokens` ratio to verify §29.1 working.
 
 ---
 
-**Last updated:** 2026-02-23  
+**Last updated:** 2026-02-23 (RAG + SHINE integration)  
 **Maintainer:** Auto-generated by Perplexity AI  
-**Specs version:** DRS v3.0 + §29 optimizations
+**Specs version:** DRS v3.0 + §29 optimizations + RAG + SHINE
