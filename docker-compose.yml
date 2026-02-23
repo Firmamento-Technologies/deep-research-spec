@@ -1,0 +1,60 @@
+# DRS Infrastructure — Docker Compose
+# PostgreSQL 16, Redis 7, MinIO (S3-compatible)
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: drs-postgres
+    environment:
+      POSTGRES_DB: drs
+      POSTGRES_USER: drs
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-drs_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U drs -d drs"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: drs-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: drs-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-drs_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-drs_secret_key}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:

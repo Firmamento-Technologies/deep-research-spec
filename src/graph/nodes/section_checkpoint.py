@@ -40,7 +40,7 @@ from typing import Any
 
 import asyncpg  # type: ignore
 
-from src.models.state import DocumentState
+from src.graph.state import DocumentState
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,68 @@
+# §29.3 Model Routing Configuration
+# Maps agent → quality_preset → model
+# Fallback chain: economy → balanced → premium
+
+writer:
+  economy: anthropic/claude-sonnet-4
+  balanced: anthropic/claude-opus-4-5
+  premium: anthropic/claude-opus-4-5
+
+jury_r:
+  economy: google/gemini-2.5-flash
+  balanced: openai/o3-mini
+  premium: openai/o3
+
+jury_f:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-pro
+  premium: openai/o3
+
+jury_s:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-pro
+  premium: google/gemini-2.5-pro
+
+reflector:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-pro
+  premium: openai/o3
+
+fusor:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-pro
+  premium: openai/o3
+
+planner:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-pro
+  premium: google/gemini-2.5-pro
+
+panel_discussion:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-pro
+  premium: google/gemini-2.5-pro
+
+coherence_guard:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-flash
+  premium: google/gemini-2.5-flash
+
+post_draft_analyzer:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-flash
+  premium: google/gemini-2.5-flash
+
+span_editor:
+  economy: google/gemini-2.5-flash
+  balanced: anthropic/claude-sonnet-4
+  premium: anthropic/claude-sonnet-4
+
+style_fixer:
+  economy: google/gemini-2.5-flash
+  balanced: anthropic/claude-sonnet-4
+  premium: anthropic/claude-sonnet-4
+
+length_adjuster:
+  economy: google/gemini-2.5-flash
+  balanced: google/gemini-2.5-flash
+  premium: google/gemini-2.5-flash

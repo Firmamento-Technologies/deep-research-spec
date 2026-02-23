@@ -89,7 +89,7 @@ def _detect_css_oscillation(css_history: list[float]) -> str | None:
     directions = []
     for i in range(1, len(window)):
         diff = window[i] - window[i - 1]
-        if abs(diff) > 0.01:  # ignore noise
+        if abs(diff) > 0.03:  # ignore noise (must be meaningful swing)
             directions.append(1 if diff > 0 else -1)
 
     if len(directions) >= _CSS_DIRECTION_CHANGES:
@@ -100,13 +100,14 @@ def _detect_css_oscillation(css_history: list[float]) -> str | None:
         if changes >= _CSS_DIRECTION_CHANGES - 1:
             return "CSS"
 
-    # Pattern 2: Stuck (variance too low — not improving)
+    # Pattern 2: Stuck (variance too low + not improving)
     if len(window) >= 4:
         mean = sum(window) / len(window)
         variance = sum((x - mean) ** 2 for x in window) / len(window)
         if variance < _CSS_OSCILLATION_THRESHOLD ** 2:
-            # Check if CSS is below threshold (stuck at low quality)
-            if mean < 0.75:
+            # Only flag if CSS is below threshold AND not steadily improving
+            improving = window[-1] > window[0] + 0.02
+            if mean < 0.75 and not improving:
                 return "WHACK_A_MOLE"
 
     return None

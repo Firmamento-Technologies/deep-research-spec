@@ -20,17 +20,47 @@ from src.graph.routers.style_lint import route_style_lint
 from src.graph.routers.post_draft_gap import route_post_draft_gap
 from src.graph.routers.post_qa import route_post_qa
 from src.graph.routers.panel_loop import route_after_panel_internal
+from src.graph.routers.post_await_human import route_after_await_human
 
-# ── Real node implementations (Phase 0 + Phase 1 + Phase 2 + Phase 3) ────────
+# ── Real node implementations (all phases — 32/32) ───────────────────────────
+# Phase 0-1
 from src.graph.nodes.shine_adapter import shine_adapter_node
 from src.graph.nodes.planner import planner_node
 from src.graph.nodes.writer import writer_node
+# Phase 2
 from src.graph.nodes.jury import jury_node
 from src.graph.nodes.aggregator import aggregator_node
+# Phase 3
 from src.graph.nodes.reflector import reflector_node
 from src.graph.nodes.style_linter import style_linter_node
 from src.graph.nodes.style_fixer import style_fixer_node
 from src.graph.nodes.oscillation_check import oscillation_check_node
+# Phase 4
+from src.graph.nodes.panel_discussion import panel_discussion_node
+from src.graph.nodes.coherence_guard import coherence_guard_node
+# Pre-existing implementations
+from src.graph.nodes.citation_manager import citation_manager_node
+from src.graph.nodes.citation_verifier import citation_verifier_node
+from src.graph.nodes.source_sanitizer import source_sanitizer_node
+from src.graph.nodes.source_synthesizer import source_synthesizer_node
+from src.graph.nodes.researcher_targeted import researcher_targeted_node
+from src.graph.nodes.budget_controller import budget_controller_node
+from src.graph.nodes.context_compressor import run as context_compressor_node
+from src.graph.nodes.section_checkpoint import run as section_checkpoint_node
+# Remaining stubs (now real)
+from src.graph.nodes.preflight import preflight_node
+from src.graph.nodes.budget_estimator import budget_estimator_node
+from src.graph.nodes.await_outline import await_outline_node
+from src.graph.nodes.researcher import researcher_node
+from src.graph.nodes.post_draft_analyzer import post_draft_analyzer_node
+from src.graph.nodes.metrics_collector import metrics_collector_node
+from src.graph.nodes.span_editor import span_editor_node
+from src.graph.nodes.diff_merger import diff_merger_node
+from src.graph.nodes.await_human import await_human_node
+from src.graph.nodes.post_qa import post_qa_node
+from src.graph.nodes.length_adjuster import length_adjuster_node
+from src.graph.nodes.publisher import publisher_node
+from src.graph.nodes.feedback_collector import feedback_collector_node
 
 # ── Node list — §4.5 ────────────────────────────────────────────────────────
 # 32 nodes. MoW nodes (writer_a, writer_b, writer_c, jury_multi_draft, fusor)
@@ -46,14 +76,14 @@ NODES: list[str] = [
     "citation_verifier",
     "source_sanitizer",
     "source_synthesizer",
-    "shine_adapter",              # RAG+SHINE: LoRA generation (§RAG_SHINE_INTEGRATION §2)
-    "writer",                   # MoW is internal (§7.6)
+    "shine_adapter",
+    "writer",
     "post_draft_analyzer",
     "researcher_targeted",
     "style_linter",
     "style_fixer",
     "metrics_collector",
-    "jury",                     # runs jury_R, jury_F, jury_S in gather
+    "jury",
     "aggregator",
     "reflector",
     "span_editor",
@@ -61,7 +91,7 @@ NODES: list[str] = [
     "oscillation_check",
     "panel_discussion",
     "coherence_guard",
-    "context_compressor",       # no-op on idx==0 (§5.16)
+    "context_compressor",
     "section_checkpoint",
     "await_human",
     "budget_controller",
@@ -71,17 +101,40 @@ NODES: list[str] = [
     "feedback_collector",
 ]
 
-# ── Map of nodes with real implementations (overrides stubs) ─────────────────
+# ── All 32 nodes have real implementations — zero stubs ──────────────────────
 _REAL_NODES: dict[str, callable] = {
+    "preflight": preflight_node,
+    "budget_estimator": budget_estimator_node,
     "planner": planner_node,
+    "await_outline": await_outline_node,
+    "researcher": researcher_node,
+    "citation_manager": citation_manager_node,
+    "citation_verifier": citation_verifier_node,
+    "source_sanitizer": source_sanitizer_node,
+    "source_synthesizer": source_synthesizer_node,
     "shine_adapter": shine_adapter_node,
     "writer": writer_node,
+    "post_draft_analyzer": post_draft_analyzer_node,
+    "researcher_targeted": researcher_targeted_node,
+    "style_linter": style_linter_node,
+    "style_fixer": style_fixer_node,
+    "metrics_collector": metrics_collector_node,
     "jury": jury_node,
     "aggregator": aggregator_node,
-    "reflector": reflector_node,          # Phase 3
-    "style_linter": style_linter_node,    # Phase 3
-    "style_fixer": style_fixer_node,      # Phase 3
-    "oscillation_check": oscillation_check_node,  # Phase 3
+    "reflector": reflector_node,
+    "span_editor": span_editor_node,
+    "diff_merger": diff_merger_node,
+    "oscillation_check": oscillation_check_node,
+    "panel_discussion": panel_discussion_node,
+    "coherence_guard": coherence_guard_node,
+    "context_compressor": context_compressor_node,
+    "section_checkpoint": section_checkpoint_node,
+    "await_human": await_human_node,
+    "budget_controller": budget_controller_node,
+    "post_qa": post_qa_node,
+    "length_adjuster": length_adjuster_node,
+    "publisher": publisher_node,
+    "feedback_collector": feedback_collector_node,
 }
 
 
@@ -236,6 +289,12 @@ def build_graph(checkpointer=None):
     # ══════════════════════════════════════════════════════════════════════
     # Phase D: Publisher & Output
     # ══════════════════════════════════════════════════════════════════════
+
+    # ── Await human routing — resume after escalation ─────────────────
+    g.add_conditional_edges("await_human", route_after_await_human, {
+        "aggregator": "aggregator",   # auto-resolved → force_approve
+        "__end__": END,               # interactive → pause graph
+    })
 
     g.add_edge("publisher", "feedback_collector")
     g.add_edge("feedback_collector", END)
