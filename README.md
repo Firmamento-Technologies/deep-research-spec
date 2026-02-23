@@ -26,6 +26,32 @@
 
 ---
 
+## 🤖 For AI Coding Agents (Claude Opus, Cursor, Cline, etc.)
+
+**SINGLE SOURCE OF TRUTH FOR IMPLEMENTATION:**
+
+📘 **[`docs/AI_CODING_PLAN.md`](docs/AI_CODING_PLAN.md)** ← Start here!
+
+This file contains:
+- ✅ Phase 0-4 implementation roadmap
+- ✅ Code skeletons for every component
+- ✅ Integration with Cost Optimization (81% reduction)
+- ✅ RAG + SHINE integration steps
+- ✅ Test commands and acceptance criteria
+
+**Quick start command:**
+```bash
+# For Claude Opus / AI coding agents:
+Read docs/AI_CODING_PLAN.md and start with Phase 0, Task 0.1 (MemvidConnector)
+```
+
+**Supporting documentation:**
+- 📊 [`docs/COST_OPTIMIZATION_ROADMAP.md`](docs/COST_OPTIMIZATION_ROADMAP.md) — Cost reduction strategy ($13.70 → $0.80/doc)
+- 🔧 [`docs/29_performance_optimizations.md`](docs/29_performance_optimizations.md) — Technical optimization specs
+- 🔍 [`docs/RAG_SHINE_INTEGRATION.md`](docs/RAG_SHINE_INTEGRATION.md) — RAG + SHINE architecture
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -113,7 +139,13 @@ Jury (§8) → CSS evaluation → Approve/Reject
 
 ## 📚 Documentation
 
-- **[RAG + SHINE Integration Guide](docs/RAG_SHINE_INTEGRATION.md)** — Complete architecture, code examples, benchmarks
+### For Developers & AI Agents
+- **[AI Coding Plan](docs/AI_CODING_PLAN.md)** — Complete implementation roadmap (Phase 0-4)
+- **[Cost Optimization Roadmap](docs/COST_OPTIMIZATION_ROADMAP.md)** — 81% cost reduction strategy
+- **[Performance Optimizations](docs/29_performance_optimizations.md)** — Technical specs (§29.1-29.7)
+- **[RAG + SHINE Integration](docs/RAG_SHINE_INTEGRATION.md)** — Architecture, benchmarks, fallback rules
+
+### For Users
 - **[CHANGELOG](CHANGELOG.md)** — Version history and release notes
 - **[Agent Specifications](docs/)** — Detailed specs for all 21 agents
 - **[SHINE Paper](https://arxiv.org/abs/2602.06358)** — arXiv:2602.06358 (Yewei Liu et al., Feb 2026)
@@ -164,27 +196,40 @@ pytest tests/test_rag_shine_e2e.py --gpu -v
 
 ---
 
-## 🛣️ Roadmap
+## 🛣️ Implementation Roadmap
 
-### Phase 1 (Week 1) — RAG Only ✅
-- [x] Integrate `MemvidConnector` into Researcher
-- [x] Build knowledge base from specs
-- [x] Test retrieval accuracy
+### Phase 0: RAG + SHINE Infrastructure (Week 1)
+- [ ] MemvidConnector — Local knowledge base
+- [ ] ShineAdapter — LoRA generation with fallback
+- [ ] Update Researcher priority (memvid_local first)
+- [ ] Swap embeddings to bge-m3
 
-### Phase 2 (Week 2) — SHINE Writer
-- [ ] Add `ShineAdapter` node to graph
-- [ ] Enable SHINE for Balanced/Premium
-- [ ] Monitor fallback rate (<10%)
+### Phase 1: MVP Pipeline (Week 2-3)
+- [ ] LLM Client with prompt caching (§29.1)
+- [ ] Writer agent with SHINE support
+- [ ] Planner agent
+- [ ] Mock jury (temporary)
+- [ ] State optimization (§29.5)
 
-### Phase 3 (Week 3) — SHINE Context
-- [ ] Integrate `ShineContextCompressor`
-- [ ] A/B test: SHINE vs. text summary
-- [ ] Coherence validation
+### Phase 2: Real Jury System (Week 4-5)
+- [ ] Judge base class + R/F/S implementations
+- [ ] Jury orchestrator (parallel execution)
+- [ ] Aggregator + CSS formula
+- [ ] Prompt caching active (50% cache hit rate)
 
-### Phase 4 (Week 4) — Production
-- [ ] Enable SHINE by default for Premium
-- [ ] Monitoring dashboard
-- [ ] User feedback collection
+### Phase 3: Iteration Loop (Week 6-7)
+- [ ] Reflector agent
+- [ ] Style linter + fixer
+- [ ] Oscillation detector
+- [ ] Model tiering (§29.3)
+
+### Phase 4: Production Ready (Week 8+)
+- [ ] MoW (Mixture-of-Writers)
+- [ ] Panel discussion
+- [ ] Coherence guard
+- [ ] Distillation (§29.7)
+
+**Detailed tasks:** See [`docs/AI_CODING_PLAN.md`](docs/AI_CODING_PLAN.md)
 
 ---
 
