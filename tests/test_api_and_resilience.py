@@ -1,8 +1,11 @@
 """Tests for LLM client resilience (retry + rate limiting) and FastAPI API."""
 from __future__ import annotations
 
+import os
 import time
 import unittest
+
+import pytest
 
 from src.llm.resilience import (
     TokenBucketRateLimiter,
@@ -181,6 +184,7 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertEqual(data["status"], "ok")
         self.assertIn("uptime_s", data)
 
+    @pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="Requires OPENROUTER_API_KEY")
     def test_create_run(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
@@ -195,6 +199,7 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertEqual(data["status"], "queued")
         return data["run_id"]
 
+    @pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="Requires OPENROUTER_API_KEY")
     def test_get_run(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
@@ -219,6 +224,7 @@ class TestAPIEndpoints(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
 
+    @pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="Requires OPENROUTER_API_KEY")
     def test_cancel_run(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
