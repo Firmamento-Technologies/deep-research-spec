@@ -1,68 +1,72 @@
-# §29.3 Model Routing Configuration
-# Maps agent → quality_preset → model
-# Fallback chain: economy → balanced → premium
+# Model routing configuration for Deep Research System
+# All models routed through OpenRouter (single API key)
+# Format: openrouter/<provider>/<model>
+#
+# OpenRouter model list: https://openrouter.ai/models
+# Presets: economy | balanced | premium
 
+# ── Writer ──────────────────────────────────────────────────────────────────
 writer:
-  economy: anthropic/claude-sonnet-4
-  balanced: anthropic/claude-opus-4-5
-  premium: anthropic/claude-opus-4-5
+  economy:  "openrouter/anthropic/claude-3-5-haiku"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
 
-jury_r:
-  economy: google/gemini-2.5-flash
-  balanced: openai/o3-mini
-  premium: openai/o3
+# ── Researcher ──────────────────────────────────────────────────────────────
+researcher:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/google/gemini-2.5-flash"
+  premium:  "openrouter/google/gemini-2.5-pro"
 
-jury_f:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-pro
-  premium: openai/o3
-
-jury_s:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-pro
-  premium: google/gemini-2.5-pro
-
-reflector:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-pro
-  premium: openai/o3
-
-fusor:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-pro
-  premium: openai/o3
-
+# ── Planner ─────────────────────────────────────────────────────────────────
 planner:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-pro
-  premium: google/gemini-2.5-pro
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
 
-panel_discussion:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-pro
-  premium: google/gemini-2.5-pro
+# ── Jury - Judge R (Relevance) ───────────────────────────────────────────────
+jury_r:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/openai/o3-mini"
+  premium:  "openrouter/openai/o3"
 
+# ── Jury - Judge F (Factual accuracy) ───────────────────────────────────────
+jury_f:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/google/gemini-2.5-pro"
+  premium:  "openrouter/openai/o3"
+
+# ── Jury - Judge S (Style) ───────────────────────────────────────────────────
+jury_s:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
+
+# ── Reflector ────────────────────────────────────────────────────────────────
+reflector:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
+
+# ── Fusor (multi-draft fusion) ───────────────────────────────────────────────
+fusor:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
+
+# ── Publisher ────────────────────────────────────────────────────────────────
+publisher:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
+
+# ── Oscillation check ────────────────────────────────────────────────────────
+oscillation_check:
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/google/gemini-2.5-flash"
+  premium:  "openrouter/google/gemini-2.5-pro"
+
+# ── Coherence guard ──────────────────────────────────────────────────────────
 coherence_guard:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-flash
-  premium: google/gemini-2.5-flash
-
-post_draft_analyzer:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-flash
-  premium: google/gemini-2.5-flash
-
-span_editor:
-  economy: google/gemini-2.5-flash
-  balanced: anthropic/claude-sonnet-4
-  premium: anthropic/claude-sonnet-4
-
-style_fixer:
-  economy: google/gemini-2.5-flash
-  balanced: anthropic/claude-sonnet-4
-  premium: anthropic/claude-sonnet-4
-
-length_adjuster:
-  economy: google/gemini-2.5-flash
-  balanced: google/gemini-2.5-flash
-  premium: google/gemini-2.5-flash
+  economy:  "openrouter/google/gemini-2.5-flash"
+  balanced: "openrouter/anthropic/claude-sonnet-4"
+  premium:  "openrouter/anthropic/claude-opus-4-5"
