@@ -448,19 +448,19 @@ class TestModelRouting:
 
     def test_economy_writer(self):
         from src.llm.routing import route_model
-        assert route_model("writer", "economy") == "anthropic/claude-sonnet-4"
+        assert route_model("writer", "economy") == "openrouter/anthropic/claude-3-5-haiku"
 
     def test_premium_writer(self):
         from src.llm.routing import route_model
-        assert route_model("writer", "premium") == "anthropic/claude-opus-4-5"
+        assert route_model("writer", "premium") == "openrouter/anthropic/claude-opus-4-5"
 
     def test_economy_jury_r(self):
         from src.llm.routing import route_model
-        assert route_model("jury_r", "economy") == "google/gemini-2.5-flash"
+        assert route_model("jury_r", "economy") == "openrouter/google/gemini-2.5-flash"
 
     def test_premium_jury_r(self):
         from src.llm.routing import route_model
-        assert route_model("jury_r", "premium") == "openai/o3"
+        assert route_model("jury_r", "premium") == "openrouter/openai/o3"
 
     def test_unknown_agent_fallback(self):
         from src.llm.routing import route_model
@@ -469,9 +469,9 @@ class TestModelRouting:
 
     def test_case_insensitive(self):
         from src.llm.routing import route_model
-        assert route_model("writer", "PREMIUM") == "anthropic/claude-opus-4-5"
+        assert route_model("writer", "PREMIUM").lower() == "openrouter/anthropic/claude-opus-4-5".lower()
 
     def test_coherence_guard_always_flash(self):
         from src.llm.routing import route_model
-        assert route_model("coherence_guard", "economy") == "google/gemini-2.5-flash"
-        assert route_model("coherence_guard", "premium") == "google/gemini-2.5-flash"
+        assert route_model("coherence_guard", "economy") == "openrouter/google/gemini-2.5-flash"
+        assert route_model("coherence_guard", "premium") == "openrouter/google/gemini-2.5-flash"
