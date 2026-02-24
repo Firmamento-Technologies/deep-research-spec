@@ -471,7 +471,10 @@ class TestModelRouting:
         from src.llm.routing import route_model
         assert route_model("writer", "PREMIUM").lower() == "openrouter/anthropic/claude-opus-4-5".lower()
 
-    def test_coherence_guard_always_flash(self):
+    def test_coherence_guard_economy_uses_flash(self):
         from src.llm.routing import route_model
         assert route_model("coherence_guard", "economy") == "openrouter/google/gemini-2.5-flash"
-        assert route_model("coherence_guard", "premium") == "openrouter/google/gemini-2.5-flash"
+
+    def test_coherence_guard_premium_uses_opus(self):
+        from src.llm.routing import route_model
+        assert route_model("coherence_guard", "premium") == "openrouter/anthropic/claude-opus-4-5"
