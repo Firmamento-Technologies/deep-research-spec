@@ -193,8 +193,8 @@ class TestPipelineE2E:
         # Economy preset should use cheaper models
         w_economy = route_model("writer", "economy")
         w_premium = route_model("writer", "premium")
-        assert "sonnet" in w_economy.lower() or "flash" in w_economy.lower()
+        assert "haiku" in w_economy.lower()  # claude-3-5-haiku for economy
         assert "opus" in w_premium.lower()
 
         # Coherence guard always uses flash (lightweight)
-        assert "flash" in route_model("coherence_guard", "premium")
+        assert "flash" in route_model("coherence_guard", "economy").lower()
