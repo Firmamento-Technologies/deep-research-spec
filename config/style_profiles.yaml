@@ -1,0 +1,56 @@
+# Style Profiles — §26 L1/L2 rules for Writer/JudgeS
+# Each profile defines rules the writer must follow and the jury evaluates against.
+
+academic:
+  name: "Academic Research Paper"
+  rules:
+    - "Use passive voice for methodology sections"
+    - "Cite every factual claim with [source_id]"
+    - "Avoid first-person pronouns (I, we, my)"
+    - "Use formal vocabulary and domain-specific terminology"
+    - "Structure: Introduction → Methods → Results → Discussion"
+    - "Include limitations and future work"
+    - "Quantify claims with data where possible"
+
+business:
+  name: "Business Report"
+  rules:
+    - "Executive summary at top (max 200 words)"
+    - "Use bullet points for key findings"
+    - "Include actionable recommendations"
+    - "Charts and tables for numeric data"
+    - "Professional but conversational tone"
+    - "Highlight ROI and business impact"
+    - "Keep paragraphs under 4 sentences"
+
+technical:
+  name: "Technical Documentation"
+  rules:
+    - "Code examples inline with explanation"
+    - "Step-by-step instructions with numbered lists"
+    - "Prerequisites section at the start"
+    - "Troubleshooting section at the end"
+    - "Clear headings and subheadings (max 3 levels)"
+    - "Use monospace for commands, variables, file paths"
+    - "Include expected output for each command"
+
+journalistic:
+  name: "Journalistic Article"
+  rules:
+    - "Lead with the most important information (inverted pyramid)"
+    - "Use direct quotes from sources"
+    - "Short paragraphs (2-3 sentences max)"
+    - "Active voice throughout"
+    - "Explain technical concepts in plain language"
+    - "Include context and background"
+    - "Attribute all claims to named sources"
+
+narrative:
+  name: "Narrative / Long-form"
+  rules:
+    - "Use storytelling structure (hook, build, payoff)"
+    - "Include anecdotes and case studies"
+    - "Vary sentence length for rhythm"
+    - "Use vivid, concrete language"
+    - "Connect sections with smooth transitions"
+    - "Build toward a clear conclusion"

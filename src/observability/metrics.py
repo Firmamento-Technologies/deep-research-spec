@@ -124,6 +124,12 @@ if _HAS_PROMETHEUS:
         buckets=(30, 60, 120, 300, 600, 1200, 1800, 3600),
     )
 
+    DRS_JURY_QUALITY = Gauge(
+        "drs_jury_pass_rate",
+        "Jury approval rate (0.0-1.0)",
+        ["preset"],
+    )
+
 else:
     DRS_LLM_CALLS = _StubMetric()  # type: ignore[assignment]
     DRS_LLM_COST = _StubMetric()  # type: ignore[assignment]
@@ -136,6 +142,7 @@ else:
     DRS_BUDGET_SPENT = _StubMetric()  # type: ignore[assignment]
     DRS_BUDGET_REMAINING_PCT = _StubMetric()  # type: ignore[assignment]
     DRS_PIPELINE_DURATION = _StubMetric()  # type: ignore[assignment]
+    DRS_JURY_QUALITY = _StubMetric()  # type: ignore[assignment]
 
 
 # ── Helper functions ────────────────────────────────────────────────────────

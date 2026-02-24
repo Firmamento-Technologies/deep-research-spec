@@ -164,14 +164,42 @@ Constraints:
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _get_style_profile_rules(style_profile: Any) -> str:
-    """Load L1/L2 rules from §26 style profiles.
+    """Load style rules from config/style_profiles.yaml (§26).
 
-    TODO: implement full style profile loader from config/.
+    Accepts:
+        - str: profile name (e.g. "academic", "business")
+        - dict with "name" key → profile name
+        - dict with "rules" key → inline rules (legacy)
     """
-    if isinstance(style_profile, dict):
-        rules = style_profile.get("rules", [])
-        if rules:
-            return "Style rules:\n" + "\n".join(f"- {r}" for r in rules)
+    import yaml as _yaml
+    from pathlib import Path as _Path
+
+    # Determine profile name
+    if isinstance(style_profile, str):
+        profile_name = style_profile
+    elif isinstance(style_profile, dict):
+        # Legacy: inline rules take precedence
+        inline_rules = style_profile.get("rules", [])
+        if inline_rules:
+            return "Style rules:\n" + "\n".join(f"- {r}" for r in inline_rules)
+        profile_name = style_profile.get("name", "academic")
+    else:
+        profile_name = "academic"
+
+    # Load from config file
+    config_path = _Path(__file__).resolve().parents[3] / "config" / "style_profiles.yaml"
+    if config_path.exists():
+        try:
+            with open(config_path) as f:
+                profiles = _yaml.safe_load(f) or {}
+            profile = profiles.get(profile_name, profiles.get("academic", {}))
+            rules = profile.get("rules", [])
+            if rules:
+                return "Style rules:\n" + "\n".join(f"- {r}" for r in rules)
+        except Exception:
+            pass  # Fall through to default
+
+    # Fallback
     return "Follow academic writing conventions. Be precise and well-sourced."
 
 
