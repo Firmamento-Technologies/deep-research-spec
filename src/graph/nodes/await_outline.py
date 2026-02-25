@@ -21,7 +21,7 @@ def await_outline_node(state: dict) -> dict:
     """
     outline = state.get("outline", [])
     config = state.get("config", {})
-    auto_approve = config.get("auto_approve_outline", True)
+    auto_approve = config.get("auto_approve_outline", False)  # Default False for safety
 
     if not outline:
         logger.warning("AwaitOutline: no outline to review")
@@ -46,12 +46,12 @@ def await_outline_node(state: dict) -> dict:
         )
         return {"outline_approved": True}
 
-    # In interactive mode, set pending flag
+    # In interactive mode, set pending flag and do NOT approve
     logger.info(
         "AwaitOutline: %d sections pending human review (valid=%s)",
         len(outline), valid,
     )
     return {
-        "outline_approved": valid and auto_approve,
+        "outline_approved": False,  # Explicitly False in interactive mode
         "human_review_pending": "outline",
     }
