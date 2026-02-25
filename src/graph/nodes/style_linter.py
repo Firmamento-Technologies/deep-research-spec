@@ -16,6 +16,9 @@ from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
+# Maximum style fix iterations before forcing clean
+MAX_STYLE_ITERATIONS = 3
+
 # ── Built-in L1 rules (always enforced) ──────────────────────────────────────
 
 _L1_RULES: list[dict] = [
@@ -53,6 +56,18 @@ def style_linter_node(state: dict) -> dict:
     Returns:
         Partial state update with ``style_lint_violations``.
     """
+    # Check iteration limit to prevent infinite loops
+    style_iterations = state.get("style_iterations", 0)
+    if style_iterations >= MAX_STYLE_ITERATIONS:
+        logger.warning(
+            "StyleLinter: max iterations (%d) reached, forcing clean exit",
+            MAX_STYLE_ITERATIONS
+        )
+        return {
+            "style_lint_violations": [],
+            "style_iterations": style_iterations,
+        }
+
     draft = state.get("current_draft", "")
     style_profile = state.get("style_profile", {})
 
@@ -89,14 +104,17 @@ def style_linter_node(state: dict) -> dict:
         violations.extend(l2_violations)
 
     logger.info(
-        "StyleLinter: %d violations (%d L1, %d L2)",
+        "StyleLinter: %d violations (%d L1, %d L2), iteration %d/%d",
         len(violations),
         sum(1 for v in violations if v.get("level") == "L1"),
         sum(1 for v in violations if v.get("level") == "L2"),
+        style_iterations + 1,
+        MAX_STYLE_ITERATIONS,
     )
 
     return {
         "style_lint_violations": violations,
+        "style_iterations": style_iterations + 1,
     }
 
 
