@@ -4,7 +4,7 @@ from typing import TypedDict, Annotated, Any, Literal
 from langgraph.graph.message import add_messages
 
 
-# ── §29.5 Bounded reducers ───────────────────────────────────────────────────
+# ── §29.5 Bounded reducers ───────────────────────────────────────────
 
 def _max_len_reducer(window: int):
     """Create a LangGraph reducer that keeps only the last *window* items."""
@@ -13,7 +13,7 @@ def _max_len_reducer(window: int):
     return reducer
 
 
-# ── Sub-TypedDicts ───────────────────────────────────────────────────────────
+# ── Sub-TypedDicts ─────────────────────────────────────────────────
 
 class BudgetState(TypedDict):
     max_dollars: float
@@ -130,10 +130,10 @@ class SectionCSSReport(TypedDict):
     threshold_style: float
 
 
-# ── Main State ───────────────────────────────────────────────────────────────
+# ── Main State ────────────────────────────────────────────────────
 
 class DocumentState(TypedDict):
-    # ── Identifiers ──────────────────────────────────────────────────────
+    # ── Identifiers ───────────────────────────────────────────────────
     doc_id: str
     thread_id: str
     user_id: str
@@ -142,27 +142,28 @@ class DocumentState(TypedDict):
         "awaiting_approval", "completed", "failed", "cancelled"
     ]
 
-    # ── Config (frozen after preflight) ──────────────────────────────────
+    # ── Config (frozen after preflight) ────────────────────────────────
     config: dict[str, Any]
     style_profile: dict[str, Any]
     style_exemplar: str | None
     quality_preset: Literal["Economy", "Balanced", "Premium"]
 
-    # ── Outline (Phase A) ────────────────────────────────────────────────
+    # ── Outline (Phase A) ────────────────────────────────────────────
     outline: list[OutlineSection]
     outline_approved: bool
 
-    # ── Section loop control ─────────────────────────────────────────────
+    # ── Section loop control ─────────────────────────────────────────
     current_section_idx: int
     total_sections: int
 
-    # ── Current section state (reset each section) ───────────────────────
+    # ── Current section state (reset each section) ─────────────────────────
     current_sources: list[Source]
     synthesized_sources: str
     current_draft: str
     current_iteration: int
     post_draft_gaps: list[dict]
     style_lint_violations: list[StyleLintViolation]
+    style_iterations: int  # Counter for style linter/fixer loop prevention
     jury_verdicts: list[JudgeVerdict]
     all_verdicts_history: list[list[JudgeVerdict]]
     aggregator_verdict: AggregatorVerdict
@@ -170,15 +171,15 @@ class DocumentState(TypedDict):
     css_history: Annotated[list[float], _max_len_reducer(8)]          # §29.5: keep last 8
     draft_embeddings: Annotated[list[list[float]], _max_len_reducer(4)]  # §29.5: keep last 4
 
-    # ── Aggregator CSS outputs (§9.7) ────────────────────────────────────
+    # ── Aggregator CSS outputs (§9.7) ───────────────────────────────────
     css_content_current: float
     css_style_current: float
     css_composite_current: float
 
-    # ── Force-approve (§19.5) ────────────────────────────────────────────
+    # ── Force-approve (§19.5) ──────────────────────────────────────────
     force_approve: bool
 
-    # ── Targeted research flag ───────────────────────────────────────────
+    # ── Targeted research flag ───────────────────────────────────────
     targeted_research_active: bool
 
     # ── MoW state (internal to writer — §7.1) ────────────────────────────
@@ -186,42 +187,42 @@ class DocumentState(TypedDict):
     mow_css_per_draft: list[float]
     fusor_draft: str | None
 
-    # ── Approved sections store ──────────────────────────────────────────
+    # ── Approved sections store ──────────────────────────────────────
     approved_sections: list[dict]
     compressed_context: str
 
-    # ── Writer Memory (§5.18) ────────────────────────────────────────────
+    # ── Writer Memory (§5.18) ──────────────────────────────────────────
     writer_memory: dict[str, Any]
 
-    # ── Budget (§19) ─────────────────────────────────────────────────────
+    # ── Budget (§19) ─────────────────────────────────────────────────
     budget: BudgetState
 
-    # ── Oscillation (§13) ────────────────────────────────────────────────
+    # ── Oscillation (§13) ────────────────────────────────────────────
     oscillation_detected: bool
     oscillation_type: Literal["CSS", "SEMANTIC", "WHACK_A_MOLE"] | None
 
-    # ── Panel Discussion (§11) ───────────────────────────────────────────
+    # ── Panel Discussion (§11) ───────────────────────────────────────
     panel_active: bool
     panel_round: int
     panel_anonymized_log: list[dict]
 
-    # ── Coherence / Post-QA ──────────────────────────────────────────────
+    # ── Coherence / Post-QA ──────────────────────────────────────────
     coherence_conflicts: list[CoherenceConflict]
     format_validated: bool
 
-    # ── Human-in-the-loop ────────────────────────────────────────────────
+    # ── Human-in-the-loop ──────────────────────────────────────────
     human_intervention_required: bool
     active_escalation: dict | None
 
-    # ── Run Companion (§6) ───────────────────────────────────────────────
+    # ── Run Companion (§6) ───────────────────────────────────────────
     companion_messages: Annotated[list, add_messages]
 
-    # ── RAG + SHINE integration (§RAG_SHINE_INTEGRATION) ─────────────────
+    # ── RAG + SHINE integration (§RAG_SHINE_INTEGRATION) ─────────────────────
     shine_active: bool                  # True if SHINE generated LoRA
     shine_lora: Any | None              # LoRA adapter from ShineAdapter
     context_lora: Any | None            # LoRA from ContextCompressor (future)
     rag_local_sources: list[Source]      # Sources from memvid_local connector
 
-    # ── Output ───────────────────────────────────────────────────────────
+    # ── Output ─────────────────────────────────────────────────────
     output_paths: dict[str, str]
     run_metrics: dict[str, Any]
