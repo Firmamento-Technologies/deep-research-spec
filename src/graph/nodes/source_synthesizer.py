@@ -98,11 +98,14 @@ class SourceSynthesizerNode:
         return truncated + "\n[TRUNCATED: compression fallback]"
 
 
-# ── Node function for graph registration ─────────────────────────────────────
+# ── Node function for graph registration ──────────────────────────────
 
 _default_node = SourceSynthesizerNode()
 
 
 async def source_synthesizer_node(state: dict) -> dict:
     """Graph-compatible node function."""
+    # RLM bypass: raw corpus propagated directly — no compression needed
+    if state.get("rlm_mode", False):
+        return state  # no-op: rlm.completion() handles context recursively
     return await _default_node.run(state)

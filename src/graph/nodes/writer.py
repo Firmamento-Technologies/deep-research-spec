@@ -1,9 +1,12 @@
-"""Writer agent (§5.7) with §29.1 prompt caching + SHINE support.
+"""Writer agent (§5.7) with §29.1 prompt caching + SHINE + RLM mode support.
 
-Generates a section draft using either:
+Generates a section draft using one of three paths:
 - **SHINE path** (``shine_active=True``): LoRA adapter provides knowledge,
   no corpus text in the prompt → 95% token reduction.
-- **Fallback path** (``shine_active=False``): compressed corpus included
+- **RLM path** (``rlm_mode=True``): raw corpus passed directly to writer;
+  source_synthesizer and context_compressor are bypassed upstream;
+  rlm.completion() handles recursive context internally.
+- **Standard path** (fallback): compressed/synthesized corpus included
   as text in the user prompt.
 
 System prompt uses §29.1 cache-control blocks (Anthropic) so that
@@ -21,10 +24,10 @@ from src.llm.routing import route_model
 logger = logging.getLogger(__name__)
 
 
-# ── Writer Node ──────────────────────────────────────────────────────────────
+# ── Writer Node ─────────────────────────────────────────────
 
 def writer_node(state: dict) -> dict:
-    """Generate section draft from compressed corpus or SHINE LoRA.
+    """Generate section draft from compressed corpus, RLM raw corpus, or SHINE LoRA.
 
     Args:
         state: DocumentState dict.
@@ -49,7 +52,7 @@ def writer_node(state: dict) -> dict:
     style_exemplar = state.get("style_exemplar") or ""
     writer_memory = state.get("writer_memory", {})
 
-    # ── §29.1 Prompt Caching: system as array with cache_control ─────
+    # ── §29.1 Prompt Caching: system as array with cache_control ──────
     system_blocks = [
         {
             "type": "text",
@@ -68,29 +71,42 @@ def writer_node(state: dict) -> dict:
         },
     ]
 
-    # ── SHINE vs corpus path ─────────────────────────────────────────
+    # ── SHINE vs RLM vs standard corpus path ───────────────────────
     shine_active = state.get("shine_active", False)
+    rlm_mode = state.get("rlm_mode", False)
 
     # Build citation map text
     current_sources = state.get("current_sources", [])
     citation_text = _format_sources_as_citations(current_sources)
 
     if shine_active:
-        logger.info("Writer using SHINE LoRA (no corpus in context)")
+        logger.info("Writer: SHINE LoRA path (no corpus in context)")
         user_prompt = _build_prompt_shine(
             style_profile_str, section_scope, target_words, citation_text,
+        )
+    elif rlm_mode:
+        # RLM mode: raw corpus bypasses source_synthesizer + context_compressor.
+        # Graceful fallback chain: sanitized_sources → research_results → synthesized_sources.
+        corpus = (
+            state.get("sanitized_sources", "")
+            or state.get("research_results", "")
+            or state.get("synthesized_sources", "")  # graceful fallback
+        )
+        logger.info("Writer: RLM mode (raw corpus, bypassing compression)")
+        user_prompt = _build_prompt_corpus(
+            style_profile_str, section_scope, target_words, citation_text, corpus,
         )
     else:
         corpus = (
             state.get("synthesized_sources", "")
             or state.get("compressed_corpus", "")
         )
-        logger.info("Writer using text corpus (SHINE inactive)")
+        logger.info("Writer: standard corpus path (SHINE inactive, RLM inactive)")
         user_prompt = _build_prompt_corpus(
             style_profile_str, section_scope, target_words, citation_text, corpus,
         )
 
-    # ── LLM call ─────────────────────────────────────────────────────
+    # ── LLM call ─────────────────────────────────────────────
     messages = [{"role": "user", "content": user_prompt}]
 
     response = llm_client.call(
@@ -118,7 +134,7 @@ def writer_node(state: dict) -> dict:
     }
 
 
-# ── Prompt builders ──────────────────────────────────────────────────────────
+# ── Prompt builders ──────────────────────────────────────────
 
 def _build_prompt_shine(
     style: str, scope: str, target_words: int, citations: str,
@@ -161,7 +177,7 @@ Constraints:
 - No markdown formatting"""
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────
 
 def _get_style_profile_rules(style_profile: Any) -> str:
     """Load style rules from config/style_profiles.yaml (§26).
