@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.budget.guard import BudgetExhaustedError, check_budget
 from src.llm.client import llm_client
 from src.llm.routing import route_model
 
@@ -56,7 +57,7 @@ def reflector_node(state: dict) -> dict:
     # Optional: use LLM for detailed analysis if PARTIAL/FULL
     if scope in ("PARTIAL", "FULL") and draft:
         preset = state.get("quality_preset", "balanced")
-        llm_feedback = _get_llm_feedback(draft, failures, scope, preset)
+        llm_feedback = _get_llm_feedback(draft, failures, scope, preset, state)
         if llm_feedback:
             feedback_items.extend(llm_feedback)
 
@@ -169,10 +170,28 @@ def _build_generic_feedback(agg: dict) -> list[dict]:
 
 
 def _get_llm_feedback(
-    draft: str, failures: list[dict], scope: str, quality_preset: str = "balanced",
+    draft: str,
+    failures: list[dict],
+    scope: str,
+    quality_preset: str = "balanced",
+    state: dict | None = None,
 ) -> list[dict]:
-    """Use LLM to generate detailed improvement suggestions."""
+    """Use LLM to generate detailed improvement suggestions.
+    
+    §19.6: Enforces budget before LLM call. Returns empty list if budget exhausted.
+    """
     try:
+        # §19.6 Budget guard
+        if state is not None:
+            try:
+                check_budget(state, agent="reflector", estimated_cost=0.15)
+            except BudgetExhaustedError:
+                logger.warning(
+                    "Reflector: budget exhausted before LLM feedback call — "
+                    "returning empty feedback list"
+                )
+                return []
+        
         failure_summary = "\n".join(
             f"- [{v.get('judge_slot', '?')}] {v.get('motivation', 'No details')}"
             for v in failures[:5]
