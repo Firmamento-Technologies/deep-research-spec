@@ -1,33 +1,31 @@
-"""Writer agent (§5.7) with §29.1 prompt caching + SHINE + RLM mode support.
+"""Writer agent (§5.7) con §29.1 prompt caching + SHINE + RLM mode.
 
-Generates a section draft using one of three paths:
+Genera il draft di una sezione usando uno di tre path:
 
 - **SHINE LoRA path** (``shine_active=True`` AND ``SHINE_SERVING_URL`` set):
-  SHINE hypernetwork encodes the research corpus into LoRA weight deltas in a
-  single forward pass. Those deltas are injected into a local vLLM/AIBrix
-  inference server — the model ACTUALLY has the domain knowledge in its
-  weights, no corpus in the prompt → ~95% token reduction.
+  L'hypernetwork SHINE encoda il corpus di ricerca in LoRA weight deltas in un
+  singolo forward pass, iniettati in un server vLLM/AIBrix locale. Il modello
+  ha la domain knowledge nei weights — corpus non nel prompt (~95% token reduction).
   Ref: https://github.com/Yewei-Liu/SHINE (arXiv:2602.06358)
 
-  IMPORTANT: ``state["shine_lora"]`` contains binary weight TENSORS, NOT
-  text. They cannot be placed in a prompt. ``shine_active=True`` without
-  ``SHINE_SERVING_URL`` is a misconfiguration — the node falls back to
-  standard corpus and emits a logger.warning() (P1 fix).
+  IMPORTANTE: ``state["shine_lora"]`` contiene tensori binari, NON testo.
+  ``shine_active=True`` senza ``SHINE_SERVING_URL`` è una misconfiguration:
+  il nodo fallback a corpus standard + logger.warning().
 
 - **RLM path** (``rlm_mode=True``):
-  RLM (https://github.com/alexzhang13/rlm, arXiv:2512.24601) opens a REPL
-  environment and calls the model recursively to decompose and process the
-  full corpus chunk-by-chunk. The complete (non-compressed) corpus is passed
-  to ``rlm.completion()``; RLM handles context management internally.
-  source_synthesizer and context_compressor are bypassed upstream.
-  All HTTP calls are routed through llm_client via DeepResearchLM adapter
-  (rate limiter + cost tracking + tier guard preserved).
+  RLM (https://github.com/alexzhang13/rlm, arXiv:2512.24601) apre un REPL
+  e chiama il modello ricorsivamente per decomporre il corpus chunk-by-chunk.
+  Il corpus completo (non compresso) è passato a ``rlm.completion()``;
+  RLM gestisce il context management internamente.
+  Budget enforcement: max_budget passato a RLM() + riconciliazione costi
+  post-completion su state['budget']['spent_dollars'].
+  Early return prima di llm_client.call().
 
-- **Standard path** (fallback): compressed/synthesized corpus included
-  as text in the user prompt via a single llm_client.call().
+- **Standard path** (fallback): corpus compresso/sintetizzato nel prompt,
+  singola llm_client.call().
 
-System prompt uses §29.1 cache-control blocks (Anthropic) so that
-style rules + exemplar are cached across sections (~5 min TTL).
+Il system prompt usa §29.1 cache-control blocks (Anthropic) per caching
+delle style rules + exemplar attraverso le sezioni (~5 min TTL).
 """
 from __future__ import annotations
 
@@ -41,33 +39,32 @@ from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
-# Real LoRA serving endpoint required for SHINE.
-# SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) encodes the
-# research corpus into LoRA weight deltas via a hypernetwork, then injects
-# them into this local inference server. The model then "knows" the corpus
-# WITHOUT it being in the prompt (~95% token reduction).
-#
-# Cloud API models (Anthropic, OpenAI, OpenRouter) cannot receive LoRA
-# injections — do NOT set shine_active=True without this URL configured.
-# If empty: writer falls back to standard corpus path + logger.warning().
+# Endpoint reale del server LoRA per SHINE.
+# SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) encoda il
+# corpus in LoRA weight deltas tramite hypernetwork, poi li inietta in questo
+# server di inferenza locale. Il modello "conosce" il corpus senza averlo
+# nel prompt (~95% riduzione token).
+# I modelli cloud API (Anthropic, OpenAI, OpenRouter) non possono ricevere
+# iniezioni LoRA. Se vuoto: fallback a corpus standard + logger.warning().
 _SHINE_SERVING_URL: str = os.getenv("SHINE_SERVING_URL", "")
 
 
-# ── Writer Node ─────────────────────────────────────────────────
+# ── Writer Node ──────────────────────────────────────────────────────────────
 
 def writer_node(state: dict) -> dict:
-    """Generate section draft from compressed corpus, RLM, or SHINE.
+    """Genera il draft della sezione da corpus compresso, RLM o SHINE.
 
-    Path selection priority:
+    Priorità di selezione path:
       1. SHINE LoRA   (shine_active=True AND SHINE_SERVING_URL set)
-      2. RLM          (rlm_mode=True) — early return, bypasses llm_client
+      2. RLM          (rlm_mode=True) — early return, bypassa llm_client
       3. Standard     (fallback)
 
     Args:
         state: DocumentState dict.
 
     Returns:
-        Partial state update with ``current_draft`` and ``current_iteration``.
+        Aggiornamento parziale dello stato con ``current_draft``,
+        ``current_iteration`` e opzionalmente ``budget`` aggiornato.
     """
     section_idx = state.get("current_section_idx", 0)
     outline = state.get("outline", [])
@@ -75,7 +72,8 @@ def writer_node(state: dict) -> dict:
 
     section_scope = section.get("scope", "")
     target_words = section.get("target_words", 500)
-    preset = state.get("quality_preset", "balanced")
+    # Normalizza preset: stato usa 'Balanced' (cap), routing usa 'balanced' (lower)
+    preset = (state.get("quality_preset") or "balanced").lower()
 
     style_profile = state.get("style_profile", {})
     style_profile_str = (
@@ -91,16 +89,13 @@ def writer_node(state: dict) -> dict:
     shine_active = state.get("shine_active", False)
     rlm_mode = state.get("rlm_mode", False)
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # PATH 1 — SHINE LoRA
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     if shine_active:
-        # P1 fix: state["shine_lora"] contains binary weight TENSORS —
-        # NOT text. Only Path A (real vLLM serving) is valid.
         if _SHINE_SERVING_URL:
             logger.info(
-                "Writer: SHINE LoRA path — local server %s — "
-                "corpus encoded as weight deltas "
+                "Writer: SHINE LoRA path — server %s — corpus come weight deltas "
                 "(https://github.com/Yewei-Liu/SHINE)",
                 _SHINE_SERVING_URL,
             )
@@ -109,36 +104,34 @@ def writer_node(state: dict) -> dict:
             )
         else:
             logger.warning(
-                "Writer: shine_active=True but SHINE_SERVING_URL is not set. "
-                "SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) "
-                "requires a local vLLM/AIBrix server to inject LoRA weight "
-                "deltas — cloud API models cannot receive LoRA injections. "
-                "state['shine_lora'] contains binary tensors, not text. "
-                "Falling back to standard corpus path."
+                "Writer: shine_active=True ma SHINE_SERVING_URL non configurato. "
+                "SHINE richiede un server vLLM/AIBrix locale per iniettare i LoRA "
+                "weight deltas — i modelli cloud non possono ricevere iniezioni LoRA. "
+                "state['shine_lora'] contiene tensori binari, non testo. "
+                "Fallback a corpus standard."
             )
             corpus = (
                 state.get("synthesized_sources", "")
                 or state.get("compressed_corpus", "")
             )
             user_prompt = _build_prompt_corpus(
-                style_profile_str, section_scope, target_words,
-                citation_text, corpus,
+                style_profile_str, section_scope, target_words, citation_text, corpus,
             )
 
-    # ─────────────────────────────────────────────────────────────────────
-    # PATH 2 — RLM (early return — bypasses llm_client.call below)
-    # RLM drives a REPL loop that decomposes the corpus recursively.
-    # All HTTP calls are routed through DeepResearchLM → llm_client.
+    # ─────────────────────────────────────────────────────────────────────────
+    # PATH 2 — RLM (early return — bypassa llm_client.call)
+    # RLM gestisce il proprio HTTP transport (backend string, non BaseLM inject).
+    # Budget enforcement: max_budget a RLM + riconciliazione post-completion.
     # Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     elif rlm_mode:
         from src.llm.rlm_adapter import get_rlm_client  # lazy import
 
-        # Pass full uncompressed corpus — RLM handles decomposition internally
+        # Corpus completo non compresso — RLM gestisce la decomposizione
         corpus = (
             state.get("sanitized_sources", "")
             or state.get("research_results", "")
-            or state.get("synthesized_sources", "")  # graceful fallback
+            or state.get("synthesized_sources", "")  # fallback gracioso
         )
 
         full_prompt = _build_prompt_corpus(
@@ -162,28 +155,40 @@ def writer_node(state: dict) -> dict:
         draft = result.response
         word_count = len(draft.split())
         citations_used = list(set(re.findall(r"\[(\w+)\]", draft)))
-        cost_usd = (
-            result.usage_summary.total_cost
-            if result.usage_summary and result.usage_summary.total_cost
-            else 0.0
-        )
+
+        # Riconciliazione costi: leggi da RLM e aggiorna budget state
+        cost_usd = 0.0
+        if result.usage_summary is not None:
+            try:
+                cost_usd = float(result.usage_summary.total_cost or 0.0)
+            except (AttributeError, TypeError, ValueError):
+                logger.warning(
+                    "Writer/RLM: impossibile leggere total_cost da usage_summary, "
+                    "budget state non aggiornato per questa sezione."
+                )
 
         logger.info(
-            "RLM draft: %d words, %d citations, "
-            "cost=$%.4f, time=%.2fs",
-            word_count, len(citations_used),
-            cost_usd, result.execution_time,
+            "RLM draft: %d words, %d citations, cost=$%.4f, time=%.2fs",
+            word_count, len(citations_used), cost_usd, result.execution_time,
         )
 
-        # Early return — RLM owned transport, no llm_client.call() needed
+        # Aggiorna budget nel state
+        budget_update: dict = {}
+        existing_budget = state.get("budget", {})
+        if cost_usd > 0 and existing_budget:
+            new_spent = existing_budget.get("spent_dollars", 0.0) + cost_usd
+            budget_update = {"budget": {**existing_budget, "spent_dollars": new_spent}}
+
+        # Early return — RLM ha gestito il transport
         return {
             "current_draft": draft,
             "current_iteration": state.get("current_iteration", 0) + 1,
+            **budget_update,
         }
 
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     # PATH 3 — Standard (SHINE inactive, RLM inactive)
-    # ─────────────────────────────────────────────────────────────────────
+    # ─────────────────────────────────────────────────────────────────────────
     else:
         corpus = (
             state.get("synthesized_sources", "")
@@ -194,9 +199,9 @@ def writer_node(state: dict) -> dict:
             style_profile_str, section_scope, target_words, citation_text, corpus,
         )
 
-    # ── §29.1 Prompt Caching: system as array with cache_control ──────────
-    # Applies to PATH 1 (SHINE) and PATH 3 (standard) only.
-    # PATH 2 (RLM) returned early above.
+    # ── §29.1 Prompt Caching: system come array con cache_control ────────────
+    # Si applica a PATH 1 (SHINE) e PATH 3 (standard) soltanto.
+    # PATH 2 (RLM) ha fatto early return sopra.
     system_blocks = [
         {
             "type": "text",
@@ -211,16 +216,16 @@ def writer_node(state: dict) -> dict:
         {
             "type": "text",
             "text": _format_writer_memory(writer_memory),
-            # NOT cached — changes per section
+            # NON cached — cambia per sezione
         },
     ]
 
-    # P8: Dynamic max_tokens proportional to target_words.
+    # P8: max_tokens dinamico proporzionale a target_words.
     # Formula: words × 1.5 safety buffer ÷ 0.75 words/token + 256 overhead.
-    # Floor 512 (short sections), cap 8192 (provider limit).
+    # Floor 512, cap 8192.
     max_tokens = max(512, min(int(target_words * 1.5 / 0.75) + 256, 8192))
 
-    # ── LLM call (PATH 1 + PATH 3) ──────────────────────────────────
+    # ── LLM call (PATH 1 + PATH 3) ───────────────────────────────────────────
     messages = [{"role": "user", "content": user_prompt}]
 
     response = llm_client.call(
@@ -248,77 +253,66 @@ def writer_node(state: dict) -> dict:
     }
 
 
-# ── Prompt builders ─────────────────────────────────────────────
+# ── Prompt builders ───────────────────────────────────────────────────────────
 
 def _build_prompt_shine_lora(
     style: str, scope: str, target_words: int, citations: str,
 ) -> str:
-    """Prompt for REAL LoRA serving path ONLY.
+    """Prompt per il path LoRA reale SOLO.
 
-    Called exclusively when SHINE_SERVING_URL is configured. The SHINE
-    hypernetwork (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358)
-    has encoded the research corpus into LoRA weight deltas injected into
-    the local inference server. The model ACTUALLY has the domain knowledge
-    — the directive is architecturally valid here.
-
-    NEVER call this for cloud API models. They cannot receive LoRA
-    injections and the directive will cause hallucination.
+    Chiamato esclusivamente quando SHINE_SERVING_URL è configurato. Il modello
+    ha già la domain knowledge nei weights tramite iniezione LoRA.
+    NON chiamare per modelli cloud API (non possono ricevere LoRA).
     """
     return f"""\
-Write a section for a {style} document.
+Scrivi una sezione per un documento {style}.
 
-Section: {scope}
-Target word count: {target_words} (±15% acceptable)
+Sezione: {scope}
+Conteggio parole target: {target_words} (±15% accettabile)
 
-Sources (use ONLY citations from this map):
+Fonti (usa SOLO le citazioni da questa mappa):
 {citations}
 
-Constraints:
-- Your LoRA adapter contains the domain knowledge for this section
-- Cite sources using [source_id] format
-- Word count: {target_words} ± 15%
-- No markdown formatting"""
+Vincoli:
+- Il tuo adapter LoRA contiene la domain knowledge per questa sezione
+- Cita le fonti nel formato [source_id]
+- Conteggio parole: {target_words} ±15%
+- Nessuna formattazione markdown"""
 
 
 def _build_prompt_corpus(
     style: str, scope: str, target_words: int, citations: str, corpus: str,
 ) -> str:
-    """Prompt for standard and RLM paths.
+    """Prompt per path standard e RLM.
 
-    Used by:
-      - PATH 2 (RLM): full uncompressed corpus; RLM decomposes internally
-      - PATH 3 (standard): pre-compressed corpus
-      - PATH 1 fallback (SHINE misconfigured): compressed corpus
+    Usato da:
+      - PATH 2 (RLM): corpus completo non compresso
+      - PATH 3 (standard): corpus pre-compresso
+      - PATH 1 fallback (SHINE mal configurato): corpus compresso
     """
     return f"""\
-Write a section for a {style} document.
+Scrivi una sezione per un documento {style}.
 
-Section: {scope}
-Target word count: {target_words} (±15% acceptable)
+Sezione: {scope}
+Conteggio parole target: {target_words} (±15% accettabile)
 
-Sources (use ONLY citations from this map):
+Fonti (usa SOLO le citazioni da questa mappa):
 {citations}
 
-Research corpus:
+Corpus di ricerca:
 {corpus}
 
-Constraints:
-- Use ONLY facts from the corpus above
-- Cite sources using [source_id] format
-- Word count: {target_words} ± 15%
-- No markdown formatting"""
+Vincoli:
+- Usa SOLO fatti dal corpus sopra
+- Cita le fonti nel formato [source_id]
+- Conteggio parole: {target_words} ±15%
+- Nessuna formattazione markdown"""
 
 
-# ── Helpers ──────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _get_style_profile_rules(style_profile: Any) -> str:
-    """Load style rules from config/style_profiles.yaml (§26).
-
-    Accepts:
-        - str: profile name (e.g. "academic", "business")
-        - dict with "name" key → profile name
-        - dict with "rules" key → inline rules (legacy)
-    """
+    """Carica le style rules da config/style_profiles.yaml (§26)."""
     import yaml as _yaml
     from pathlib import Path as _Path
 
@@ -344,25 +338,25 @@ def _get_style_profile_rules(style_profile: Any) -> str:
         except Exception:
             pass
 
-    return "Follow academic writing conventions. Be precise and well-sourced."
+    return "Segui le convenzioni di scrittura accademica. Sii preciso e ben documentato."
 
 
 def _format_sources_as_citations(sources: list[dict]) -> str:
-    """Format current_sources into a citation map string."""
+    """Formatta current_sources come mappa di citazioni."""
     if not sources:
-        return "(no sources available)"
+        return "(nessuna fonte disponibile)"
     lines = []
     for s in sources:
         sid = s.get("source_id", "?")
-        title = s.get("title", "Untitled")
+        title = s.get("title", "Senza titolo")
         snippet = (s.get("abstract") or s.get("full_text_snippet") or "")[:200]
         lines.append(f"[{sid}] {title}: {snippet}")
     return "\n".join(lines)
 
 
 def _format_writer_memory(writer_memory: dict) -> str:
-    """Format recurring errors from writer memory (§5.18)."""
+    """Formatta gli errori ricorrenti dalla writer memory (§5.18)."""
     recurring = writer_memory.get("recurring_errors", [])
     if not recurring:
         return ""
-    return "Previous errors to avoid:\n" + "\n".join(f"- {err}" for err in recurring)
+    return "Errori precedenti da evitare:\n" + "\n".join(f"- {err}" for err in recurring)

@@ -1,219 +1,150 @@
-"""DeepResearchLM: BaseLM adapter bridging RLM → our llm_client stack.
+"""RLM client factory — src/llm/rlm_adapter.py
 
-RLM (https://github.com/alexzhang13/rlm, arXiv:2512.24601) runs its own
-REPL loop and spawns sub-calls via BaseLM subclasses. By default it
-instantiates its own HTTP clients, which bypass:
-  - our per-model rate limiter (P5)
-  - our cost tracking / budget_controller
-  - our tier upgrade guard (P9 / RLM_ALLOW_TIER_UPGRADE)
-  - our retry and fallback logic
+Provides get_rlm_client() which builds a correctly-wired RLM instance.
 
-This module provides ``DeepResearchLM``, a ``BaseLM`` subclass whose
-``completion()`` method delegates every call — root AND recursive
-sub-calls — to our ``llm_client``. RLM drives the REPL orchestration;
-our stack owns transport, rate limiting, and cost accounting.
+ARCHITETTURA — perché DeepResearchLM è stato rimosso
+=====================================================
+RLM (https://github.com/alexzhang13/rlm, arXiv:2512.24601) espone un
+construttore che accetta solo stringhe backend:
 
-Usage (from writer_node)::
+    RLM(backend='openrouter', backend_kwargs={'model_name': '...'}, ...)
 
-    from src.llm.rlm_adapter import get_rlm_client
+get_client() in rlm/clients/__init__.py è una factory NON estendibile:
+accetta {'openai','openrouter','anthropic','vllm','litellm','portkey',
+'gemini','azure_openai','vercel'} e restituisce un BaseLM concreto.
+Non c'è nessun parametro custom_client= / custom_sub_client= per iniettare
+un'istanza BaseLM precostruita — TypeError immediato se usati.
 
-    rlm = get_rlm_client(
-        model=route_model("writer", preset),
-        child_model=route_model("writer", "economy"),
-        state=state,
-    )
-    result = rlm.completion(full_prompt)
-    draft = result.response
+STRATEGIA DI BUDGET (sostituisce il bridge approach)
+=====================================================
+  1. max_budget passato a RLM() → enforced internamente dal REPL loop
+  2. Dopo rlm.completion(), il caller (writer_node) legge
+     result.usage_summary.total_cost e aggiorna state['budget']['spent_dollars']
+  3. Il rate limiting a livello provider è gestito dalle API key quotas
+
+MAPPA BACKEND
+=============
+  Il routing table usa il formato 'provider/model_name':
+    'openrouter/google/gemini-2.5-pro' → backend='openrouter', model_name='google/gemini-2.5-pro'
+    'anthropic/claude-opus-4-5'        → backend='anthropic', model_name='claude-opus-4-5'
+    'openai/gpt-4o'                    → backend='openai',    model_name='gpt-4o'
+  I backend non riconosciuti fallback a 'openai' con model_name intatto.
 """
 from __future__ import annotations
 
 import logging
 import os
-import time
 from typing import Any
-
-from rlm import RLM
-from rlm.clients import BaseLM
-from rlm.core.types import UsageSummary
-from rlm.logger import RLMLogger
-
-from src.llm.client import llm_client
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Env-driven RLM settings
-# ---------------------------------------------------------------------------
-_RLM_ENVIRONMENT: str = os.getenv("RLM_ENVIRONMENT", "local")
-_RLM_LOG_DIR: str = os.getenv("RLM_LOG_DIR", "./logs/rlm")
-_RLM_MAX_ITERATIONS: int = int(os.getenv("RLM_MAX_ITERATIONS", "30"))
-_RLM_MAX_DEPTH: int = int(os.getenv("RLM_MAX_DEPTH", "2"))
+# ── Env config ──────────────────────────────────────────────────────────────
+
+# RLM environment (default: 'corpus' — legge tutto il corpus nel REPL loop)
+_RLM_ENVIRONMENT: str = os.getenv("RLM_ENVIRONMENT", "corpus")
+
+# Directory per i log del REPL trace (debugging)
+_RLM_LOG_DIR: str = os.getenv("RLM_LOG_DIR", "/tmp/rlm_logs")
+
+# Profondità massima di ricorsione del REPL
+_RLM_MAX_DEPTH: int = int(os.getenv("RLM_MAX_DEPTH", "10"))
+
+# Iterazioni massime per completion
+_RLM_MAX_ITERATIONS: int = int(os.getenv("RLM_MAX_ITERATIONS", "20"))
+
+# Backend noti in RLM (da rlm/clients/__init__.py, alexzhang13/rlm@main)
+_KNOWN_BACKENDS: frozenset[str] = frozenset({
+    "openai", "openrouter", "anthropic", "vllm",
+    "litellm", "portkey", "gemini", "azure_openai", "vercel",
+})
 
 
-# ---------------------------------------------------------------------------
-# BaseLM adapter
-# ---------------------------------------------------------------------------
+# ── Backend parser ────────────────────────────────────────────────────────────
 
-class DeepResearchLM(BaseLM):
-    """BaseLM subclass that routes every RLM call through our llm_client.
+def _parse_model_string(model: str) -> tuple[str, str]:
+    """Parse una stringa modello nel formato routing → (backend, model_name) RLM.
 
-    RLM passes this object to its internal ``LMHandler``, which calls
-    ``completion()`` for each REPL iteration. By delegating here we
-    guarantee that rate limiting, cost tracking, and tier-upgrade
-    enforcement apply to ALL calls, including recursive sub-calls.
+    Il routing table usa 'provider/model_name'. Esempi:
+      'openrouter/google/gemini-2.5-pro' → ('openrouter', 'google/gemini-2.5-pro')
+      'anthropic/claude-opus-4-5'        → ('anthropic', 'claude-opus-4-5')
+      'openai/gpt-4o'                    → ('openai', 'gpt-4o')
+      'gpt-4o'                           → ('openai', 'gpt-4o')  # fallback
 
     Args:
-        model_name: Provider-prefixed model string (e.g.
-            ``"openrouter/google/gemini-2.5-pro"``). Must match the
-            format expected by ``llm_client.call()``.
-        agent: Agent tag passed to the rate limiter and cost tracker.
-        preset: Quality preset (``"economy"``/``"balanced"``/``"premium"``).
+        model: Stringa modello nel formato del routing table.
+
+    Returns:
+        Tupla (backend, model_name) pronta per RLM().
     """
-
-    def __init__(
-        self,
-        model_name: str,
-        agent: str = "writer_rlm",
-        preset: str = "balanced",
-    ) -> None:
-        self._model_name = model_name
-        self._agent = agent
-        self._preset = preset
-        self._last_usage: dict[str, Any] = {}
-
-    # ---- BaseLM interface --------------------------------------------------
-
-    @property
-    def model_name(self) -> str:
-        return self._model_name
-
-    def completion(
-        self,
-        prompt: str | list[dict[str, Any]],
-        **kwargs: Any,
-    ) -> str:
-        """Delegate to llm_client, returning plain text for RLM's REPL loop.
-
-        RLM calls this for every iteration: root turns and recursive
-        sub-calls at depth > 0. Rate limiter and cost tracker apply to all.
-        """
-        start = time.perf_counter()
-
-        if isinstance(prompt, str):
-            messages = [{"role": "user", "content": prompt}]
-        else:
-            messages = prompt
-
-        response = llm_client.call(
-            model=self._model_name,
-            messages=messages,
-            agent=self._agent,
-            preset=self._preset,
-        )
-
-        elapsed = time.perf_counter() - start
-        self._last_usage = {
-            "input_tokens": response.get("input_tokens", 0),
-            "output_tokens": response.get("output_tokens", 0),
-            "cost_usd": response.get("cost_usd", 0.0),
-            "latency_s": elapsed,
-        }
-
-        logger.debug(
-            "DeepResearchLM: model=%s agent=%s "
-            "in=%d out=%d cost=$%.5f latency=%.2fs",
-            self._model_name, self._agent,
-            self._last_usage["input_tokens"],
-            self._last_usage["output_tokens"],
-            self._last_usage["cost_usd"],
-            elapsed,
-        )
-
-        return response["text"]
-
-    def get_last_usage(self) -> UsageSummary:
-        """Return usage wrapped in RLM's UsageSummary for budget tracking."""
-        return UsageSummary(
-            model_usage_summaries={
-                self._model_name: {
-                    "total_input_tokens": self._last_usage.get("input_tokens", 0),
-                    "total_output_tokens": self._last_usage.get("output_tokens", 0),
-                    "total_cost": self._last_usage.get("cost_usd", 0.0),
-                }
-            }
-        )
+    parts = model.split("/", 1)
+    if len(parts) == 2 and parts[0] in _KNOWN_BACKENDS:
+        return parts[0], parts[1]
+    # Fallback: stringa intera come model_name, backend openai
+    logger.warning(
+        "rlm_adapter: provider non riconosciuto in '%s', fallback backend='openai'",
+        model,
+    )
+    return "openai", model
 
 
-# ---------------------------------------------------------------------------
-# Factory
-# ---------------------------------------------------------------------------
+# ── Factory ───────────────────────────────────────────────────────────────────
 
 def get_rlm_client(
     model: str,
     child_model: str | None = None,
-    state: dict | None = None,
-) -> RLM:
-    """Build a fully-wired RLM instance backed by our llm_client.
+    state: dict[str, Any] | None = None,
+):
+    """Costruisce un'istanza RLM configurata per il writer node.
+
+    Non usa DeepResearchLM né custom_client= — quei parametri non esistono
+    nell'API pubblica di RLM. Il budget è enforced via max_budget di RLM;
+    la riconciliazione costi avviene nel caller dopo rlm.completion().
 
     Args:
-        model:       Root model (from ``route_model('writer', preset)``).
-        child_model: Model for recursive sub-calls. Defaults to
-                     ``route_model('writer', 'economy')`` to keep sub-call
-                     costs low. Pass the same as ``model`` to use a single
-                     backbone.
-        state:       DocumentState dict. Used to read
-                     ``state['section_budget_usd']`` for per-section budget
-                     cap and ``state['quality_preset']`` for agent tagging.
+        model:       Modello root (es. 'openrouter/google/gemini-2.5-pro').
+                     Usato per il turno principale del REPL.
+        child_model: Modello per i sub-call ricorsivi (es. 'openai/gpt-4o-mini').
+                     Default: route_model('writer', 'economy').
+        state:       DocumentState dict. Usato per leggere section_budget_usd.
 
     Returns:
-        A configured :class:`RLM` instance ready for ``rlm.completion()``.
-
-    Example::
-
-        from src.llm.rlm_adapter import get_rlm_client
-        from src.llm.routing import route_model
-
-        rlm = get_rlm_client(
-            model=route_model("writer", preset),
-            child_model=route_model("writer", "economy"),
-            state=state,
-        )
-        result = rlm.completion(full_prompt)
-        draft = result.response
+        Istanza RLM pronta per .completion().
     """
+    from rlm.core.rlm import RLM
+    from rlm.utils.logger import RLMLogger
+
     state = state or {}
-    preset = state.get("quality_preset", "balanced")
+
+    # Budget per-sezione passato a RLM (enforced internamente)
     budget_usd: float | None = state.get("section_budget_usd")
 
+    # Child model fallback
     if child_model is None:
-        # Sub-calls default to economy tier to avoid runaway costs during
-        # recursive decomposition.  Caller can override if needed.
-        from src.llm.routing import route_model as _route
-        child_model = _route("writer", "economy")
+        from src.llm.routing import route_model as _route_model
+        child_model = _route_model("writer", "economy")
 
-    root_lm = DeepResearchLM(model_name=model, agent="writer_rlm", preset=preset)
-    child_lm = DeepResearchLM(
-        model_name=child_model, agent="writer_rlm_sub", preset="economy"
+    # Parse entrambe le stringhe modello
+    root_backend, root_model_name = _parse_model_string(model)
+    child_backend, child_model_name = _parse_model_string(child_model)
+
+    logger.info(
+        "rlm_adapter: root=%s/%s child=%s/%s budget=$%s env=%s",
+        root_backend, root_model_name,
+        child_backend, child_model_name,
+        f"{budget_usd:.4f}" if budget_usd is not None else "None",
+        _RLM_ENVIRONMENT,
     )
 
     rlm_logger = RLMLogger(log_dir=_RLM_LOG_DIR)
 
-    logger.info(
-        "RLM client: root=%s child=%s env=%s max_depth=%d max_iter=%d budget=$%s",
-        model, child_model, _RLM_ENVIRONMENT,
-        _RLM_MAX_DEPTH, _RLM_MAX_ITERATIONS,
-        f"{budget_usd:.4f}" if budget_usd else "none",
-    )
-
     return RLM(
-        backend="openai",           # backend is overridden by custom_client below
-        backend_kwargs={"model_name": model},
+        backend=root_backend,
+        backend_kwargs={"model_name": root_model_name},
+        other_backends=[child_backend],
+        other_backend_kwargs=[{"model_name": child_model_name}],
         environment=_RLM_ENVIRONMENT,
         max_depth=_RLM_MAX_DEPTH,
         max_iterations=_RLM_MAX_ITERATIONS,
         max_budget=budget_usd,
         logger=rlm_logger,
-        # Route all HTTP through our stack
-        custom_client=root_lm,          # root turns
-        custom_sub_client=child_lm,     # recursive sub-calls
     )
