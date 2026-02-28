@@ -1,10 +1,17 @@
-"""DocumentState and all sub-TypedDicts — §4.6 canonical."""
+"""DocumentState and all sub-TypedDicts — §4.6 canonical.
+
+Convenzione quality_preset / regime:
+  Tutti i valori sono lowercase: "economy" | "balanced" | "premium".
+  Vedere src/graph/_presets.py per il tipo canonico QualityPreset.
+  La normalizzazione avviene SOLO in preflight_node (src/graph/nodes/preflight.py).
+"""
 from __future__ import annotations
 from typing import TypedDict, Annotated, Any, Literal
 from langgraph.graph.message import add_messages
+from src.graph._presets import QualityPreset
 
 
-# ── §29.5 Bounded reducers ───────────────────────────────────────────
+# ── §29.5 Bounded reducers ────────────────────────────────────────────────────
 
 def _max_len_reducer(window: int):
     """Create a LangGraph reducer that keeps only the last *window* items."""
@@ -13,13 +20,18 @@ def _max_len_reducer(window: int):
     return reducer
 
 
-# ── Sub-TypedDicts ─────────────────────────────────────────────────
+# ── Sub-TypedDicts ───────────────────────────────────────────────────────
 
 class BudgetState(TypedDict):
     max_dollars: float
     spent_dollars: float
     projected_final: float
-    regime: Literal["Economy", "Balanced", "Premium"]
+    # Canonical lowercase: "economy" | "balanced" | "premium".
+    # Inizializzato da preflight_node() da DocumentState.quality_preset.
+    # Non confondere con DocumentState.quality_preset:
+    #   - DocumentState.quality_preset è il campo top-level (input utente normalizzato)
+    #   - BudgetState.regime è la copia dentro il budget per i calcoli di costo
+    regime: QualityPreset
     css_content_threshold: float
     css_style_threshold: float
     css_panel_threshold: float
@@ -130,10 +142,10 @@ class SectionCSSReport(TypedDict):
     threshold_style: float
 
 
-# ── Main State ────────────────────────────────────────────────────
+# ── Main State ────────────────────────────────────────────────────────────
 
 class DocumentState(TypedDict):
-    # ── Identifiers ───────────────────────────────────────────────────
+    # ── Identifiers ────────────────────────────────────────────────────
     doc_id: str
     thread_id: str
     user_id: str
@@ -142,21 +154,24 @@ class DocumentState(TypedDict):
         "awaiting_approval", "completed", "failed", "cancelled"
     ]
 
-    # ── Config (frozen after preflight) ────────────────────────────────
+    # ── Config (frozen after preflight) ───────────────────────────────────
     config: dict[str, Any]
     style_profile: dict[str, Any]
     style_exemplar: str | None
-    quality_preset: Literal["Economy", "Balanced", "Premium"]
+    # Canonical lowercase: "economy" | "balanced" | "premium".
+    # Normalizzato da preflight_node() — non modificare dopo Phase A.
+    # Fonte di verità: src/graph/_presets.py
+    quality_preset: QualityPreset
 
-    # ── Outline (Phase A) ────────────────────────────────────────────
+    # ── Outline (Phase A) ──────────────────────────────────────────────
     outline: list[OutlineSection]
     outline_approved: bool
 
-    # ── Section loop control ─────────────────────────────────────────
+    # ── Section loop control ───────────────────────────────────────────
     current_section_idx: int
     total_sections: int
 
-    # ── Current section state (reset each section) ─────────────────────────
+    # ── Current section state (reset each section) ────────────────────────────
     current_sources: list[Source]
     synthesized_sources: str
     current_draft: str
@@ -168,33 +183,33 @@ class DocumentState(TypedDict):
     all_verdicts_history: list[list[JudgeVerdict]]
     aggregator_verdict: AggregatorVerdict
     reflector_output: ReflectorOutput | None
-    css_history: Annotated[list[float], _max_len_reducer(8)]          # §29.5: keep last 8
+    css_history: Annotated[list[float], _max_len_reducer(8)]             # §29.5: keep last 8
     draft_embeddings: Annotated[list[list[float]], _max_len_reducer(4)]  # §29.5: keep last 4
 
-    # ── Aggregator CSS outputs (§9.7) ───────────────────────────────────
+    # ── Aggregator CSS outputs (§9.7) ─────────────────────────────────────────
     css_content_current: float
     css_style_current: float
     css_composite_current: float
 
-    # ── Force-approve (§19.5) ──────────────────────────────────────────
+    # ── Force-approve (§19.5) ───────────────────────────────────────────────
     force_approve: bool
 
-    # ── Targeted research flag ───────────────────────────────────────
+    # ── Targeted research flag ───────────────────────────────────────────
     targeted_research_active: bool
 
-    # ── MoW state (internal to writer — §7.1) ────────────────────────────
+    # ── MoW state (internal to writer — §7.1) ────────────────────────────────
     mow_drafts: list[str]
     mow_css_per_draft: list[float]
     fusor_draft: str | None
 
-    # ── Approved sections store ──────────────────────────────────────
+    # ── Approved sections store ─────────────────────────────────────────────
     approved_sections: list[dict]
     compressed_context: str
 
-    # ── Writer Memory (§5.18) ──────────────────────────────────────────
+    # ── Writer Memory (§5.18) ───────────────────────────────────────────────
     writer_memory: dict[str, Any]
 
-    # ── Budget (§19) ─────────────────────────────────────────────────
+    # ── Budget (§19) ────────────────────────────────────────────────────────
     budget: BudgetState
 
     # Per-section budget cap (USD) per il path RLM.
@@ -208,40 +223,40 @@ class DocumentState(TypedDict):
     # (AsyncPostgresSaver) e sono sempre None al resume dopo interrupt.
     section_budget_usd: float | None
 
-    # ── Oscillation (§13) ────────────────────────────────────────────
+    # ── Oscillation (§13) ──────────────────────────────────────────────────
     oscillation_detected: bool
     oscillation_type: Literal["CSS", "SEMANTIC", "WHACK_A_MOLE"] | None
 
-    # ── Panel Discussion (§11) ───────────────────────────────────────
+    # ── Panel Discussion (§11) ────────────────────────────────────────────
     panel_active: bool
     panel_round: int
     panel_anonymized_log: list[dict]
 
-    # ── Coherence / Post-QA ──────────────────────────────────────────
+    # ── Coherence / Post-QA ───────────────────────────────────────────────
     coherence_conflicts: list[CoherenceConflict]
     format_validated: bool
 
-    # ── Human-in-the-loop ──────────────────────────────────────────
+    # ── Human-in-the-loop ───────────────────────────────────────────────
     human_intervention_required: bool
     active_escalation: dict | None
 
-    # ── Run Companion (§6) ───────────────────────────────────────────
+    # ── Run Companion (§6) ────────────────────────────────────────────────
     companion_messages: Annotated[list, add_messages]
 
-    # ── RAG + SHINE integration (§RAG_SHINE_INTEGRATION) ─────────────────────
-    shine_active: bool                  # True if SHINE generated LoRA
-    shine_lora: Any | None              # LoRA adapter from ShineAdapter
-    context_lora: Any | None            # LoRA from ContextCompressor (future)
-    rag_local_sources: list[Source]      # Sources from memvid_local connector
+    # ── RAG + SHINE integration (§RAG_SHINE_INTEGRATION) ───────────────────────
+    shine_active: bool
+    shine_lora: Any | None
+    context_lora: Any | None
+    rag_local_sources: list[Source]
 
-    # ── RLM Mode (https://github.com/alexzhang13/rlm, arXiv:2512.24601) ──────
+    # ── RLM Mode (https://github.com/alexzhang13/rlm, arXiv:2512.24601) ───────────
     # Attiva il path RLM nel writer_node(): invece di llm_client.call()
     # singolo, RLM apre un REPL loop che decompone e processa il corpus
     # recursivamente. source_synthesizer e context_compressor vengono
     # bypassati upstream quando questo flag è True.
     #
     # Default: False (opt-in). Impostato da preflight_node() se la config
-    # contiene {"rlm_mode": true} o se quality_preset == "Premium" e
+    # contiene {"rlm_mode": true} o se quality_preset == "premium" e
     # il corpus supera la context window del modello writer.
     #
     # CONTRATTO LANGGRAPH: campo OBBLIGATORIO nel TypedDict.
@@ -251,6 +266,6 @@ class DocumentState(TypedDict):
     # senza alcun errore visibile — bug silenzioso impossibile da debuggare.
     rlm_mode: bool
 
-    # ── Output ─────────────────────────────────────────────────────
+    # ── Output ──────────────────────────────────────────────────────────────────
     output_paths: dict[str, str]
     run_metrics: dict[str, Any]
