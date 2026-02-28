@@ -1,0 +1,28 @@
+# RLM Integration — example feature flag configuration
+# Copy relevant sections into your main config.yaml
+#
+# Rollout strategy:
+#   Week 1-2:  source_synthesizer_rlm only (highest impact, lowest risk)
+#   Week 3-4:  add coherence_guard_rlm
+#   Week 5+:   add post_draft_analyzer_rlm
+#
+# Monitor per-section CSS and cost_usd/section after each activation.
+# Roll back by removing the agent from rlm_agents list.
+
+features:
+  rlm_enabled: true
+
+  # Activate agents incrementally
+  rlm_agents:
+    - source_synthesizer_rlm
+    # - coherence_guard_rlm      # activate in week 3
+    # - post_draft_analyzer_rlm  # activate in week 5
+
+  # Per-adapter feature flags (inline in each node)
+  rlm_source_synthesizer: true
+  rlm_coherence_guard: false
+  rlm_post_draft_analyzer: false
+
+  # Model override (defaults to claude-sonnet-4-5 / claude-haiku-3-5)
+  # rlm_root_model: claude-sonnet-4-5
+  # rlm_sub_model: claude-haiku-3-5
