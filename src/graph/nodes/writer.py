@@ -14,12 +14,17 @@ Generates a section draft using one of three paths:
   ``SHINE_SERVING_URL`` is a misconfiguration — the node falls back to
   standard corpus and emits a logger.warning() (P1 fix).
 
-- **RLM path** (``rlm_mode=True``): raw corpus passed directly to writer;
+- **RLM path** (``rlm_mode=True``):
+  RLM (https://github.com/alexzhang13/rlm, arXiv:2512.24601) opens a REPL
+  environment and calls the model recursively to decompose and process the
+  full corpus chunk-by-chunk. The complete (non-compressed) corpus is passed
+  to ``rlm.completion()``; RLM handles context management internally.
   source_synthesizer and context_compressor are bypassed upstream.
-  Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
+  All HTTP calls are routed through llm_client via DeepResearchLM adapter
+  (rate limiter + cost tracking + tier guard preserved).
 
 - **Standard path** (fallback): compressed/synthesized corpus included
-  as text in the user prompt.
+  as text in the user prompt via a single llm_client.call().
 
 System prompt uses §29.1 cache-control blocks (Anthropic) so that
 style rules + exemplar are cached across sections (~5 min TTL).
@@ -51,7 +56,12 @@ _SHINE_SERVING_URL: str = os.getenv("SHINE_SERVING_URL", "")
 # ── Writer Node ─────────────────────────────────────────────────
 
 def writer_node(state: dict) -> dict:
-    """Generate section draft from compressed corpus, RLM raw corpus, or SHINE.
+    """Generate section draft from compressed corpus, RLM, or SHINE.
+
+    Path selection priority:
+      1. SHINE LoRA   (shine_active=True AND SHINE_SERVING_URL set)
+      2. RLM          (rlm_mode=True) — early return, bypasses llm_client
+      3. Standard     (fallback)
 
     Args:
         state: DocumentState dict.
@@ -65,6 +75,7 @@ def writer_node(state: dict) -> dict:
 
     section_scope = section.get("scope", "")
     target_words = section.get("target_words", 500)
+    preset = state.get("quality_preset", "balanced")
 
     style_profile = state.get("style_profile", {})
     style_profile_str = (
@@ -74,7 +85,118 @@ def writer_node(state: dict) -> dict:
     style_exemplar = state.get("style_exemplar") or ""
     writer_memory = state.get("writer_memory", {})
 
+    current_sources = state.get("current_sources", [])
+    citation_text = _format_sources_as_citations(current_sources)
+
+    shine_active = state.get("shine_active", False)
+    rlm_mode = state.get("rlm_mode", False)
+
+    # ─────────────────────────────────────────────────────────────────────
+    # PATH 1 — SHINE LoRA
+    # ─────────────────────────────────────────────────────────────────────
+    if shine_active:
+        # P1 fix: state["shine_lora"] contains binary weight TENSORS —
+        # NOT text. Only Path A (real vLLM serving) is valid.
+        if _SHINE_SERVING_URL:
+            logger.info(
+                "Writer: SHINE LoRA path — local server %s — "
+                "corpus encoded as weight deltas "
+                "(https://github.com/Yewei-Liu/SHINE)",
+                _SHINE_SERVING_URL,
+            )
+            user_prompt = _build_prompt_shine_lora(
+                style_profile_str, section_scope, target_words, citation_text,
+            )
+        else:
+            logger.warning(
+                "Writer: shine_active=True but SHINE_SERVING_URL is not set. "
+                "SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) "
+                "requires a local vLLM/AIBrix server to inject LoRA weight "
+                "deltas — cloud API models cannot receive LoRA injections. "
+                "state['shine_lora'] contains binary tensors, not text. "
+                "Falling back to standard corpus path."
+            )
+            corpus = (
+                state.get("synthesized_sources", "")
+                or state.get("compressed_corpus", "")
+            )
+            user_prompt = _build_prompt_corpus(
+                style_profile_str, section_scope, target_words,
+                citation_text, corpus,
+            )
+
+    # ─────────────────────────────────────────────────────────────────────
+    # PATH 2 — RLM (early return — bypasses llm_client.call below)
+    # RLM drives a REPL loop that decomposes the corpus recursively.
+    # All HTTP calls are routed through DeepResearchLM → llm_client.
+    # Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
+    # ─────────────────────────────────────────────────────────────────────
+    elif rlm_mode:
+        from src.llm.rlm_adapter import get_rlm_client  # lazy import
+
+        # Pass full uncompressed corpus — RLM handles decomposition internally
+        corpus = (
+            state.get("sanitized_sources", "")
+            or state.get("research_results", "")
+            or state.get("synthesized_sources", "")  # graceful fallback
+        )
+
+        full_prompt = _build_prompt_corpus(
+            style_profile_str, section_scope, target_words, citation_text, corpus,
+        )
+
+        rlm = get_rlm_client(
+            model=route_model("writer", preset),
+            child_model=route_model("writer", "economy"),
+            state=state,
+        )
+
+        logger.info(
+            "Writer: RLM mode — https://github.com/alexzhang13/rlm — "
+            "corpus=%d chars, model=%s",
+            len(corpus),
+            route_model("writer", preset),
+        )
+
+        result = rlm.completion(full_prompt)
+        draft = result.response
+        word_count = len(draft.split())
+        citations_used = list(set(re.findall(r"\[(\w+)\]", draft)))
+        cost_usd = (
+            result.usage_summary.total_cost
+            if result.usage_summary and result.usage_summary.total_cost
+            else 0.0
+        )
+
+        logger.info(
+            "RLM draft: %d words, %d citations, "
+            "cost=$%.4f, time=%.2fs",
+            word_count, len(citations_used),
+            cost_usd, result.execution_time,
+        )
+
+        # Early return — RLM owned transport, no llm_client.call() needed
+        return {
+            "current_draft": draft,
+            "current_iteration": state.get("current_iteration", 0) + 1,
+        }
+
+    # ─────────────────────────────────────────────────────────────────────
+    # PATH 3 — Standard (SHINE inactive, RLM inactive)
+    # ─────────────────────────────────────────────────────────────────────
+    else:
+        corpus = (
+            state.get("synthesized_sources", "")
+            or state.get("compressed_corpus", "")
+        )
+        logger.info("Writer: standard corpus path (SHINE inactive, RLM inactive)")
+        user_prompt = _build_prompt_corpus(
+            style_profile_str, section_scope, target_words, citation_text, corpus,
+        )
+
     # ── §29.1 Prompt Caching: system as array with cache_control ──────────
+    # Applies to PATH 1 (SHINE) and PATH 3 (standard) only.
+    # PATH 2 (RLM) returned early above.
     system_blocks = [
         {
             "type": "text",
@@ -93,100 +215,22 @@ def writer_node(state: dict) -> dict:
         },
     ]
 
-    # ── P8: Dynamic max_tokens proportional to target_words ─────────────
+    # P8: Dynamic max_tokens proportional to target_words.
     # Formula: words × 1.5 safety buffer ÷ 0.75 words/token + 256 overhead.
     # Floor 512 (short sections), cap 8192 (provider limit).
     max_tokens = max(512, min(int(target_words * 1.5 / 0.75) + 256, 8192))
 
-    # ── Path selection ─────────────────────────────────────────────
-    shine_active = state.get("shine_active", False)
-    rlm_mode = state.get("rlm_mode", False)
-
-    current_sources = state.get("current_sources", [])
-    citation_text = _format_sources_as_citations(current_sources)
-
-    if shine_active:
-        # ── P1 fix: SHINE requires a LOCAL serving endpoint ───────────────
-        # SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358)
-        # works by running a hypernetwork that converts the research corpus
-        # into LoRA weight TENSORS (binary delta weights, not text).
-        # Those tensors are injected into a local vLLM/AIBrix server.
-        #
-        # state["shine_lora"] = weight tensors → NOT usable as a prompt corpus.
-        # The only two valid states are:
-        #   A) SHINE_SERVING_URL is set → real LoRA injection, proceed
-        #   B) SHINE_SERVING_URL is empty → misconfiguration, hard fallback
-        if _SHINE_SERVING_URL:
-            # Path A: local vLLM server has the LoRA deltas injected.
-            # The model ACTUALLY knows the corpus — directive is valid.
-            logger.info(
-                "Writer: SHINE LoRA path — local server %s — "
-                "corpus encoded as weight deltas (https://github.com/Yewei-Liu/SHINE)",
-                _SHINE_SERVING_URL,
-            )
-            user_prompt = _build_prompt_shine_lora(
-                style_profile_str, section_scope, target_words, citation_text,
-            )
-        else:
-            # Path B (removed): state["shine_lora"] contains binary tensors,
-            # not text — cannot be used as a prompt corpus.
-            # Hard fallback: standard corpus path + prominent warning.
-            logger.warning(
-                "Writer: shine_active=True but SHINE_SERVING_URL is not set. "
-                "SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) "
-                "requires a local vLLM/AIBrix server to inject LoRA weight "
-                "deltas — cloud API models (Anthropic/OpenAI/OpenRouter) cannot "
-                "receive LoRA injections. state['shine_lora'] contains binary "
-                "weight tensors and cannot be placed in a prompt. "
-                "Falling back to standard corpus path."
-            )
-            corpus = (
-                state.get("synthesized_sources", "")
-                or state.get("compressed_corpus", "")
-            )
-            user_prompt = _build_prompt_corpus(
-                style_profile_str, section_scope, target_words,
-                citation_text, corpus,
-            )
-
-    elif rlm_mode:
-        # RLM path: raw corpus, bypasses source_synthesizer + context_compressor.
-        # Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
-        # Graceful fallback chain: sanitized_sources → research_results → synthesized_sources.
-        corpus = (
-            state.get("sanitized_sources", "")
-            or state.get("research_results", "")
-            or state.get("synthesized_sources", "")
-        )
-        logger.info(
-            "Writer: RLM mode (https://github.com/alexzhang13/rlm) — "
-            "raw corpus, bypassing compression"
-        )
-        user_prompt = _build_prompt_corpus(
-            style_profile_str, section_scope, target_words, citation_text, corpus,
-        )
-
-    else:
-        corpus = (
-            state.get("synthesized_sources", "")
-            or state.get("compressed_corpus", "")
-        )
-        logger.info("Writer: standard corpus path (SHINE inactive, RLM inactive)")
-        user_prompt = _build_prompt_corpus(
-            style_profile_str, section_scope, target_words, citation_text, corpus,
-        )
-
-    # ── LLM call ────────────────────────────────────────────────
+    # ── LLM call (PATH 1 + PATH 3) ──────────────────────────────────
     messages = [{"role": "user", "content": user_prompt}]
 
     response = llm_client.call(
-        model=route_model("writer", state.get("quality_preset", "balanced")),
+        model=route_model("writer", preset),
         system=system_blocks,
         messages=messages,
         temperature=0.3,
         max_tokens=max_tokens,
         agent="writer",
-        preset=state.get("quality_preset", "balanced"),
+        preset=preset,
     )
 
     draft = response["text"]
@@ -194,7 +238,7 @@ def writer_node(state: dict) -> dict:
     citations_used = list(set(re.findall(r"\[(\w+)\]", draft)))
 
     logger.info(
-        "Draft generated: %d words, %d citations, cost=$%.4f, max_tokens=%d",
+        "Draft: %d words, %d citations, cost=$%.4f, max_tokens=%d",
         word_count, len(citations_used), response["cost_usd"], max_tokens,
     )
 
@@ -213,9 +257,9 @@ def _build_prompt_shine_lora(
 
     Called exclusively when SHINE_SERVING_URL is configured. The SHINE
     hypernetwork (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358)
-    has encoded the research corpus into LoRA weight deltas that are
-    injected into the local inference server. The model ACTUALLY has the
-    domain knowledge — the directive is architecturally valid here.
+    has encoded the research corpus into LoRA weight deltas injected into
+    the local inference server. The model ACTUALLY has the domain knowledge
+    — the directive is architecturally valid here.
 
     NEVER call this for cloud API models. They cannot receive LoRA
     injections and the directive will cause hallucination.
@@ -239,6 +283,13 @@ Constraints:
 def _build_prompt_corpus(
     style: str, scope: str, target_words: int, citations: str, corpus: str,
 ) -> str:
+    """Prompt for standard and RLM paths.
+
+    Used by:
+      - PATH 2 (RLM): full uncompressed corpus; RLM decomposes internally
+      - PATH 3 (standard): pre-compressed corpus
+      - PATH 1 fallback (SHINE misconfigured): compressed corpus
+    """
     return f"""\
 Write a section for a {style} document.
 
