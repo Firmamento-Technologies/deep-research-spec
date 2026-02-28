@@ -59,6 +59,11 @@ async def run(state: dict) -> dict:
           - compressed_context:          CompressedContext dict
           - active_lora_section_idxs:    list[int]
     """
+    # RLM bypass: source_synthesizer and context_compressor are no-ops in rlm_mode.
+    # Raw corpus is passed directly to the writer; SHINE LoRA encoding is skipped.
+    if state.get("rlm_mode", False):
+        return state  # no-op: rlm.completion() handles recursive context internally
+
     from src.shine.hypernetwork import SHINEHypernetwork
     from src.shine.adapter_registry import AdapterRegistry
     from src.shine.chunker import TextChunker
