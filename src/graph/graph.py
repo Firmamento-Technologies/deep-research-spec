@@ -8,7 +8,7 @@ from __future__ import annotations
 from langgraph.graph import StateGraph, END
 from src.graph.state import DocumentState
 
-# ── Routing functions ────────────────────────────────────────────────────────
+# ── Routing functions ─────────────────────────────────────────────────────────
 from src.graph.routers.outline_approval import route_outline_approval
 from src.graph.routers.post_aggregator import route_after_aggregator
 from src.graph.routers.post_reflector import route_after_reflector
@@ -62,7 +62,7 @@ from src.graph.nodes.length_adjuster import length_adjuster_node
 from src.graph.nodes.publisher import publisher_node
 from src.graph.nodes.feedback_collector import feedback_collector_node
 
-# ── Node list — §4.5 ────────────────────────────────────────────────────────
+# ── Node list — §4.5 ────────────────────────────────────────────────────────────
 # 32 nodes. MoW nodes (writer_a, writer_b, writer_c, jury_multi_draft, fusor)
 # are NOT graph nodes — they are internal to the writer node (§7.6 authoritative).
 
@@ -101,7 +101,7 @@ NODES: list[str] = [
     "feedback_collector",
 ]
 
-# ── All 32 nodes have real implementations — zero stubs ──────────────────────
+# ── All 32 nodes have real implementations — zero stubs ───────────────────────────
 _REAL_NODES: dict[str, callable] = {
     "preflight": preflight_node,
     "budget_estimator": budget_estimator_node,
@@ -138,7 +138,7 @@ _REAL_NODES: dict[str, callable] = {
 }
 
 
-# ── Stub node factory ────────────────────────────────────────────────────────
+# ── Stub node factory ────────────────────────────────────────────────────────────
 
 def _make_stub(name: str):
     """Create a stub node function that returns empty dict (pass-through).
@@ -152,7 +152,7 @@ def _make_stub(name: str):
     return _stub
 
 
-# ── Build graph — §4.5 ──────────────────────────────────────────────────────
+# ── Build graph — §4.5 ───────────────────────────────────────────────────────────
 
 def build_graph(checkpointer=None):
     """Build and compile the DRS LangGraph StateGraph. §4.5.
@@ -166,17 +166,17 @@ def build_graph(checkpointer=None):
     """
     g = StateGraph(DocumentState)
 
-    # ── Register nodes: real implementations override stubs ──────────────
+    # ── Register nodes: real implementations override stubs ──────────────────
     for node_name in NODES:
         fn = _REAL_NODES.get(node_name, _make_stub(node_name))
         g.add_node(node_name, fn)
 
-    # ── Entry point ──────────────────────────────────────────────────────
+    # ── Entry point ────────────────────────────────────────────────────────────
     g.set_entry_point("preflight")
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
     # Phase A: Pre-Flight & Setup
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
 
     g.add_edge("preflight", "budget_estimator")
     g.add_edge("budget_estimator", "planner")
@@ -186,9 +186,9 @@ def build_graph(checkpointer=None):
         "rejected": "planner",
     })
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
     # Phase B: Section Loop — Research Pipeline
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
 
     g.add_edge("researcher", "citation_manager")
     g.add_edge("citation_manager", "citation_verifier")
@@ -210,21 +210,26 @@ def build_graph(checkpointer=None):
     g.add_edge("researcher_targeted", "citation_manager")
     # citation_manager → citation_verifier → ... → writer already defined
 
-    # ── Style gate ───────────────────────────────────────────────────────
+    # ── Style gate ───────────────────────────────────────────────────────────────
+    # Tre path espliciti — route_style_lint ritorna Literal['violation','clean','max_style_iter'].
+    # MAX_STYLE_ITERATIONS = 3 (definito in src/graph/routers/style_lint.py).
+    # 'max_style_iter' è la guardia di terminazione: garantisce uscita dal loop
+    # anche se il fixer continua a introdurre violazioni (whack-a-mole pattern).
     g.add_conditional_edges("style_linter", route_style_lint, {
-        "violation": "style_fixer",
-        "clean": "metrics_collector",
+        "violation":      "style_fixer",
+        "clean":          "metrics_collector",
+        "max_style_iter": "metrics_collector",  # uscita garantita dopo MAX iter
     })
-    g.add_edge("style_fixer", "style_linter")  # re-lint after fix
+    g.add_edge("style_fixer", "style_linter")   # re-lint dopo fix
 
-    # ── Budget controller pass-through before jury ───────────────────────
+    # ── Budget controller pass-through before jury ────────────────────────────
     g.add_edge("metrics_collector", "budget_controller")
     g.add_conditional_edges("budget_controller", route_budget, {
         "continue": "jury",
         "hard_stop": "publisher",
     })
 
-    # ── Jury & Aggregator ────────────────────────────────────────────────
+    # ── Jury & Aggregator ────────────────────────────────────────────────────────
     g.add_edge("jury", "aggregator")
 
     # Canonical routing from §9.4 — force_approve checked FIRST
@@ -239,30 +244,30 @@ def build_graph(checkpointer=None):
         "budget_hard_stop": "publisher",
     })
 
-    # ── Span editor pipeline (SURGICAL scope) ────────────────────────────
+    # ── Span editor pipeline (SURGICAL scope) ────────────────────────────────
     g.add_edge("span_editor", "diff_merger")
     g.add_edge("diff_merger", "style_linter")  # re-lint after surgical edits
 
-    # ── Reflector routing — §12.5 ────────────────────────────────────────
+    # ── Reflector routing — §12.5 ─────────────────────────────────────────────
     g.add_conditional_edges("reflector", route_after_reflector, {
         "oscillation_check": "oscillation_check",
         "await_human": "await_human",
     })
 
-    # ── Oscillation check routing — §12.5 ────────────────────────────────
+    # ── Oscillation check routing — §12.5 ─────────────────────────────────────
     g.add_conditional_edges("oscillation_check", route_after_oscillation, {
         "span_editor": "span_editor",
         "writer": "writer",
         "escalate_human": "await_human",
     })
 
-    # ── Panel discussion self-loop — §9.5 ────────────────────────────────
+    # ── Panel discussion self-loop — §9.5 ───────────────────────────────────
     g.add_conditional_edges("panel_discussion", route_after_panel_internal, {
         "panel_discussion": "panel_discussion",
         "aggregator": "aggregator",
     })
 
-    # ── Section approval pipeline ────────────────────────────────────────
+    # ── Section approval pipeline ──────────────────────────────────────────────
     # coherence_guard → context_compressor → section_checkpoint
     g.add_conditional_edges("coherence_guard", route_after_coherence, {
         "no_conflict": "context_compressor",
@@ -275,9 +280,9 @@ def build_graph(checkpointer=None):
         "all_done": "post_qa",
     })
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
     # Phase C: Post-Flight QA
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
 
     g.add_conditional_edges("post_qa", route_post_qa, {
         "length_out_of_range": "length_adjuster",
@@ -286,11 +291,11 @@ def build_graph(checkpointer=None):
     })
     g.add_edge("length_adjuster", "publisher")
 
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
     # Phase D: Publisher & Output
-    # ══════════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════════
 
-    # ── Await human routing — resume after escalation ─────────────────
+    # ── Await human routing — resume after escalation ───────────────────────
     g.add_conditional_edges("await_human", route_after_await_human, {
         "aggregator": "aggregator",   # auto-resolved → force_approve
         "__end__": END,               # interactive → pause graph
@@ -299,5 +304,5 @@ def build_graph(checkpointer=None):
     g.add_edge("publisher", "feedback_collector")
     g.add_edge("feedback_collector", END)
 
-    # ── Compile ──────────────────────────────────────────────────────────
+    # ── Compile ───────────────────────────────────────────────────────────────────
     return g.compile(checkpointer=checkpointer)

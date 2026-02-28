@@ -1,9 +1,26 @@
 """Style linter (§5.9) — detect style rule violations in draft.
 
 Checks the current draft against style profile rules and produces
-a list of ``StyleLintViolation`` dicts.  The router
-(``route_style_lint``) sends to ``style_fixer`` if violations exist,
-otherwise passes to ``metrics_collector``.
+a list of ``StyleLintViolation`` dicts. Il router ``route_style_lint``
+(src/graph/routers/style_lint.py) decide il routing post-lint:
+  - 'violation'       → style_fixer
+  - 'clean'           → metrics_collector
+  - 'max_style_iter'  → metrics_collector (uscita garantita)
+
+RESPONSABILITÀ DI QUESTO NODO:
+  Solo linting e incremento contatore. NON decide dove andare.
+  La guardia di terminazione vive in route_style_lint (router).
+  Non duplicare MAX_STYLE_ITERATIONS qui: importarla dal router.
+
+DESIGN NOTE — perché il guard non sta qui:
+  Il pattern precedente aveva la guardia dentro il nodo:
+    if style_iterations >= MAX: return {violations: []}
+  Questo era sbagliato per tre motivi:
+  1. Logica di routing nel nodo — viola separazione responsabilità
+  2. Falsificava i log: 0 violazioni anche se ne esistevano reali
+  3. Non incrementava il contatore, rendendo lo stato incoerente
+  Il corretto design: il nodo fa il suo lavoro (sempre), il router
+  interpreta il risultato e prende la decisione.
 """
 from __future__ import annotations
 
@@ -11,15 +28,14 @@ import logging
 import re
 from typing import Any
 
+from src.graph.routers.style_lint import MAX_STYLE_ITERATIONS  # fonte di verità
 from src.llm.client import llm_client
 from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
-# Maximum style fix iterations before forcing clean
-MAX_STYLE_ITERATIONS = 3
 
-# ── Built-in L1 rules (always enforced) ──────────────────────────────────────
+# ── Built-in L1 rules (always enforced) ───────────────────────────────────────
 
 _L1_RULES: list[dict] = [
     {
@@ -46,34 +62,36 @@ _L1_RULES: list[dict] = [
 ]
 
 
+# ── Style Linter Node ──────────────────────────────────────────────────────────
+
 def style_linter_node(state: dict) -> dict:
-    """Lint the current draft against style rules.
+    """Lint il current_draft contro le style rules.
+
+    Esegue SEMPRE il linting, anche all'ultima iterazione consentita.
+    Il router (route_style_lint) deciderà se uscire verso metrics_collector
+    o iterare verso style_fixer in base a style_iterations e alle violazioni.
+
+    Il contatore style_iterations viene SEMPRE incrementato, anche quando
+    vengono trovate violazioni all'iterazione massima. Questo è necessario
+    perché route_style_lint controlla style_iterations DOPO che il nodo
+    ha già restituito il suo output.
 
     Args:
-        state: DocumentState dict with ``current_draft`` and
-               ``style_profile``.
+        state: DocumentState dict.
 
     Returns:
-        Partial state update with ``style_lint_violations``.
+        Partial state update con ``style_lint_violations`` (lista reale,
+        mai forzata a vuoto) e ``style_iterations`` incrementato.
     """
-    # Check iteration limit to prevent infinite loops
-    style_iterations = state.get("style_iterations", 0)
-    if style_iterations >= MAX_STYLE_ITERATIONS:
-        logger.warning(
-            "StyleLinter: max iterations (%d) reached, forcing clean exit",
-            MAX_STYLE_ITERATIONS
-        )
-        return {
-            "style_lint_violations": [],
-            "style_iterations": style_iterations,
-        }
+    style_iterations: int = state.get("style_iterations", 0)
+    new_iterations: int = style_iterations + 1
 
-    draft = state.get("current_draft", "")
-    style_profile = state.get("style_profile", {})
+    draft: str = state.get("current_draft", "")
+    style_profile: Any = state.get("style_profile", {})
 
     violations: list[dict] = []
 
-    # 1. Regex-based L1 rules (fast, deterministic)
+    # 1. Regex-based L1 rules (fast, deterministico)
     profile_name = (
         style_profile if isinstance(style_profile, str)
         else style_profile.get("name", "academic")
@@ -82,7 +100,7 @@ def style_linter_node(state: dict) -> dict:
     if profile_name in ("academic", "formal", "scientific"):
         for rule in _L1_RULES:
             matches = list(re.finditer(rule["pattern"], draft, re.IGNORECASE))
-            for m in matches[:3]:  # cap at 3 per rule
+            for m in matches[:3]:  # cap a 3 per regola
                 violations.append({
                     "rule_id": rule["rule_id"],
                     "level": "L1",
@@ -93,33 +111,50 @@ def style_linter_node(state: dict) -> dict:
                     "fix_hint": rule["fix_hint"],
                 })
 
-    # 2. LLM-based L2 rules (style profile specific)
-    custom_rules = []
+    # 2. LLM-based L2 rules (style profile specifiche)
+    custom_rules: list[str] = []
     if isinstance(style_profile, dict):
         custom_rules = style_profile.get("rules", [])
 
     if custom_rules and draft:
-        preset = state.get("quality_preset", "balanced")
+        preset = (state.get("quality_preset") or "balanced").lower()
         l2_violations = _check_l2_rules(draft, custom_rules, preset)
         violations.extend(l2_violations)
 
-    logger.info(
-        "StyleLinter: %d violations (%d L1, %d L2), iteration %d/%d",
-        len(violations),
-        sum(1 for v in violations if v.get("level") == "L1"),
-        sum(1 for v in violations if v.get("level") == "L2"),
-        style_iterations + 1,
-        MAX_STYLE_ITERATIONS,
-    )
+    # Log: mostra violazioni reali anche all'ultima iterazione.
+    # Se new_iterations >= MAX_STYLE_ITERATIONS, route_style_lint
+    # eseguirà l'uscita garantita verso metrics_collector.
+    if new_iterations >= MAX_STYLE_ITERATIONS and violations:
+        logger.warning(
+            "StyleLinter: iterazione %d/%d — %d violazioni residue non risolte. "
+            "route_style_lint farà uscita su 'max_style_iter' → metrics_collector. "
+            "Le violazioni verranno registrate nei run_metrics come warning.",
+            new_iterations, MAX_STYLE_ITERATIONS, len(violations),
+        )
+    else:
+        logger.info(
+            "StyleLinter: %d violazioni (%d L1, %d L2), iterazione %d/%d",
+            len(violations),
+            sum(1 for v in violations if v.get("level") == "L1"),
+            sum(1 for v in violations if v.get("level") == "L2"),
+            new_iterations,
+            MAX_STYLE_ITERATIONS,
+        )
 
     return {
-        "style_lint_violations": violations,
-        "style_iterations": style_iterations + 1,
+        "style_lint_violations": violations,  # mai forzato a []
+        "style_iterations": new_iterations,   # sempre incrementato
     }
 
 
-def _check_l2_rules(draft: str, rules: list[str], quality_preset: str = "balanced") -> list[dict]:
-    """Use LLM to check custom style rules (L2)."""
+# ── L2 Rule Checker ──────────────────────────────────────────────────────────────
+
+def _check_l2_rules(
+    draft: str,
+    rules: list[str],
+    quality_preset: str = "balanced",
+) -> list[dict]:
+    """Usa LLM per controllare regole di stile custom (L2)."""
     try:
         rules_text = "\n".join(f"- {r}" for r in rules)
         response = llm_client.call(
@@ -146,7 +181,7 @@ If no violations, return: NO_VIOLATIONS""",
             preset=quality_preset,
         )
 
-        violations = []
+        violations: list[dict] = []
         for line in response["text"].split("\n"):
             line = line.strip()
             if line.startswith("VIOLATION:"):
