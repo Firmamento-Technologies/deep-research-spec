@@ -1,36 +1,45 @@
-# Python bytecode
+# === Python bytecode ===
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-
-# Testing
-.pytest_cache/
-.coverage
-.hypothesis/
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Distribution / packaging
+.Python
+*.egg
 *.egg-info/
 dist/
 build/
+.eggs/
 
-# Environment variables
+# === Env / secrets (NEVER commit real .env) ===
 .env
 .env.local
+.env.production
+!.env.example
+*.pem
+*.key
 
-# OS
+# === IDE ===
+.idea/
+*.swp
+*.swo
+*.orig
+
+# === Test artifacts ===
+.pytest_cache/
+.coverage
+htmlcov/
+
+# === Logs ===
+*.log
+logs/
+
+# === OS ===
 .DS_Store
 Thumbs.db
+
+# === RLM Runtime Artifacts ===
+logs/rlm/
+
+# === SHINE Runtime Artifacts ===
+*.lora_tmp
+shine_cache/
