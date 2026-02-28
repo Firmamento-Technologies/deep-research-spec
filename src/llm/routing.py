@@ -20,7 +20,9 @@ Key changes vs original routing.py:
   - writer → anthropic/ prefix (direct Anthropic API, enables §29.1 prompt caching)
   - all other agents → openrouter/ prefix (single-key gateway)
 
-Ref: arXiv:2512.24601 (RLM integration), ChatEval arXiv:2308.07201 (jury diversity)
+Ref:
+  - RLM: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
+  - ChatEval: arXiv:2308.07201 (jury diversity / heterogeneous backbones)
 """
 from __future__ import annotations
 
@@ -41,17 +43,17 @@ logger = logging.getLogger(__name__)
 # using a 10–20× more expensive model on transient provider failures.
 # Set RLM_ALLOW_TIER_UPGRADE=true only when you explicitly accept budget
 # overruns as a resilience trade-off (e.g. SLA-critical production runs).
+# Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
 # ---------------------------------------------------------------------------
 _ALLOW_TIER_UPGRADE: bool = (
     os.getenv("RLM_ALLOW_TIER_UPGRADE", "false").lower() == "true"
 )
 
 # Relative cost weights per tier — used only for logging the cost delta.
-# These are approximate multipliers, not exact dollar values.
 _TIER_COST_WEIGHT: dict[str, float] = {
     "economy":  1.0,
-    "balanced": 4.0,   # ~4× economy
-    "premium":  15.0,  # ~15× economy
+    "balanced": 4.0,
+    "premium":  15.0,
 }
 
 # ---------------------------------------------------------------------------
@@ -90,7 +92,6 @@ _DEFAULT_ROUTING: dict[str, dict[str, str]] = {
         "balanced": "openrouter/anthropic/claude-sonnet-4",
         "premium":  "openrouter/anthropic/claude-opus-4-5",
     },
-    # Single-slot fallback (jury_size=1 or economy with size>1)
     "jury_r": {
         "economy":  "openrouter/google/gemini-2.5-flash",
         "balanced": "openrouter/openai/o3-mini",
@@ -233,7 +234,6 @@ _DEFAULT_ROUTING: dict[str, dict[str, str]] = {
 
 # ---------------------------------------------------------------------------
 # Lateral fallbacks: same-tier alternative before vertical upgrade
-# Strategy: try a different provider at the SAME cost level before escalating.
 # ---------------------------------------------------------------------------
 _LATERAL_FALLBACKS: dict[str, list[str]] = {
     "openrouter/openai/o3":                   ["openrouter/anthropic/claude-opus-4-5"],
@@ -267,7 +267,6 @@ def _load_routing_config() -> dict[str, dict[str, str]]:
                 with open(path) as f:
                     data = yaml.safe_load(f) or {}
                 logger.info("RLM Router: loaded config from %s", path)
-                # Merge: file overrides defaults (allows partial overrides)
                 merged = dict(_DEFAULT_ROUTING)
                 merged.update(data)
                 return merged
@@ -279,9 +278,9 @@ def _load_routing_config() -> dict[str, dict[str, str]]:
 
 def _get_routing_table() -> dict[str, dict[str, str]]:
     global _routing_table
-    if _routing_table is None:          # fast path (no lock)
+    if _routing_table is None:
         with _routing_lock:
-            if _routing_table is None:  # slow path (double-checked)
+            if _routing_table is None:
                 _routing_table = _load_routing_config()
     return _routing_table
 
@@ -302,17 +301,13 @@ def route_model(
 
     Tier upgrade policy (P9 fix):
       - ``allow_tier_upgrade=None`` (default): defers to the
-        ``RLM_ALLOW_TIER_UPGRADE`` env var (false by default). This makes
-        the env var the single source of truth — no call-site needs to
-        pass the flag explicitly in normal operation.
-      - ``allow_tier_upgrade=False``: always blocks upgrades regardless of
-        env var. Use in tests or budget-critical paths.
-      - ``allow_tier_upgrade=True``: always allows upgrades regardless of
-        env var. Use only for explicit escalation after lateral exhaustion.
+        ``RLM_ALLOW_TIER_UPGRADE`` env var (false by default).
+      - ``allow_tier_upgrade=False``: always blocks regardless of env var.
+      - ``allow_tier_upgrade=True``: always allows regardless of env var.
 
-    When a vertical upgrade is blocked, a RuntimeError is raised so the
-    caller can decide how to proceed (fail-fast, alert, manual override).
-    This prevents silent 10–20× cost escalation on transient failures.
+    When a vertical upgrade is blocked, RuntimeError is raised so the
+    caller can decide (fail-fast, alert, manual override).
+    Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
 
     Args:
         agent:              Agent identifier (see _DEFAULT_ROUTING keys).
@@ -321,13 +316,12 @@ def route_model(
                             explicit override.
 
     Returns:
-        Provider-prefixed model string, e.g. "openrouter/google/gemini-2.5-flash".
+        Provider-prefixed model string.
 
     Raises:
         RuntimeError: If only a vertical upgrade could satisfy the request
                       but tier upgrade is blocked.
     """
-    # Resolve allow_tier_upgrade: None defers to env var
     if allow_tier_upgrade is None:
         allow_tier_upgrade = _ALLOW_TIER_UPGRADE
 
@@ -346,7 +340,7 @@ def route_model(
     if model:
         return model
 
-    # 2. Lateral fallback (same tier, alternative provider — zero cost delta)
+    # 2. Lateral fallback (same tier, zero cost delta)
     primary = agent_routes.get(preset_lower, "")
     for lateral in _LATERAL_FALLBACKS.get(primary, []):
         if lateral:
@@ -356,7 +350,7 @@ def route_model(
             )
             return lateral
 
-    # 3. Vertical downgrade (cost ≤ current tier — always safe)
+    # 3. Vertical downgrade (always safe)
     try:
         current_idx = _TIER_ORDER.index(preset_lower)
     except ValueError:
@@ -371,7 +365,6 @@ def route_model(
             return model
 
     # 4. Vertical upgrade — opt-in only
-    # Check upgrade candidates first to decide whether to raise or allow.
     upgrade_candidates: list[tuple[str, str]] = []
     for i in range(current_idx + 1, len(_TIER_ORDER)):
         m = agent_routes.get(_TIER_ORDER[i])
@@ -385,22 +378,20 @@ def route_model(
         cost_multiplier = target_weight / current_weight if current_weight else 1.0
 
         if not allow_tier_upgrade:
-            # Blocked: raise explicitly so the caller can alert / fail-fast.
-            # Do NOT silently fall through to hard default — that would mask
-            # the problem and potentially use an irrelevant cheap model.
             raise RuntimeError(
                 f"RLM Router: tier upgrade blocked for agent='{agent}' "
                 f"preset='{preset_lower}'. Only candidate is "
                 f"'{target_tier}'/{target_model} ({cost_multiplier:.0f}× cost). "
                 f"Set RLM_ALLOW_TIER_UPGRADE=true to permit, or check why "
-                f"'{preset_lower}' models are unavailable."
+                f"'{preset_lower}' models are unavailable. "
+                f"Ref: https://github.com/alexzhang13/rlm"
             )
 
-        # Upgrade allowed — emit prominent COST ALERT before proceeding.
         logger.warning(
             "COST ALERT: RLM Router tier upgrade for agent='%s': "
             "%s(%g×) → %s(%g×) = %g× cost increase — model=%s. "
-            "RLM_ALLOW_TIER_UPGRADE=true. Notify budget controller.",
+            "RLM_ALLOW_TIER_UPGRADE=true. Notify budget controller. "
+            "Ref: https://github.com/alexzhang13/rlm",
             agent,
             preset_lower, current_weight,
             target_tier, target_weight,
@@ -409,7 +400,7 @@ def route_model(
         )
         return target_model
 
-    # 5. Hard default — no route found at all (routing table gap)
+    # 5. Hard default
     logger.error(
         "RLM Router: no model found for agent=%s preset=%s allow_upgrade=%s "
         "-> hard default (routing table may be incomplete)",
@@ -425,19 +416,11 @@ def route_model_with_fallback(
 ) -> tuple[str, bool]:
     """Like route_model() but also returns whether a tier upgrade occurred.
 
-    Intended for budget_controller integration: the caller can inspect
-    ``tier_upgraded`` and decide whether to alert, track the delta cost,
-    or abort the run.
-
-    Args:
-        agent:              Agent identifier.
-        preset:             Quality preset.
-        allow_tier_upgrade: None = use RLM_ALLOW_TIER_UPGRADE env var.
+    Intended for budget_controller integration.
+    Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
 
     Returns:
         Tuple (model_id: str, tier_upgraded: bool).
-        ``tier_upgraded`` is True only when the response model comes from a
-        higher tier than requested (step 4 in the fallback chain).
 
     Raises:
         RuntimeError: Same as route_model() when upgrade is blocked.
@@ -452,7 +435,6 @@ def route_model_with_fallback(
     if not agent_routes:
         return "openrouter/google/gemini-2.5-flash", False
 
-    # Direct match or lateral (tier_upgraded = False)
     model = agent_routes.get(preset_lower)
     if model:
         return model, False
@@ -462,7 +444,6 @@ def route_model_with_fallback(
         if lateral:
             return lateral, False
 
-    # Downgrade (tier_upgraded = False — downgrade is never an upgrade)
     try:
         current_idx = _TIER_ORDER.index(preset_lower)
     except ValueError:
@@ -472,7 +453,6 @@ def route_model_with_fallback(
         if m:
             return m, False
 
-    # Upgrade (tier_upgraded = True if allowed)
     for i in range(current_idx + 1, len(_TIER_ORDER)):
         m = agent_routes.get(_TIER_ORDER[i])
         if m:
@@ -486,18 +466,17 @@ def route_model_with_fallback(
                     f"RLM Router: tier upgrade blocked for agent='{agent}' "
                     f"preset='{preset_lower}'. Only candidate is "
                     f"'{target_tier}'/{m} ({cost_multiplier:.0f}× cost). "
-                    f"Set RLM_ALLOW_TIER_UPGRADE=true to permit."
+                    f"Set RLM_ALLOW_TIER_UPGRADE=true to permit. "
+                    f"Ref: https://github.com/alexzhang13/rlm"
                 )
             logger.warning(
                 "COST ALERT: RLM Router tier upgrade for agent='%s': "
                 "%s(%g×) → %s(%g×) = %g× cost increase — model=%s. "
-                "RLM_ALLOW_TIER_UPGRADE=true. Notify budget controller.",
-                agent,
-                preset_lower, current_weight,
-                target_tier, target_weight,
-                cost_multiplier, m,
+                "RLM_ALLOW_TIER_UPGRADE=true. Ref: https://github.com/alexzhang13/rlm",
+                agent, preset_lower, current_weight,
+                target_tier, target_weight, cost_multiplier, m,
             )
-            return m, True  # tier_upgraded = True
+            return m, True
 
     return "openrouter/google/gemini-2.5-flash", False
 
@@ -509,20 +488,9 @@ def route_model_on_error(
 ) -> str | None:
     """Return a lateral (same-tier) fallback for a model that failed at runtime.
 
-    Called by the LLM client after HTTP 429 / model unavailable errors to
-    immediately retry with a different provider at the same cost level.
-    Never crosses tier boundaries — tier upgrade requires explicit opt-in
-    via ``allow_tier_upgrade=True`` in route_model().
-
-    Args:
-        failed_model: The provider-prefixed model string that failed.
-        agent:        Agent slot (used for logging only).
-        preset:       Quality preset (used for logging only).
-
-    Returns:
-        Provider-prefixed model string for the lateral alternative, or None
-        if no lateral fallback exists (caller must handle: alert, fail-fast,
-        or explicitly call route_model(allow_tier_upgrade=True)).
+    Never crosses tier boundaries. Returns None if no lateral fallback
+    exists — caller must decide: alert, fail-fast, or explicit upgrade.
+    Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
     """
     candidates = [
         m for m in _LATERAL_FALLBACKS.get(failed_model, [])
@@ -540,7 +508,8 @@ def route_model_on_error(
     logger.warning(
         "RLM Router on_error: agent=%s preset=%s failed=%s "
         "has no lateral fallback at same tier. "
-        "Caller must decide: fail-fast or route_model(allow_tier_upgrade=True).",
+        "Caller must decide: fail-fast or route_model(allow_tier_upgrade=True). "
+        "Ref: https://github.com/alexzhang13/rlm",
         agent, preset, failed_model,
     )
     return None
@@ -555,17 +524,7 @@ def route_jury_slots(
 
     Uses numbered slots (_1/_2/_3) which map to different provider backbones
     to ensure independent epistemic perspectives within each panel.
-
-    For jury_size=1 : returns single-slot model (jury_r / jury_f / jury_s).
-    For jury_size=2 : returns slots 1 and 2.
-    For jury_size=3 : returns slots 1, 2, and 3 (maximum supported).
-
-    Example (balanced preset, jury_size=3)::
-
-        route_jury_slots("r", "balanced", 3)
-        -> ["openrouter/openai/o3-mini",            # R1 OpenAI
-            "openrouter/google/gemini-2.5-pro",     # R2 Google
-            "openrouter/anthropic/claude-sonnet-4"] # R3 Anthropic
+    Ref: ChatEval arXiv:2308.07201
     """
     if jury_size <= 1:
         return [route_model(f"jury_{jury_type}", preset)]
@@ -579,7 +538,6 @@ def reload_routing_config() -> None:
     """Force reload of routing config from disk (hot config reload).
 
     Thread-safe: acquires _routing_lock and resets the singleton.
-    Safe to call at runtime without restarting the process.
     """
     global _routing_table
     with _routing_lock:

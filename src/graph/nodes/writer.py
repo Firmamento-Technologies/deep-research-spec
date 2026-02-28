@@ -1,18 +1,23 @@
 """Writer agent (§5.7) with §29.1 prompt caching + SHINE + RLM mode support.
 
-Generates a section draft using one of four paths:
+Generates a section draft using one of three paths:
 
 - **SHINE LoRA path** (``shine_active=True`` AND ``SHINE_SERVING_URL`` set):
-  Real LoRA adapter injected into a local inference server — knowledge is
-  encoded in model weights, no corpus in the prompt → 95% token reduction.
-- **SHINE corpus path** (``shine_active=True``, no serving URL, but
-  ``state["shine_lora"]`` / ``state["shine_encoded"]`` is populated):
-  ShineAdapter has encoded the relevant sections; the encoding is used as
-  the research corpus. The false ``"LoRA adapter active"`` directive is
-  **suppressed** because cloud API models cannot receive LoRA weights.
+  SHINE hypernetwork encodes the research corpus into LoRA weight deltas in a
+  single forward pass. Those deltas are injected into a local vLLM/AIBrix
+  inference server — the model ACTUALLY has the domain knowledge in its
+  weights, no corpus in the prompt → ~95% token reduction.
+  Ref: https://github.com/Yewei-Liu/SHINE (arXiv:2602.06358)
+
+  IMPORTANT: ``state["shine_lora"]`` contains binary weight TENSORS, NOT
+  text. They cannot be placed in a prompt. ``shine_active=True`` without
+  ``SHINE_SERVING_URL`` is a misconfiguration — the node falls back to
+  standard corpus and emits a logger.warning() (P1 fix).
+
 - **RLM path** (``rlm_mode=True``): raw corpus passed directly to writer;
-  source_synthesizer and context_compressor are bypassed upstream;
-  rlm.completion() handles recursive context internally.
+  source_synthesizer and context_compressor are bypassed upstream.
+  Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
+
 - **Standard path** (fallback): compressed/synthesized corpus included
   as text in the user prompt.
 
@@ -31,13 +36,19 @@ from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
-# Real LoRA serving endpoint (e.g. vLLM or AIBrix with LoRA adapter support).
-# If empty, SHINE falls back to corpus mode — prevents emitting a false
-# "LoRA adapter active" directive to cloud API models (P1 fix).
+# Real LoRA serving endpoint required for SHINE.
+# SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) encodes the
+# research corpus into LoRA weight deltas via a hypernetwork, then injects
+# them into this local inference server. The model then "knows" the corpus
+# WITHOUT it being in the prompt (~95% token reduction).
+#
+# Cloud API models (Anthropic, OpenAI, OpenRouter) cannot receive LoRA
+# injections — do NOT set shine_active=True without this URL configured.
+# If empty: writer falls back to standard corpus path + logger.warning().
 _SHINE_SERVING_URL: str = os.getenv("SHINE_SERVING_URL", "")
 
 
-# ── Writer Node ─────────────────────────────────────────────
+# ── Writer Node ─────────────────────────────────────────────────
 
 def writer_node(state: dict) -> dict:
     """Generate section draft from compressed corpus, RLM raw corpus, or SHINE.
@@ -55,7 +66,6 @@ def writer_node(state: dict) -> dict:
     section_scope = section.get("scope", "")
     target_words = section.get("target_words", 500)
 
-    # Style info
     style_profile = state.get("style_profile", {})
     style_profile_str = (
         style_profile if isinstance(style_profile, str)
@@ -64,7 +74,7 @@ def writer_node(state: dict) -> dict:
     style_exemplar = state.get("style_exemplar") or ""
     writer_memory = state.get("writer_memory", {})
 
-    # ── §29.1 Prompt Caching: system as array with cache_control ──────
+    # ── §29.1 Prompt Caching: system as array with cache_control ──────────
     system_blocks = [
         {
             "type": "text",
@@ -83,60 +93,52 @@ def writer_node(state: dict) -> dict:
         },
     ]
 
-    # ── P8: Dynamic max_tokens proportional to target_words ───────────
+    # ── P8: Dynamic max_tokens proportional to target_words ─────────────
     # Formula: words × 1.5 safety buffer ÷ 0.75 words/token + 256 overhead.
-    # Floor 512 (short sections never need less), cap 8192 (provider limit).
+    # Floor 512 (short sections), cap 8192 (provider limit).
     max_tokens = max(512, min(int(target_words * 1.5 / 0.75) + 256, 8192))
 
-    # ── Path selection: SHINE LoRA / SHINE corpus / RLM / standard ───
+    # ── Path selection ─────────────────────────────────────────────
     shine_active = state.get("shine_active", False)
     rlm_mode = state.get("rlm_mode", False)
 
-    # Citation map (all paths)
     current_sources = state.get("current_sources", [])
     citation_text = _format_sources_as_citations(current_sources)
 
     if shine_active:
-        # ── P1 fix: three-way SHINE path ──────────────────────────────
-        # ShineAdapter writes the encoded representation into one of these keys:
-        shine_lora: str = (
-            state.get("shine_lora") or state.get("shine_encoded") or ""
-        )
-
+        # ── P1 fix: SHINE requires a LOCAL serving endpoint ───────────────
+        # SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358)
+        # works by running a hypernetwork that converts the research corpus
+        # into LoRA weight TENSORS (binary delta weights, not text).
+        # Those tensors are injected into a local vLLM/AIBrix server.
+        #
+        # state["shine_lora"] = weight tensors → NOT usable as a prompt corpus.
+        # The only two valid states are:
+        #   A) SHINE_SERVING_URL is set → real LoRA injection, proceed
+        #   B) SHINE_SERVING_URL is empty → misconfiguration, hard fallback
         if _SHINE_SERVING_URL:
-            # Path A: real LoRA serving endpoint configured.
-            # The model on the inference server actually has the LoRA weights
-            # injected — the knowledge directive is architecturally valid here.
+            # Path A: local vLLM server has the LoRA deltas injected.
+            # The model ACTUALLY knows the corpus — directive is valid.
             logger.info(
-                "Writer: SHINE LoRA path (real LoRA serving @ %s)",
+                "Writer: SHINE LoRA path — local server %s — "
+                "corpus encoded as weight deltas (https://github.com/Yewei-Liu/SHINE)",
                 _SHINE_SERVING_URL,
             )
             user_prompt = _build_prompt_shine_lora(
                 style_profile_str, section_scope, target_words, citation_text,
             )
-
-        elif shine_lora:
-            # Path B: ShineAdapter encoded the sections but no LoRA serving URL.
-            # Use the encoding as a corpus — suppresses the false directive.
-            logger.info(
-                "Writer: SHINE corpus path (encoding in state, SHINE_SERVING_URL "
-                "not set — corpus mode, LoRA directive suppressed to prevent P1 "
-                "hallucination on cloud API)"
-            )
-            user_prompt = _build_prompt_corpus(
-                style_profile_str, section_scope, target_words,
-                citation_text, shine_lora,
-            )
-
         else:
-            # Path C: shine_active=True but no encoding and no serving URL.
-            # Hard fallback to standard corpus. Logger.warning makes this visible.
+            # Path B (removed): state["shine_lora"] contains binary tensors,
+            # not text — cannot be used as a prompt corpus.
+            # Hard fallback: standard corpus path + prominent warning.
             logger.warning(
-                "Writer: shine_active=True but SHINE_SERVING_URL is not set and "
-                "state['shine_lora']/state['shine_encoded'] are empty. "
-                "Falling back to standard corpus path. "
-                "This prevents emitting a false 'LoRA adapter active' directive "
-                "to a cloud API model that cannot receive LoRA weights."
+                "Writer: shine_active=True but SHINE_SERVING_URL is not set. "
+                "SHINE (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358) "
+                "requires a local vLLM/AIBrix server to inject LoRA weight "
+                "deltas — cloud API models (Anthropic/OpenAI/OpenRouter) cannot "
+                "receive LoRA injections. state['shine_lora'] contains binary "
+                "weight tensors and cannot be placed in a prompt. "
+                "Falling back to standard corpus path."
             )
             corpus = (
                 state.get("synthesized_sources", "")
@@ -148,14 +150,18 @@ def writer_node(state: dict) -> dict:
             )
 
     elif rlm_mode:
-        # RLM mode: raw corpus bypasses source_synthesizer + context_compressor.
+        # RLM path: raw corpus, bypasses source_synthesizer + context_compressor.
+        # Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
         # Graceful fallback chain: sanitized_sources → research_results → synthesized_sources.
         corpus = (
             state.get("sanitized_sources", "")
             or state.get("research_results", "")
-            or state.get("synthesized_sources", "")  # graceful fallback
+            or state.get("synthesized_sources", "")
         )
-        logger.info("Writer: RLM mode (raw corpus, bypassing compression)")
+        logger.info(
+            "Writer: RLM mode (https://github.com/alexzhang13/rlm) — "
+            "raw corpus, bypassing compression"
+        )
         user_prompt = _build_prompt_corpus(
             style_profile_str, section_scope, target_words, citation_text, corpus,
         )
@@ -170,7 +176,7 @@ def writer_node(state: dict) -> dict:
             style_profile_str, section_scope, target_words, citation_text, corpus,
         )
 
-    # ── LLM call ─────────────────────────────────────────────
+    # ── LLM call ────────────────────────────────────────────────
     messages = [{"role": "user", "content": user_prompt}]
 
     response = llm_client.call(
@@ -198,16 +204,21 @@ def writer_node(state: dict) -> dict:
     }
 
 
-# ── Prompt builders ──────────────────────────────────────────
+# ── Prompt builders ─────────────────────────────────────────────
 
 def _build_prompt_shine_lora(
     style: str, scope: str, target_words: int, citations: str,
 ) -> str:
-    """Prompt for REAL LoRA serving path only.
+    """Prompt for REAL LoRA serving path ONLY.
 
-    Only called when ``SHINE_SERVING_URL`` is set — the LoRA adapter is
-    genuinely active on the inference server, so the knowledge directive
-    is architecturally valid. Never call this for cloud API models.
+    Called exclusively when SHINE_SERVING_URL is configured. The SHINE
+    hypernetwork (https://github.com/Yewei-Liu/SHINE, arXiv:2602.06358)
+    has encoded the research corpus into LoRA weight deltas that are
+    injected into the local inference server. The model ACTUALLY has the
+    domain knowledge — the directive is architecturally valid here.
+
+    NEVER call this for cloud API models. They cannot receive LoRA
+    injections and the directive will cause hallucination.
     """
     return f"""\
 Write a section for a {style} document.
@@ -247,7 +258,7 @@ Constraints:
 - No markdown formatting"""
 
 
-# ── Helpers ────────────────────────────────────────────────
+# ── Helpers ──────────────────────────────────────────────────
 
 def _get_style_profile_rules(style_profile: Any) -> str:
     """Load style rules from config/style_profiles.yaml (§26).
@@ -260,11 +271,9 @@ def _get_style_profile_rules(style_profile: Any) -> str:
     import yaml as _yaml
     from pathlib import Path as _Path
 
-    # Determine profile name
     if isinstance(style_profile, str):
         profile_name = style_profile
     elif isinstance(style_profile, dict):
-        # Legacy: inline rules take precedence
         inline_rules = style_profile.get("rules", [])
         if inline_rules:
             return "Style rules:\n" + "\n".join(f"- {r}" for r in inline_rules)
@@ -272,7 +281,6 @@ def _get_style_profile_rules(style_profile: Any) -> str:
     else:
         profile_name = "academic"
 
-    # Load from config file
     config_path = _Path(__file__).resolve().parents[3] / "config" / "style_profiles.yaml"
     if config_path.exists():
         try:
@@ -283,9 +291,8 @@ def _get_style_profile_rules(style_profile: Any) -> str:
             if rules:
                 return "Style rules:\n" + "\n".join(f"- {r}" for r in rules)
         except Exception:
-            pass  # Fall through to default
+            pass
 
-    # Fallback
     return "Follow academic writing conventions. Be precise and well-sourced."
 
 
