@@ -1,8 +1,15 @@
 """Writer agent (§5.7) with §29.1 prompt caching + SHINE + RLM mode support.
 
-Generates a section draft using one of three paths:
-- **SHINE path** (``shine_active=True``): LoRA adapter provides knowledge,
-  no corpus text in the prompt → 95% token reduction.
+Generates a section draft using one of four paths:
+
+- **SHINE LoRA path** (``shine_active=True`` AND ``SHINE_SERVING_URL`` set):
+  Real LoRA adapter injected into a local inference server — knowledge is
+  encoded in model weights, no corpus in the prompt → 95% token reduction.
+- **SHINE corpus path** (``shine_active=True``, no serving URL, but
+  ``state["shine_lora"]`` / ``state["shine_encoded"]`` is populated):
+  ShineAdapter has encoded the relevant sections; the encoding is used as
+  the research corpus. The false ``"LoRA adapter active"`` directive is
+  **suppressed** because cloud API models cannot receive LoRA weights.
 - **RLM path** (``rlm_mode=True``): raw corpus passed directly to writer;
   source_synthesizer and context_compressor are bypassed upstream;
   rlm.completion() handles recursive context internally.
@@ -15,6 +22,7 @@ style rules + exemplar are cached across sections (~5 min TTL).
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any
 
@@ -23,18 +31,22 @@ from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
+# Real LoRA serving endpoint (e.g. vLLM or AIBrix with LoRA adapter support).
+# If empty, SHINE falls back to corpus mode — prevents emitting a false
+# "LoRA adapter active" directive to cloud API models (P1 fix).
+_SHINE_SERVING_URL: str = os.getenv("SHINE_SERVING_URL", "")
+
 
 # ── Writer Node ─────────────────────────────────────────────
 
 def writer_node(state: dict) -> dict:
-    """Generate section draft from compressed corpus, RLM raw corpus, or SHINE LoRA.
+    """Generate section draft from compressed corpus, RLM raw corpus, or SHINE.
 
     Args:
         state: DocumentState dict.
 
     Returns:
-        Partial state update with ``current_draft``, ``current_iteration``,
-        and extracted citation info.
+        Partial state update with ``current_draft`` and ``current_iteration``.
     """
     section_idx = state.get("current_section_idx", 0)
     outline = state.get("outline", [])
@@ -71,19 +83,70 @@ def writer_node(state: dict) -> dict:
         },
     ]
 
-    # ── SHINE vs RLM vs standard corpus path ───────────────────────
+    # ── P8: Dynamic max_tokens proportional to target_words ───────────
+    # Formula: words × 1.5 safety buffer ÷ 0.75 words/token + 256 overhead.
+    # Floor 512 (short sections never need less), cap 8192 (provider limit).
+    max_tokens = max(512, min(int(target_words * 1.5 / 0.75) + 256, 8192))
+
+    # ── Path selection: SHINE LoRA / SHINE corpus / RLM / standard ───
     shine_active = state.get("shine_active", False)
     rlm_mode = state.get("rlm_mode", False)
 
-    # Build citation map text
+    # Citation map (all paths)
     current_sources = state.get("current_sources", [])
     citation_text = _format_sources_as_citations(current_sources)
 
     if shine_active:
-        logger.info("Writer: SHINE LoRA path (no corpus in context)")
-        user_prompt = _build_prompt_shine(
-            style_profile_str, section_scope, target_words, citation_text,
+        # ── P1 fix: three-way SHINE path ──────────────────────────────
+        # ShineAdapter writes the encoded representation into one of these keys:
+        shine_lora: str = (
+            state.get("shine_lora") or state.get("shine_encoded") or ""
         )
+
+        if _SHINE_SERVING_URL:
+            # Path A: real LoRA serving endpoint configured.
+            # The model on the inference server actually has the LoRA weights
+            # injected — the knowledge directive is architecturally valid here.
+            logger.info(
+                "Writer: SHINE LoRA path (real LoRA serving @ %s)",
+                _SHINE_SERVING_URL,
+            )
+            user_prompt = _build_prompt_shine_lora(
+                style_profile_str, section_scope, target_words, citation_text,
+            )
+
+        elif shine_lora:
+            # Path B: ShineAdapter encoded the sections but no LoRA serving URL.
+            # Use the encoding as a corpus — suppresses the false directive.
+            logger.info(
+                "Writer: SHINE corpus path (encoding in state, SHINE_SERVING_URL "
+                "not set — corpus mode, LoRA directive suppressed to prevent P1 "
+                "hallucination on cloud API)"
+            )
+            user_prompt = _build_prompt_corpus(
+                style_profile_str, section_scope, target_words,
+                citation_text, shine_lora,
+            )
+
+        else:
+            # Path C: shine_active=True but no encoding and no serving URL.
+            # Hard fallback to standard corpus. Logger.warning makes this visible.
+            logger.warning(
+                "Writer: shine_active=True but SHINE_SERVING_URL is not set and "
+                "state['shine_lora']/state['shine_encoded'] are empty. "
+                "Falling back to standard corpus path. "
+                "This prevents emitting a false 'LoRA adapter active' directive "
+                "to a cloud API model that cannot receive LoRA weights."
+            )
+            corpus = (
+                state.get("synthesized_sources", "")
+                or state.get("compressed_corpus", "")
+            )
+            user_prompt = _build_prompt_corpus(
+                style_profile_str, section_scope, target_words,
+                citation_text, corpus,
+            )
+
     elif rlm_mode:
         # RLM mode: raw corpus bypasses source_synthesizer + context_compressor.
         # Graceful fallback chain: sanitized_sources → research_results → synthesized_sources.
@@ -96,6 +159,7 @@ def writer_node(state: dict) -> dict:
         user_prompt = _build_prompt_corpus(
             style_profile_str, section_scope, target_words, citation_text, corpus,
         )
+
     else:
         corpus = (
             state.get("synthesized_sources", "")
@@ -114,7 +178,7 @@ def writer_node(state: dict) -> dict:
         system=system_blocks,
         messages=messages,
         temperature=0.3,
-        max_tokens=8192,
+        max_tokens=max_tokens,
         agent="writer",
         preset=state.get("quality_preset", "balanced"),
     )
@@ -124,8 +188,8 @@ def writer_node(state: dict) -> dict:
     citations_used = list(set(re.findall(r"\[(\w+)\]", draft)))
 
     logger.info(
-        "Draft generated: %d words, %d citations, cost=$%.4f",
-        word_count, len(citations_used), response["cost_usd"],
+        "Draft generated: %d words, %d citations, cost=$%.4f, max_tokens=%d",
+        word_count, len(citations_used), response["cost_usd"], max_tokens,
     )
 
     return {
@@ -136,9 +200,15 @@ def writer_node(state: dict) -> dict:
 
 # ── Prompt builders ──────────────────────────────────────────
 
-def _build_prompt_shine(
+def _build_prompt_shine_lora(
     style: str, scope: str, target_words: int, citations: str,
 ) -> str:
+    """Prompt for REAL LoRA serving path only.
+
+    Only called when ``SHINE_SERVING_URL`` is set — the LoRA adapter is
+    genuinely active on the inference server, so the knowledge directive
+    is architecturally valid. Never call this for cloud API models.
+    """
     return f"""\
 Write a section for a {style} document.
 
@@ -149,7 +219,7 @@ Sources (use ONLY citations from this map):
 {citations}
 
 Constraints:
-- Use ONLY facts from your knowledge (LoRA adapter active)
+- Your LoRA adapter contains the domain knowledge for this section
 - Cite sources using [source_id] format
 - Word count: {target_words} ± 15%
 - No markdown formatting"""
