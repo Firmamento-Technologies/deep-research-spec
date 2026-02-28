@@ -197,6 +197,17 @@ class DocumentState(TypedDict):
     # ── Budget (§19) ─────────────────────────────────────────────────
     budget: BudgetState
 
+    # Per-section budget cap (USD) per il path RLM.
+    # Impostato da preflight_node() / budget_estimator_node() come:
+    #   state["budget"]["max_dollars"] / total_sections * safety_factor
+    # Passato a get_rlm_client(state=state) → RLM(max_budget=...).
+    # None = nessun cap (RLM gira senza limite di spesa per sezione).
+    #
+    # CONTRATTO LANGGRAPH: campo OBBLIGATORIO nel TypedDict.
+    # Campi non dichiarati non vengono serializzati dal checkpointer
+    # (AsyncPostgresSaver) e sono sempre None al resume dopo interrupt.
+    section_budget_usd: float | None
+
     # ── Oscillation (§13) ────────────────────────────────────────────
     oscillation_detected: bool
     oscillation_type: Literal["CSS", "SEMANTIC", "WHACK_A_MOLE"] | None
@@ -222,6 +233,23 @@ class DocumentState(TypedDict):
     shine_lora: Any | None              # LoRA adapter from ShineAdapter
     context_lora: Any | None            # LoRA from ContextCompressor (future)
     rag_local_sources: list[Source]      # Sources from memvid_local connector
+
+    # ── RLM Mode (https://github.com/alexzhang13/rlm, arXiv:2512.24601) ──────
+    # Attiva il path RLM nel writer_node(): invece di llm_client.call()
+    # singolo, RLM apre un REPL loop che decompone e processa il corpus
+    # recursivamente. source_synthesizer e context_compressor vengono
+    # bypassati upstream quando questo flag è True.
+    #
+    # Default: False (opt-in). Impostato da preflight_node() se la config
+    # contiene {"rlm_mode": true} o se quality_preset == "Premium" e
+    # il corpus supera la context window del modello writer.
+    #
+    # CONTRATTO LANGGRAPH: campo OBBLIGATORIO nel TypedDict.
+    # Senza questa dichiarazione, qualsiasi interrupt (await_human, crash,
+    # K8s pod restart) causa la perdita del valore dal checkpoint Postgres.
+    # writer_node() vedrebbe rlm_mode=False e userebbe il path standard
+    # senza alcun errore visibile — bug silenzioso impossibile da debuggare.
+    rlm_mode: bool
 
     # ── Output ─────────────────────────────────────────────────────
     output_paths: dict[str, str]
