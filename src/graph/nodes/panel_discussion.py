@@ -7,6 +7,15 @@ consensus or identify the core issue blocking approval.
 The panel self-loops (via ``route_after_panel_internal``) until
 max rounds reached, then routes back to aggregator with
 updated verdicts.
+
+ALTA-07 — Escape guarantee:
+  ``get_max_panel_rounds(state)`` è la FONTE DI VERITÀ UNICA per il
+  limite di round. Importata da panel_loop.py per garantire che nodo
+  e router usino sempre lo stesso valore.
+
+  Quando ``new_round_num >= max_rounds``, il nodo imposta
+  ``force_approve=True`` nel return. Il router lo intercetta e
+  indirizza verso aggregator senza ulteriori round.
 """
 from __future__ import annotations
 
@@ -18,8 +27,53 @@ from src.llm.routing import route_model
 
 logger = logging.getLogger(__name__)
 
-# Max rounds before panel exits
-_DEFAULT_MAX_ROUNDS = 2
+# ---------------------------------------------------------------------------
+# ALTA-07 — MAX_PANEL_ROUNDS: costante esportata (fonte di verità)
+# ---------------------------------------------------------------------------
+# Valore di default usato quando né budget["max_iterations"] né
+# config.convergence.panel_max_rounds sono configurati.
+#
+# NON usare questo valore direttamente: usa get_max_panel_rounds(state)
+# che implementa la priority chain completa.
+#
+# Importata da panel_loop.py — non rinominare senza aggiornare quel file.
+MAX_PANEL_ROUNDS: int = 3
+
+
+def get_max_panel_rounds(state: dict) -> int:
+    """Return the effective max panel rounds for this run.
+
+    Priority order (first valid int > 0 wins):
+
+    1. ``state["budget"]["max_iterations"]`` — impostato da budget_estimator
+       in base al regime (Economy/Balanced/Premium). Fonte autorevole
+       per tutti i limiti di iterazione del sistema.
+
+    2. ``state["config"]["convergence"]["panel_max_rounds"]`` — override
+       esplicito per operatori che vogliono un limite panel diverso
+       dal max_iterations globale.
+
+    3. ``MAX_PANEL_ROUNDS`` (3) — fallback se nessuna configurazione
+       è disponibile (test, run manuali, ambienti di sviluppo).
+
+    Questa funzione è importata da panel_loop.py per garantire che
+    nodo e router usino SEMPRE lo stesso valore.
+    """
+    # Priority 1: budget-derived max_iterations (fonte autorevole)
+    budget_max = state.get("budget", {}).get("max_iterations")
+    if isinstance(budget_max, int) and budget_max > 0:
+        return budget_max
+
+    # Priority 2: config override esplicito
+    config_max = (
+        state.get("config", {})
+        .get("convergence", {})
+        .get("panel_max_rounds")
+    )
+    if isinstance(config_max, int) and config_max > 0:
+        return config_max
+
+    return MAX_PANEL_ROUNDS
 
 
 def panel_discussion_node(state: dict) -> dict:
@@ -31,26 +85,33 @@ def panel_discussion_node(state: dict) -> dict:
 
     Returns:
         Partial state update with incremented ``panel_round``,
-        updated ``panel_anonymized_log``, and potentially revised
-        ``jury_verdicts``.
+        updated ``panel_anonymized_log``, potentially revised
+        ``jury_verdicts``, and ``force_approve=True`` when
+        max rounds are exhausted (ALTA-07 escape guarantee).
     """
-    draft = state.get("current_draft", "")
-    verdicts = state.get("jury_verdicts", [])
-    panel_round = state.get("panel_round", 0)
-    panel_log = list(state.get("panel_anonymized_log", []))
+    draft: str = state.get("current_draft", "")
+    verdicts: list[dict] = state.get("jury_verdicts", [])
+    panel_round: int = state.get("panel_round", 0)
+    panel_log: list[dict] = list(state.get("panel_anonymized_log", []))
+    # ALTA-07 fix: quality_preset estratto qui nel scope corretto
+    # e passato esplicitamente a _run_panel_round() (fix NameError)
+    quality_preset: str = state.get("quality_preset", "balanced")
 
-    section_idx = state.get("current_section_idx", 0)
-    outline = state.get("outline", [])
-    section_scope = (
+    section_idx: int = state.get("current_section_idx", 0)
+    outline: list[dict] = state.get("outline", [])
+    section_scope: str = (
         outline[section_idx]["scope"]
         if section_idx < len(outline)
         else ""
     )
 
+    max_rounds: int = get_max_panel_rounds(state)
+    new_round_num: int = panel_round + 1
+
     # Build context from previous verdicts
     verdict_summary = _summarize_verdicts(verdicts)
 
-    # Previous panel rounds
+    # Previous panel rounds (last 3 only, per context budget)
     prior_discussion = ""
     if panel_log:
         prior_discussion = "\n\n".join(
@@ -59,8 +120,8 @@ def panel_discussion_node(state: dict) -> dict:
         )
 
     logger.info(
-        "Panel Discussion round %d for section %d",
-        panel_round + 1, section_idx,
+        "Panel Discussion round %d/%d for section %d",
+        new_round_num, max_rounds, section_idx,
     )
 
     # Run panel debate via LLM
@@ -69,12 +130,13 @@ def panel_discussion_node(state: dict) -> dict:
         section_scope=section_scope,
         verdict_summary=verdict_summary,
         prior_discussion=prior_discussion,
-        round_num=panel_round + 1,
+        round_num=new_round_num,
+        quality_preset=quality_preset,  # fix NameError: ora nel scope
     )
 
     # Log the round
     panel_log.append({
-        "round": panel_round + 1,
+        "round": new_round_num,
         "summary": discussion_result.get("summary", ""),
         "consensus": discussion_result.get("consensus", None),
         "key_issues": discussion_result.get("key_issues", []),
@@ -87,11 +149,35 @@ def panel_discussion_node(state: dict) -> dict:
             verdicts, discussion_result["revised_scores"],
         )
 
+    # ------------------------------------------------------------------
+    # ALTA-07 — Escape guarantee
+    #
+    # Quando max_rounds è raggiunto, force_approve=True viene impostato
+    # PRIMA che il router venga chiamato. Il router (panel_loop.py)
+    # intercetta force_approve=True e indirizza verso aggregator
+    # immediatamente, senza ulteriori round.
+    #
+    # Questo è un override one-shot: section_checkpoint.py resetta
+    # force_approve=False all'inizio di ogni nuova sezione (ALTA-05).
+    # ------------------------------------------------------------------
+    force_approve = False
+    if new_round_num >= max_rounds:
+        logger.warning(
+            "[panel] MAX_PANEL_ROUNDS (%d) reached for section %d — "
+            "force_approve=True to prevent infinite loop. "
+            "Unresolved issues: %s",
+            max_rounds,
+            section_idx,
+            discussion_result.get("key_issues", []),
+        )
+        force_approve = True
+
     return {
-        "panel_round": panel_round + 1,
+        "panel_round": new_round_num,
         "panel_active": True,
         "panel_anonymized_log": panel_log,
         "jury_verdicts": updated_verdicts,
+        "force_approve": force_approve,
     }
 
 
@@ -113,8 +199,20 @@ def _run_panel_round(
     verdict_summary: str,
     prior_discussion: str,
     round_num: int,
+    quality_preset: str = "balanced",  # ALTA-07 fix: era acceduto come
+                                        # state.get() dentro questo scope
+                                        # → NameError silenzioso
 ) -> dict:
-    """Run one round of panel discussion via LLM."""
+    """Run one round of panel discussion via LLM.
+
+    Args:
+        draft: Current section draft text.
+        section_scope: Expected scope/requirements for this section.
+        verdict_summary: Formatted string of current jury verdicts.
+        prior_discussion: Summary of previous panel rounds (last 3).
+        round_num: Current round number (1-based).
+        quality_preset: LLM preset for model routing (default 'balanced').
+    """
     try:
         system_blocks = [
             {
@@ -139,7 +237,7 @@ REVISED_SCORES: only if consensus changes scores, format: SLOT=NEW_SCORE""",
         prior_ctx = f"\n\nPrior discussion:\n{prior_discussion}" if prior_discussion else ""
 
         response = llm_client.call(
-            model=route_model("panel_discussion", state.get("quality_preset", "balanced")),
+            model=route_model("panel_discussion", quality_preset),
             system=system_blocks,
             messages=[{
                 "role": "user",
@@ -160,12 +258,12 @@ Facilitate the panel discussion and provide your structured analysis.""",
             temperature=0.3,
             max_tokens=2048,
             agent="panel_discussion",
-            preset=state.get("quality_preset", "balanced"),
+            preset=quality_preset,
         )
 
         return _parse_panel_response(response["text"])
 
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Panel discussion LLM call failed: %s", exc)
         return {
             "summary": f"Panel round {round_num} failed: {exc}",
@@ -177,7 +275,7 @@ Facilitate the panel discussion and provide your structured analysis.""",
 
 def _parse_panel_response(text: str) -> dict:
     """Parse structured panel discussion response."""
-    result = {
+    result: dict[str, Any] = {
         "summary": "",
         "consensus": None,
         "key_issues": [],
@@ -185,7 +283,7 @@ def _parse_panel_response(text: str) -> dict:
     }
 
     lines = text.split("\n")
-    current_section = None
+    current_section: str | None = None
 
     for line in lines:
         line = line.strip()
