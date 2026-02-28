@@ -14,6 +14,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any
 
+from src.budget.guard import BudgetExhaustedError, check_budget
 from src.llm.client import llm_client
 
 logger = logging.getLogger(__name__)
@@ -32,10 +33,30 @@ class Judge(ABC):
         ...
 
     def _call_llm_with_cache(
-        self, system_blocks: list[dict], user_prompt: str,
+        self,
+        system_blocks: list[dict],
+        user_prompt: str,
         quality_preset: str = "balanced",
+        state: dict | None = None,
     ) -> dict:
-        """§29.1: Reuse cached system prompt (verdict schema + rubric)."""
+        """§29.1: Reuse cached system prompt (verdict schema + rubric).
+        
+        §19.6: Enforces budget before calling LLM. If budget exhausted,
+        raises BudgetExhaustedError which the caller should catch.
+        
+        Args:
+            system_blocks: System prompt blocks with cache_control.
+            user_prompt: User prompt text.
+            quality_preset: Quality preset for routing.
+            state: DocumentState dict (optional, for budget guard).
+        
+        Raises:
+            BudgetExhaustedError: If budget is exhausted before LLM call.
+        """
+        # §19.6 Budget guard
+        if state is not None:
+            check_budget(state, agent=f"jury_{self.slot}", estimated_cost=0.20)
+        
         return llm_client.call(
             model=self.model,
             system=system_blocks,
@@ -74,7 +95,7 @@ class Judge(ABC):
         return verdict
 
 
-# ── Shared constants ─────────────────────────────────────────────────────────
+# ── Shared constants ───────────────────────────────────────────────────────────────────
 
 VERDICT_SCHEMA = """\
 Return your evaluation as valid JSON with this exact structure:
