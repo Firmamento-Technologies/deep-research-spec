@@ -1,10 +1,20 @@
-"""Unified LLM client with §29.1 prompt caching support.
+"""Unified LLM client with §29.1 prompt caching and RLM rate limiting.
 
 Wraps Anthropic, OpenAI, Google, and OpenRouter APIs behind a single
-``call()`` interface.  Automatically tracks cost via ``cost_usd()``
+``call()`` interface. Automatically tracks cost via ``cost_usd()``
 from ``src.llm.pricing`` and reports Prometheus metrics.
 
-OpenRouter is the recommended provider: one API key for all models.
+RLM changes vs original:
+  - Thread-safe SDK init: per-SDK threading.Lock eliminates race conditions
+    with parallel jury execution (Priority 4)
+  - Google model instance cache: keyed by (model_id, sys_hash, temperature,
+    max_tokens) — eliminates N identical re-instantiations per section (Priority 13)
+  - Per-model RLM rate limiter: replaces global 60-RPM singleton with
+    independent per-model token buckets from src.llm.rate_limiter (Priority 5)
+  - OpenRouter cache_control fix: list[dict] system prompts forwarded as
+    content array instead of flattened to string (Priority 2)
+  - OpenAI system prompt fix: correctly handles list[dict] in system field (Priority 11)
+  - on_429 drain: RLM bucket for failed model is drained on HTTP 429
 
 Usage::
 
@@ -29,86 +39,138 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
-from typing import Any
+from typing import Any, Dict, Tuple
 
 from src.llm.pricing import cost_usd
-from src.llm.resilience import default_rate_limiter, retry_with_backoff
+from src.llm.rate_limiter import rlm_rate_limiter, estimate_tokens
+from src.llm.resilience import retry_with_backoff
 from src.observability.metrics import observe_llm_call
 
 logger = logging.getLogger(__name__)
 
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_SITE_URL = os.getenv("OPENROUTER_SITE_URL", "https://github.com/lucadidomenicodopehubs/deep-research-spec")
+OPENROUTER_SITE_URL = os.getenv(
+    "OPENROUTER_SITE_URL",
+    "https://github.com/lucadidomenicodopehubs/deep-research-spec",
+)
 OPENROUTER_SITE_NAME = os.getenv("OPENROUTER_SITE_NAME", "Deep Research System")
 
 
 class LLMClient:
     """Unified LLM wrapper — OpenRouter, Anthropic, OpenAI, Google.
 
-    Features:
-    - OpenRouter as single-key gateway for all models
-    - Automatic retry with exponential backoff on transient errors
-    - Token bucket rate limiting (default 60 RPM)
-    - Prometheus metrics (cost, latency, tokens)
-    - Provider-prefixed model routing
+    RLM-integrated: per-model rate limiting, thread-safe lazy SDK init,
+    Google model instance caching, Anthropic cache_control preservation.
 
     Model prefix convention:
         openrouter/<provider>/<model>  →  OpenRouter gateway (recommended)
-        anthropic/<model>              →  Direct Anthropic API
+        anthropic/<model>              →  Direct Anthropic API (prompt caching §29.1)
         openai/<model>                 →  Direct OpenAI API
         google/<model>                 →  Direct Google Gemini API
     """
 
-    def __init__(self, rate_limiter=None) -> None:
+    def __init__(self) -> None:
+        # SDK client instances
         self._anthropic: Any = None
         self._openai: Any = None
         self._openrouter: Any = None
-        self._google: Any = None
-        self._rate_limiter = rate_limiter or default_rate_limiter
+        self._google_sdk: Any = None
 
-    # ── Lazy SDK accessors ───────────────────────────────────────────────
+        # Per-SDK initialization locks — eliminates race conditions in parallel jury
+        # (9 judges may all call _get_* concurrently on first section)
+        self._anthropic_lock = threading.Lock()
+        self._openai_lock = threading.Lock()
+        self._openrouter_lock = threading.Lock()
+        self._google_lock = threading.Lock()
+
+        # Google model instance cache: (model_id, sys_hash, temperature, max_tokens) → model
+        # Avoids repeated GenerativeModel() instantiation for identical configs.
+        self._google_models: Dict[Tuple, Any] = {}
+        self._google_models_lock = threading.Lock()
+
+    # ── Thread-safe SDK accessors ────────────────────────────────────
 
     def _get_anthropic(self) -> Any:
         if self._anthropic is None:
-            import anthropic  # type: ignore[import-untyped]
-            self._anthropic = anthropic.Anthropic()
+            with self._anthropic_lock:
+                if self._anthropic is None:  # double-checked locking
+                    import anthropic  # type: ignore[import-untyped]
+                    self._anthropic = anthropic.Anthropic()
         return self._anthropic
 
     def _get_openai(self) -> Any:
         if self._openai is None:
-            import openai  # type: ignore[import-untyped]
-            self._openai = openai.OpenAI()
+            with self._openai_lock:
+                if self._openai is None:
+                    import openai  # type: ignore[import-untyped]
+                    self._openai = openai.OpenAI()
         return self._openai
 
     def _get_openrouter(self) -> Any:
         """OpenAI-compatible client pointed at OpenRouter."""
         if self._openrouter is None:
-            import openai  # type: ignore[import-untyped]
-            api_key = os.getenv("OPENROUTER_API_KEY")
-            if not api_key:
-                raise RuntimeError(
-                    "OPENROUTER_API_KEY not set. "
-                    "Get one at https://openrouter.ai/keys"
-                )
-            self._openrouter = openai.OpenAI(
-                base_url=OPENROUTER_BASE_URL,
-                api_key=api_key,
-                default_headers={
-                    "HTTP-Referer": OPENROUTER_SITE_URL,
-                    "X-Title": OPENROUTER_SITE_NAME,
-                },
-            )
+            with self._openrouter_lock:
+                if self._openrouter is None:
+                    import openai  # type: ignore[import-untyped]
+                    api_key = os.getenv("OPENROUTER_API_KEY")
+                    if not api_key:
+                        raise RuntimeError(
+                            "OPENROUTER_API_KEY not set. "
+                            "Get one at https://openrouter.ai/keys"
+                        )
+                    self._openrouter = openai.OpenAI(
+                        base_url=OPENROUTER_BASE_URL,
+                        api_key=api_key,
+                        default_headers={
+                            "HTTP-Referer": OPENROUTER_SITE_URL,
+                            "X-Title": OPENROUTER_SITE_NAME,
+                        },
+                    )
         return self._openrouter
 
-    def _get_google(self) -> Any:
-        if self._google is None:
-            import google.generativeai as genai  # type: ignore[import-untyped]
-            genai.configure()
-            self._google = genai
-        return self._google
+    def _get_google_sdk(self) -> Any:
+        if self._google_sdk is None:
+            with self._google_lock:
+                if self._google_sdk is None:
+                    import google.generativeai as genai  # type: ignore[import-untyped]
+                    genai.configure()
+                    self._google_sdk = genai
+        return self._google_sdk
 
-    # ── Main call method ─────────────────────────────────────────────────
+    def _get_google_model(
+        self,
+        model_id: str,
+        system_instruction: str | None,
+        temperature: float,
+        max_tokens: int,
+    ) -> Any:
+        """Return a cached Google GenerativeModel instance.
+
+        Cache key: (model_id, hash(system_instruction), temperature, max_tokens).
+        Avoids re-instantiation on every section iteration or jury retry.
+        """
+        sys_hash = hash(system_instruction or "")
+        cache_key = (model_id, sys_hash, temperature, max_tokens)
+        with self._google_models_lock:
+            if cache_key not in self._google_models:
+                genai = self._get_google_sdk()
+                gen_config = {
+                    "temperature": temperature,
+                    "max_output_tokens": max_tokens,
+                }
+                self._google_models[cache_key] = genai.GenerativeModel(
+                    model_name=model_id,
+                    system_instruction=system_instruction,
+                    generation_config=gen_config,
+                )
+                logger.debug(
+                    "LLMClient: cached Google model instance for %s", model_id
+                )
+            return self._google_models[cache_key]
+
+    # ── Main call method ───────────────────────────────────────────
 
     def call(
         self,
@@ -121,36 +183,61 @@ class LLMClient:
         preset: str = "balanced",
         **kwargs: Any,
     ) -> dict:
-        """Unified LLM call with retry, rate limiting, and cost tracking.
+        """Unified LLM call with RLM rate limiting, retry, and cost tracking.
 
         Args:
             model:       Provider-prefixed model id.
                          Examples:
                            "openrouter/anthropic/claude-opus-4-5"  (recommended)
                            "openrouter/google/gemini-2.5-flash"
-                           "openrouter/openai/gpt-4o"
-                           "anthropic/claude-opus-4-5"  (direct)
-            messages:    Chat messages.
-            system:      System prompt (string or Anthropic cache-control list).
+                           "anthropic/claude-opus-4-5"  (direct, prompt caching)
+            messages:    Chat messages list.
+            system:      System prompt — str or Anthropic cache-control list[dict].
             temperature: Sampling temperature.
             max_tokens:  Max output tokens.
-            agent:       Agent slot name (for metrics).
-            preset:      Quality preset (for metrics).
+            agent:       Agent slot name (for Prometheus metrics).
+            preset:      Quality preset (for Prometheus metrics).
 
         Returns:
             Dict: text, tokens_in, tokens_out, cost_usd,
-                  cache_creation_tokens, cache_read_tokens, model, latency_s.
+            cache_creation_tokens, cache_read_tokens, model, latency_s.
         """
         provider = model.split("/")[0]
 
-        if not self._rate_limiter.acquire(timeout=60.0):
-            raise RuntimeError(f"Rate limiter timeout for {agent}/{model}")
+        # Estimate tokens for per-model RLM rate limiter
+        all_text = " ".join(
+            m.get("content", "") if isinstance(m.get("content"), str) else ""
+            for m in messages
+        )
+        if isinstance(system, str):
+            all_text += " " + system
+        elif isinstance(system, list):
+            all_text += " " + " ".join(
+                b.get("text", "") for b in system if isinstance(b, dict)
+            )
+        estimated_tokens = estimate_tokens(all_text) + max_tokens
+
+        # Per-model rate limiter — independent bucket per model string
+        if not rlm_rate_limiter.acquire(
+            model=model,
+            estimated_tokens=estimated_tokens,
+            timeout=120.0,
+        ):
+            raise RuntimeError(
+                f"RLM rate limiter timeout: model={model}, agent={agent}"
+            )
 
         t0 = time.perf_counter()
-
-        result = self._dispatch_with_retry(
-            provider, model, messages, system, temperature, max_tokens, **kwargs
-        )
+        try:
+            result = self._dispatch_with_retry(
+                provider, model, messages, system, temperature, max_tokens, **kwargs
+            )
+        except Exception as exc:
+            # On HTTP 429, drain only this model's bucket
+            err_str = str(exc).lower()
+            if "429" in err_str or "rate limit" in err_str or "too many" in err_str:
+                rlm_rate_limiter.on_429(model)
+            raise
 
         latency_s = time.perf_counter() - t0
         result["latency_s"] = round(latency_s, 3)
@@ -169,52 +256,57 @@ class LLMClient:
 
     @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=60.0)
     def _dispatch_with_retry(
-        self, provider: str, model: str, messages: list[dict],
+        self,
+        provider: str,
+        model: str,
+        messages: list[dict],
         system: str | list[dict] | None,
-        temperature: float, max_tokens: int, **kwargs: Any,
+        temperature: float,
+        max_tokens: int,
+        **kwargs: Any,
     ) -> dict:
-        if provider == "openrouter":
-            return self._call_openrouter(model, messages, system, temperature, max_tokens, **kwargs)
-        elif provider == "anthropic":
-            return self._call_anthropic(model, messages, system, temperature, max_tokens, **kwargs)
-        elif provider == "openai":
-            return self._call_openai(model, messages, system, temperature, max_tokens, **kwargs)
-        elif provider == "google":
-            return self._call_google(model, messages, system, temperature, max_tokens, **kwargs)
-        else:
+        dispatch = {
+            "openrouter": self._call_openrouter,
+            "anthropic":  self._call_anthropic,
+            "openai":     self._call_openai,
+            "google":     self._call_google,
+        }
+        handler = dispatch.get(provider)
+        if handler is None:
             raise ValueError(f"Unsupported provider: {provider!r} (model={model!r})")
+        return handler(model, messages, system, temperature, max_tokens, **kwargs)
 
-    # ── Provider implementations ─────────────────────────────────────────
+    # ── Provider implementations ───────────────────────────────────
 
     def _call_openrouter(
-        self, model: str, messages: list[dict],
+        self,
+        model: str,
+        messages: list[dict],
         system: str | list[dict] | None,
-        temperature: float, max_tokens: int, **kwargs: Any,
+        temperature: float,
+        max_tokens: int,
+        **kwargs: Any,
     ) -> dict:
         """Route call through OpenRouter (OpenAI-compatible API).
 
-        model format: "openrouter/<provider>/<model>"
-        e.g. "openrouter/anthropic/claude-opus-4-5"
-             "openrouter/google/gemini-2.5-flash"
-             "openrouter/openai/gpt-4o-mini"
+        Cache_control fix: Anthropic-style list[dict] system prompts are
+        forwarded as a content array (NOT flattened to string) so OpenRouter
+        can pass cache_control blocks natively to the Anthropic backend.
+        For non-Anthropic models, cache_control fields are gracefully ignored.
         """
         client = self._get_openrouter()
-        # Strip the "openrouter/" prefix → pass e.g. "anthropic/claude-opus-4-5"
-        model_id = model[len("openrouter/"):]
+        model_id = model[len("openrouter/"):]  # strip "openrouter/" prefix
 
-        sys_content = ""
-        if isinstance(system, str):
-            sys_content = system
-        elif isinstance(system, list):
-            # Flatten Anthropic-style cache-control blocks to plain text
-            sys_content = " ".join(
-                block.get("text", "") for block in system
-                if isinstance(block, dict)
-            )
+        full_messages: list[dict] = []
 
-        full_messages = []
-        if sys_content:
-            full_messages.append({"role": "system", "content": sys_content})
+        if system is not None:
+            if isinstance(system, list):
+                # Preserve cache_control blocks — pass as content array, not plain string.
+                # OpenRouter forwards this to Anthropic backend natively.
+                full_messages.append({"role": "system", "content": system})
+            elif isinstance(system, str) and system:
+                full_messages.append({"role": "system", "content": system})
+
         full_messages.extend(messages)
 
         response = client.chat.completions.create(
@@ -225,11 +317,10 @@ class LLMClient:
             **kwargs,
         )
 
-        text = response.choices[0].message.content or ""
+        text = (response.choices[0].message.content or "") if response.choices else ""
         tokens_in = response.usage.prompt_tokens if response.usage else 0
         tokens_out = response.usage.completion_tokens if response.usage else 0
 
-        # OpenRouter returns actual cost in usage (when available)
         or_cost = None
         if response.usage and hasattr(response.usage, "cost"):
             or_cost = response.usage.cost
@@ -240,9 +331,13 @@ class LLMClient:
         )
 
     def _call_anthropic(
-        self, model: str, messages: list[dict],
+        self,
+        model: str,
+        messages: list[dict],
         system: str | list[dict] | None,
-        temperature: float, max_tokens: int, **kwargs: Any,
+        temperature: float,
+        max_tokens: int,
+        **kwargs: Any,
     ) -> dict:
         client = self._get_anthropic()
         model_id = model.split("/", 1)[1]
@@ -265,18 +360,30 @@ class LLMClient:
         cache_creation = getattr(response.usage, "cache_creation_input_tokens", 0) or 0
         cache_read = getattr(response.usage, "cache_read_input_tokens", 0) or 0
 
-        return self._build_result(model, text, tokens_in, tokens_out, cache_creation, cache_read)
+        return self._build_result(
+            model, text, tokens_in, tokens_out, cache_creation, cache_read
+        )
 
     def _call_openai(
-        self, model: str, messages: list[dict],
+        self,
+        model: str,
+        messages: list[dict],
         system: str | list[dict] | None,
-        temperature: float, max_tokens: int, **kwargs: Any,
+        temperature: float,
+        max_tokens: int,
+        **kwargs: Any,
     ) -> dict:
         client = self._get_openai()
         model_id = model.split("/", 1)[1]
 
-        sys_content = system if isinstance(system, str) else ""
-        full_messages = [{"role": "system", "content": sys_content}, *messages]
+        full_messages: list[dict] = []
+        if system is not None:
+            if isinstance(system, list):
+                # OpenAI accepts list[dict] as multi-part system content
+                full_messages.append({"role": "system", "content": system})
+            elif isinstance(system, str) and system:
+                full_messages.append({"role": "system", "content": system})
+        full_messages.extend(messages)
 
         response = client.chat.completions.create(
             model=model_id,
@@ -286,30 +393,34 @@ class LLMClient:
             **kwargs,
         )
 
-        tokens_in = response.usage.prompt_tokens
-        tokens_out = response.usage.completion_tokens
-        text = response.choices[0].message.content
+        tokens_in = response.usage.prompt_tokens if response.usage else 0
+        tokens_out = response.usage.completion_tokens if response.usage else 0
+        text = (response.choices[0].message.content or "") if response.choices else ""
 
         return self._build_result(model, text, tokens_in, tokens_out, 0, 0)
 
     def _call_google(
-        self, model: str, messages: list[dict],
+        self,
+        model: str,
+        messages: list[dict],
         system: str | list[dict] | None,
-        temperature: float, max_tokens: int, **kwargs: Any,
+        temperature: float,
+        max_tokens: int,
+        **kwargs: Any,
     ) -> dict:
-        genai = self._get_google()
         model_id = model.split("/", 1)[1]
-
-        gen_config = {"temperature": temperature, "max_output_tokens": max_tokens}
         sys_instruction = system if isinstance(system, str) else None
-        gmodel = genai.GenerativeModel(
-            model_name=model_id,
-            system_instruction=sys_instruction,
-            generation_config=gen_config,
+
+        # Use cached model instance — avoids re-instantiation on every call
+        gmodel = self._get_google_model(
+            model_id, sys_instruction, temperature, max_tokens
         )
 
         contents = [
-            {"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]}
+            {
+                "role": "user" if m["role"] == "user" else "model",
+                "parts": [m["content"]],
+            }
             for m in messages
         ]
         response = gmodel.generate_content(contents)
@@ -320,17 +431,26 @@ class LLMClient:
 
         return self._build_result(model, text, tokens_in, tokens_out, 0, 0)
 
-    # ── Helpers ──────────────────────────────────────────────────────────
+    # ── Helpers ────────────────────────────────────────────────
 
     def _build_result(
-        self, model: str, text: str,
-        tokens_in: int, tokens_out: int,
-        cache_creation: int, cache_read: int,
+        self,
+        model: str,
+        text: str,
+        tokens_in: int,
+        tokens_out: int,
+        cache_creation: int,
+        cache_read: int,
         override_cost: float | None = None,
     ) -> dict:
-        cost = override_cost if override_cost is not None else cost_usd(model, tokens_in, tokens_out)
+        cost = (
+            override_cost
+            if override_cost is not None
+            else cost_usd(model, tokens_in, tokens_out)
+        )
         logger.debug(
-            "LLM call: model=%s in=%d out=%d cost=$%.4f cache_create=%d cache_read=%d",
+            "LLMClient: model=%s in=%d out=%d cost=$%.4f "
+            "cache_create=%d cache_read=%d",
             model, tokens_in, tokens_out, cost, cache_creation, cache_read,
         )
         return {
@@ -344,5 +464,5 @@ class LLMClient:
         }
 
 
-# ── Singleton instance ───────────────────────────────────────────────────────
+# ── Singleton instance ─────────────────────────────────────────────
 llm_client = LLMClient()
