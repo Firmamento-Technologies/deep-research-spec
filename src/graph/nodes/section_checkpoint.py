@@ -7,6 +7,8 @@ Single authoritative point where:
   4. SSE event SECTION_APPROVED is emitted to the Run Companion.
   5. [NEW] Approved section is mirrored to disk as Markdown for
      real-time human observation during the generation process.
+  6. [FIX ALTA-05] ALL per-section DocumentState fields are reset
+     to prevent data bleed into the next section.
 
 Filesystem mirror layout::
 
@@ -25,6 +27,12 @@ The filesystem mirror is:
 - Idempotent: re-runs overwrite the same file safely.
 - Observable with ``tail -f output/{doc_id}/_live_document.md``
   or any Markdown-aware editor (VSCode, Obsidian, …).
+
+Per-section reset contract (ALTA-05):
+  _PER_SECTION_RESET is THE canonical list of fields that must be
+  cleared before every new section. If you add a new per-section field
+  to DocumentState, you MUST also add it here with its zero-value.
+  Failure to do so causes silent data bleed between sections.
 """
 
 from __future__ import annotations
@@ -43,6 +51,86 @@ import asyncpg  # type: ignore
 from src.graph.state import DocumentState
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# ALTA-05 — Per-section reset table (fonte di verità auditabile)
+# ---------------------------------------------------------------------------
+#
+# REGOLA: ogni campo dichiarato in DocumentState che è relativo a UNA
+# singola sezione (non all'intero run) DEVE comparire qui con il suo
+# valore di reset canonico.
+#
+# Campi ESCLUSI da questo dict (gestiti separatamente nel return):
+#   - approved_sections      → viene appendato (accumulatore cross-sezione)
+#   - current_section_idx    → viene incrementato (contatore cross-sezione)
+#   - writer_memory          → viene aggiornato con i dati della sezione
+#
+# Campi ESCLUSI perché global/frozen dopo preflight:
+#   - doc_id, thread_id, user_id, status, config, style_profile,
+#     style_exemplar, quality_preset, outline, outline_approved,
+#     total_sections, compressed_context, budget, section_budget_usd,
+#     rlm_mode, output_paths, run_metrics, companion_messages,
+#     shine_active, shine_lora, context_lora, rag_local_sources,
+#     preflight_passed, preflight_warnings, active_escalation
+# ---------------------------------------------------------------------------
+_PER_SECTION_RESET: dict[str, Any] = {
+    # ── Ricerca e fonti ────────────────────────────────────────────────────
+    "current_sources":          [],       # §5.3 researcher output
+    "synthesized_sources":      "",       # §5.4 source_synthesizer output
+    "post_draft_gaps":          [],       # §5.10 post_draft_analyzer output
+
+    # ── Draft corrente ────────────────────────────────────────────────────
+    "current_draft":            "",       # §5.5 writer output
+    "current_iteration":        1,        # loop counter (1-based)
+
+    # ── MoW (Mixture-of-Writers §7) ───────────────────────────────────────
+    "mow_drafts":               [],       # bozze parallele MoW
+    "mow_css_per_draft":        [],       # CSS per ogni bozza MoW
+    "fusor_draft":              None,     # output fusor
+
+    # ── Giuria ─────────────────────────────────────────────────────────────
+    "jury_verdicts":            [],       # verdetti round corrente
+    "all_verdicts_history":     [],       # tutti i round di questa sezione
+    "aggregator_verdict":       None,     # output aggregator corrente
+
+    # ── CSS aggregati correnti ─────────────────────────────────────────────
+    "css_content_current":      0.0,      # §9.7 content gate score
+    "css_style_current":        0.0,      # §9.7 style gate score
+    "css_composite_current":    0.0,      # §9.7 composite score
+    "css_history":              [],       # §29.5 bounded reducer (last 8)
+    "draft_embeddings":         [],       # §29.5 bounded reducer (last 4)
+
+    # ── Stile ──────────────────────────────────────────────────────────────
+    "style_lint_violations":    [],       # §5.15 style_linter output
+    "style_iterations":         0,        # anti-loop counter (reset=0)
+
+    # ── Reflector ─────────────────────────────────────────────────────────
+    "reflector_output":         None,     # §5.12 reflector output
+
+    # ── Ricerca mirata ─────────────────────────────────────────────────────
+    "targeted_research_active": False,    # §5.3 targeted research flag
+
+    # ── Panel Discussion §11 ───────────────────────────────────────────────
+    "panel_active":             False,    # panel in corso
+    "panel_round":              0,        # round panel corrente
+    "panel_anonymized_log":     [],       # log anonimizzato panel
+
+    # ── Oscillation §13 ────────────────────────────────────────────────────
+    "oscillation_detected":     False,
+    "oscillation_type":         None,
+
+    # ── Force-approve §19.5 ───────────────────────────────────────────────
+    # IMPORTANTE: force_approve è un override manuale one-shot.
+    # Va resettato qui per evitare che un'approvazione forzata in sezione N
+    # si propaghi automaticamente a sezione N+1.
+    "force_approve":            False,
+
+    # ── Human-in-the-loop ─────────────────────────────────────────────────
+    # Resettato per evitare che un interrupt non risolto di sezione N
+    # blocchi l'avanzamento a sezione N+1 dopo il checkpoint.
+    "human_intervention_required": False,
+}
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers — Markdown mirror (§5.21 extension)
@@ -367,6 +455,8 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
         currentsectionidx increments ONLY after DB INSERT succeeds.
         Filesystem writes happen ONLY after DB INSERT succeeds.
         Filesystem failures never block section advancement.
+        ALL per-section fields in _PER_SECTION_RESET are cleared
+        before the next section starts (ALTA-05).
     """
     doc_id: str = state["doc_id"]
     run_id: str = state["run_id"]
@@ -504,7 +594,16 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
     )
 
     # ------------------------------------------------------------------
-    # Step 6 — Increment currentsectionidx (LAST, after all writes)
+    # Step 6 — Increment currentsectionidx + reset per-section state
+    #
+    # ALTA-05: usa _PER_SECTION_RESET come fonte di verità unica.
+    # L'ordine degli override è:
+    #   {**state}               ← preserva tutti i campi globali/frozen
+    #   {**_PER_SECTION_RESET}  ← azzera TUTTI i campi per-section
+    #   {campi espliciti}       ← override finali non resettabili a default
+    #
+    # Se aggiungi un campo per-section a DocumentState, aggiungi il suo
+    # zero-value a _PER_SECTION_RESET. Mai aggiungere qui direttamente.
     # ------------------------------------------------------------------
     next_idx = section_idx + 1
     logger.info(
@@ -514,19 +613,10 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
 
     return {  # type: ignore[return-value]
         **state,
-        "approved_sections": approved_sections,
-        "current_section_idx": next_idx,
-        "writer_memory": updated_memory,
-        # Reset per-section state for the next section
-        "current_draft": "",
-        "current_iteration": 1,
-        "css_history": [],
-        "all_verdicts_history": [],
-        "style_lint_violations": [],
-        "post_draft_gaps": [],
-        "reflector_output": None,
-        "aggregator_verdict": None,
-        "draft_embeddings": [],
-        "oscillation_detected": False,
-        "oscillation_type": None,
+        **_PER_SECTION_RESET,
+        # Campi che non usano il valore di reset di _PER_SECTION_RESET
+        # perché devono essere valorizzati con dati calcolati in questo step:
+        "approved_sections":    approved_sections,
+        "current_section_idx":  next_idx,
+        "writer_memory":        updated_memory,
     }
