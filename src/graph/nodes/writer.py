@@ -34,6 +34,7 @@ import os
 import re
 from typing import Any
 
+from src.budget.guard import BudgetExhaustedError, check_budget
 from src.llm.client import llm_client
 from src.llm.routing import route_model
 
@@ -49,7 +50,7 @@ logger = logging.getLogger(__name__)
 _SHINE_SERVING_URL: str = os.getenv("SHINE_SERVING_URL", "")
 
 
-# ── Writer Node ──────────────────────────────────────────────────────────────
+# ── Writer Node ───────────────────────────────────────────────────────────────────────
 
 def writer_node(state: dict) -> dict:
     """Genera il draft della sezione da corpus compresso, RLM o SHINE.
@@ -65,6 +66,7 @@ def writer_node(state: dict) -> dict:
     Returns:
         Aggiornamento parziale dello stato con ``current_draft``,
         ``current_iteration`` e opzionalmente ``budget`` aggiornato.
+        Se budget esaurito, ritorna {"force_approve": True}.
     """
     section_idx = state.get("current_section_idx", 0)
     outline = state.get("outline", [])
@@ -125,6 +127,15 @@ def writer_node(state: dict) -> dict:
     # Ref: https://github.com/alexzhang13/rlm (arXiv:2512.24601)
     # ─────────────────────────────────────────────────────────────────────────
     elif rlm_mode:
+        # §19.6 Budget guard per RLM path
+        try:
+            check_budget(state, agent="writer_rlm", estimated_cost=1.50)
+        except BudgetExhaustedError:
+            logger.warning(
+                "Writer/RLM: budget exhausted before RLM call — forcing approval"
+            )
+            return {"force_approve": True}
+
         from src.llm.rlm_adapter import get_rlm_client  # lazy import
 
         # Corpus completo non compresso — RLM gestisce la decomposizione
@@ -225,7 +236,16 @@ def writer_node(state: dict) -> dict:
     # Floor 512, cap 8192.
     max_tokens = max(512, min(int(target_words * 1.5 / 0.75) + 256, 8192))
 
-    # ── LLM call (PATH 1 + PATH 3) ───────────────────────────────────────────
+    # ── §19.6 Budget guard per PATH 1 + PATH 3 ────────────────────────
+    try:
+        check_budget(state, agent="writer", estimated_cost=0.50)
+    except BudgetExhaustedError:
+        logger.warning(
+            "Writer: budget exhausted before llm_client.call — forcing approval"
+        )
+        return {"force_approve": True}
+
+    # ── LLM call (PATH 1 + PATH 3) ─────────────────────────────────────
     messages = [{"role": "user", "content": user_prompt}]
 
     response = llm_client.call(
@@ -253,7 +273,7 @@ def writer_node(state: dict) -> dict:
     }
 
 
-# ── Prompt builders ───────────────────────────────────────────────────────────
+# ── Prompt builders ───────────────────────────────────────────────────────────────────
 
 def _build_prompt_shine_lora(
     style: str, scope: str, target_words: int, citations: str,
@@ -309,7 +329,7 @@ Vincoli:
 - Nessuna formattazione markdown"""
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Helpers ─────────────────────────────────────────────────────────────────────────
 
 def _get_style_profile_rules(style_profile: Any) -> str:
     """Carica le style rules da config/style_profiles.yaml (§26)."""
