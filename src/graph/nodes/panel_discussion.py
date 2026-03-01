@@ -16,12 +16,29 @@ ALTA-07 — Escape guarantee:
   Quando ``new_round_num >= max_rounds``, il nodo imposta
   ``force_approve=True`` nel return. Il router lo intercetta e
   indirizza verso aggregator senza ulteriori round.
+
+ALTA-08 — Budget guard:
+  ``check_budget_before_call(state, "panel_discussion")`` è il PRIMO
+  statement di ``panel_discussion_node()``, prima di qualsiasi lettura
+  dello state o chiamata a ``_run_panel_round()``.
+
+  Quando ``budget["hard_stop_fired"] is True`` (cap superato), solleva
+  ``BudgetExhaustedError`` che viene intercettata localmente. Il nodo
+  restituisce immediatamente::
+
+      {"panel_round": panel_round + 1,
+       "panel_active": False,
+       "force_approve": True}
+
+  Il router (panel_loop.py) legge ``force_approve=True`` ed esce dal loop
+  verso l'aggregator — stessa semantica dell'escape ALTA-07.
 """
 from __future__ import annotations
 
 import logging
 from typing import Any
 
+from src.budget.guard import BudgetExhaustedError, check_budget_before_call
 from src.llm.client import llm_client
 from src.llm.routing import route_model
 
@@ -87,8 +104,28 @@ def panel_discussion_node(state: dict) -> dict:
         Partial state update with incremented ``panel_round``,
         updated ``panel_anonymized_log``, potentially revised
         ``jury_verdicts``, and ``force_approve=True`` when
-        max rounds are exhausted (ALTA-07 escape guarantee).
+        max rounds are exhausted (ALTA-07) or budget is exhausted (ALTA-08).
     """
+    # ------------------------------------------------------------------
+    # ALTA-08 — Budget guard (DEVE essere il primo statement del nodo).
+    #
+    # Se hard_stop_fired=True il budget cap è stato superato: nessun
+    # ulteriore token LLM deve essere consumato.
+    #
+    # Restituisce panel_round+1 affinché il router (panel_loop.py) abbia
+    # un contatore aggiornato. panel_active=False comunica che il panel
+    # non deve proseguire. force_approve=True è il segnale canonico
+    # che tutto il grafo usa per uscire dal loop di raffinamento.
+    # ------------------------------------------------------------------
+    try:
+        check_budget_before_call(state, "panel_discussion")
+    except BudgetExhaustedError:
+        return {
+            "panel_round": state.get("panel_round", 0) + 1,
+            "panel_active": False,
+            "force_approve": True,
+        }
+
     draft: str = state.get("current_draft", "")
     verdicts: list[dict] = state.get("jury_verdicts", [])
     panel_round: int = state.get("panel_round", 0)
@@ -212,6 +249,11 @@ def _run_panel_round(
         prior_discussion: Summary of previous panel rounds (last 3).
         round_num: Current round number (1-based).
         quality_preset: LLM preset for model routing (default 'balanced').
+
+    Note:
+        The ALTA-08 budget guard fires BEFORE this function is called
+        (in panel_discussion_node). The ``except Exception`` block here
+        handles LLM infrastructure errors, not budget exhaustion.
     """
     try:
         system_blocks = [
