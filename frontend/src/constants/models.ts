@@ -1,61 +1,40 @@
-// Available OpenRouter models — used by Settings model-assignment rows,
-// AgentModelDropdown (STEP 8) and ModelBadge display.
-
 export interface ModelOption {
-  id: string        // OpenRouter model ID (e.g. 'anthropic/claude-sonnet-4-6')
-  name: string      // Short display name
-  provider: string  // Provider group label
+  id: string
+  name: string
+  provider: string
+  contextK: number
+  costIn: number   // $ per 1M tokens input
+  costOut: number  // $ per 1M tokens output
 }
 
 export const AVAILABLE_MODELS: ModelOption[] = [
   // Anthropic
-  { id: 'anthropic/claude-opus-4-6',   name: 'Claude Opus 4.6',   provider: 'Anthropic'   },
-  { id: 'anthropic/claude-sonnet-4-6', name: 'Claude Sonnet 4.6', provider: 'Anthropic'   },
-  { id: 'anthropic/claude-haiku-3',    name: 'Claude Haiku 3',    provider: 'Anthropic'   },
+  { id: 'anthropic/claude-opus-4-5',   name: 'Claude Opus 4.5',   provider: 'Anthropic', contextK: 200, costIn: 15.0,  costOut: 75.0  },
+  { id: 'anthropic/claude-sonnet-4',   name: 'Claude Sonnet 4',   provider: 'Anthropic', contextK: 200, costIn: 3.0,   costOut: 15.0  },
+  { id: 'anthropic/claude-haiku-3',    name: 'Claude Haiku 3',    provider: 'Anthropic', contextK: 200, costIn: 0.25,  costOut: 1.25  },
   // OpenAI
-  { id: 'openai/o3',                   name: 'o3',                provider: 'OpenAI'      },
-  { id: 'openai/o3-mini',              name: 'o3 mini',           provider: 'OpenAI'      },
+  { id: 'openai/o3',                   name: 'o3',                provider: 'OpenAI',    contextK: 200, costIn: 10.0,  costOut: 40.0  },
+  { id: 'openai/o3-mini',              name: 'o3-mini',           provider: 'OpenAI',    contextK: 128, costIn: 1.1,   costOut: 4.4   },
+  { id: 'openai/gpt-4o',               name: 'GPT-4o',            provider: 'OpenAI',    contextK: 128, costIn: 2.5,   costOut: 10.0  },
+  { id: 'openai/gpt-4o-mini',          name: 'GPT-4o Mini',       provider: 'OpenAI',    contextK: 128, costIn: 0.15,  costOut: 0.6   },
   // Google
-  { id: 'google/gemini-3.1-pro',       name: 'Gemini 3.1 Pro',   provider: 'Google'      },
+  { id: 'google/gemini-2.5-pro',       name: 'Gemini 2.5 Pro',    provider: 'Google',    contextK: 1000,costIn: 1.25,  costOut: 5.0   },
+  { id: 'google/gemini-2.5-flash',     name: 'Gemini 2.5 Flash',  provider: 'Google',    contextK: 1000,costIn: 0.075, costOut: 0.3   },
+  { id: 'google/gemini-1.5-flash',     name: 'Gemini 1.5 Flash',  provider: 'Google',    contextK: 1000,costIn: 0.075, costOut: 0.3   },
   // Perplexity
-  { id: 'perplexity/sonar-pro',        name: 'Sonar Pro',         provider: 'Perplexity'  },
+  { id: 'perplexity/sonar-pro',        name: 'Sonar Pro',         provider: 'Perplexity',contextK: 200, costIn: 3.0,   costOut: 15.0  },
+  { id: 'perplexity/sonar',            name: 'Sonar',             provider: 'Perplexity',contextK: 128, costIn: 1.0,   costOut: 1.0   },
+  // Meta
+  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', provider: 'Meta',  contextK: 128, costIn: 0.12,  costOut: 0.3   },
   // Qwen
-  { id: 'qwen/qwen3-7b',              name: 'Qwen3 7B',          provider: 'Qwen'        },
+  { id: 'qwen/qwen3-7b',              name: 'Qwen3 7B',           provider: 'Qwen',      contextK: 32,  costIn: 0.07,  costOut: 0.07  },
 ]
 
-/** Grouped by provider for <optgroup> dropdowns in Settings and AgentModelDropdown. */
 export const MODELS_BY_PROVIDER: Record<string, ModelOption[]> = AVAILABLE_MODELS.reduce(
   (acc, m) => {
-    ;(acc[m.provider] ??= []).push(m)
+    if (!acc[m.provider]) acc[m.provider] = []
+    acc[m.provider].push(m)
     return acc
   },
-  {} as Record<string, ModelOption[]>,
+  {} as Record<string, ModelOption[]>
 )
-
-/** Default model assignments for all agents — from UI_BUILD_PLAN.md Section 7. */
-export const DEFAULT_MODEL_ASSIGNMENTS: Record<string, string> = {
-  planner:            'google/gemini-3.1-pro',
-  researcher:         'perplexity/sonar-pro',
-  researcher_targeted:'perplexity/sonar-pro',
-  source_synth:       'anthropic/claude-sonnet-4-6',
-  writer_a:           'anthropic/claude-opus-4-6',
-  writer_b:           'anthropic/claude-opus-4-6',
-  writer_c:           'anthropic/claude-opus-4-6',
-  writer_single:      'anthropic/claude-opus-4-6',
-  fusor:              'openai/o3',
-  post_draft_analyzer:'google/gemini-3.1-pro',
-  style_fixer:        'anthropic/claude-sonnet-4-6',
-  r1:                 'openai/o3',
-  r2:                 'openai/o3-mini',
-  r3:                 'openai/o3-mini',
-  f1:                 'google/gemini-3.1-pro',
-  f2:                 'google/gemini-3.1-pro',
-  f3:                 'google/gemini-3.1-pro',
-  s1:                 'anthropic/claude-sonnet-4-6',
-  s2:                 'anthropic/claude-haiku-3',
-  s3:                 'anthropic/claude-haiku-3',
-  reflector:          'openai/o3',
-  span_editor:        'anthropic/claude-sonnet-4-6',
-  context_compressor: 'qwen/qwen3-7b',
-  coherence_guard:    'google/gemini-3.1-pro',
-}
