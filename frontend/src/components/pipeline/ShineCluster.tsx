@@ -1,4 +1,4 @@
-import React from 'react'
+// ShineCluster — optional SHINE LoRA serving overlay
 
 interface ShineClusterProps {
   active: boolean
@@ -10,9 +10,9 @@ export function ShineCluster({ active }: ShineClusterProps) {
   const opacity = active ? 1 : 0.3
 
   const nodes = [
-    { id: 'shine_singleton',   label: 'SHINE SINGLETON',  x: 1700, y: 800 },
-    { id: 'shine_hypernetwork',label: 'SHINE HYPERNET',   x: 1700, y: 880 },
-    { id: 'shine_lora',        label: 'LORA WEIGHTS',     x: 1700, y: 960 },
+    { id: 'shine_singleton', label: 'SHINE SINGLETON', x: 1700, y: 800 },
+    { id: 'shine_hypernetwork', label: 'SHINE HYPERNET', x: 1700, y: 880 },
+    { id: 'shine_lora', label: 'LORA WEIGHTS', x: 1700, y: 960 },
   ]
 
   return (
@@ -43,7 +43,7 @@ export function ShineCluster({ active }: ShineClusterProps) {
             width: 160,
             height: 56,
             background: `${SHINE_COLOR}10`,
-            border: `1px dashed ${SHINE_COLOR}${ active ? 'AA' : '44' }`,
+            border: `1px dashed ${SHINE_COLOR}${active ? 'AA' : '44'}`,
             borderRadius: 8,
             display: 'flex',
             alignItems: 'center',

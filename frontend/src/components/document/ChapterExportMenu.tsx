@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 interface ChapterExportMenuProps {
   docId: string
@@ -7,10 +7,10 @@ interface ChapterExportMenuProps {
 }
 
 const FORMATS = [
-  { id: 'docx',     label: '⬇ DOCX' },
-  { id: 'pdf',      label: '⬇ PDF' },
+  { id: 'docx', label: '⬇ DOCX' },
+  { id: 'pdf', label: '⬇ PDF' },
   { id: 'markdown', label: '⬇ Markdown' },
-  { id: 'json',     label: '⬇ JSON' },
+  { id: 'json', label: '⬇ JSON' },
 ] as const
 
 export function ChapterExportMenu({ docId, sectionIdx, label = 'Esporta' }: ChapterExportMenuProps) {

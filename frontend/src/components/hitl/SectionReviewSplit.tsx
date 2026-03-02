@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import type React from 'react'
+import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 import { Source, SourceList } from '../panel/SourceList'
@@ -27,17 +26,17 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
   const { activeRun } = useRunStore()
 
   const payload = (activeRun as any)?.hitlPayload ?? {}
-  const draft: string         = payload.draft     ?? ''
+  const draft: string = payload.draft ?? ''
   const violations: Violation[] = payload.violations ?? []
-  const feedback: FeedbackItem[]= (payload.feedbackItems ?? []).sort(
+  const feedback: FeedbackItem[] = (payload.feedbackItems ?? []).sort(
     (a: FeedbackItem, b: FeedbackItem) => severityOrder(b.severity) - severityOrder(a.severity)
   )
   const sources: Source[] = payload.sources ?? []
 
   const [manualEdit, setManualEdit] = useState(false)
-  const [manualText, setManualText]   = useState(draft)
-  const [submitting, setSubmitting]   = useState(false)
-  const [error, setError]             = useState<string | null>(null)
+  const [manualText, setManualText] = useState(draft)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const post = async (action: 'approve' | 'regenerate' | 'edit', editContent?: string) => {
     setSubmitting(true)
@@ -177,8 +176,8 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
 function FeedbackCard({ item }: { item: FeedbackItem }) {
   const [expanded, setExpanded] = useState(false)
   const color =
-    item.severity === 'HIGH'   ? '#EF4444' :
-    item.severity === 'MEDIUM' ? '#F97316' : '#EAB308'
+    item.severity === 'HIGH' ? '#EF4444' :
+      item.severity === 'MEDIUM' ? '#F97316' : '#EAB308'
 
   return (
     <div
@@ -250,7 +249,7 @@ function applyViolationHighlights(text: string, violations: Violation[]): string
 }
 
 function escapeHtml(s: string) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function ActionBtn({

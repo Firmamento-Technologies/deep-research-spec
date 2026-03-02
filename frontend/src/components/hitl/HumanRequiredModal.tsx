@@ -1,4 +1,3 @@
-import React from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 import { OutlineDragList } from './OutlineDragList'
@@ -12,7 +11,7 @@ import { EscalationBanner } from './EscalationBanner'
  * Type is read from activeRun.hitlType (set by useSSE when HUMAN_REQUIRED fires).
  */
 export function HumanRequiredModal() {
-  const { appState, activeDocId } = useAppStore()
+  const { state: appState, activeDocId } = useAppStore()
   const { activeRun } = useRunStore()
 
   if (appState !== 'AWAITING_HUMAN' || !activeDocId) return null
@@ -35,7 +34,7 @@ export function HumanRequiredModal() {
         justifyContent: 'center',
         backdropFilter: 'blur(4px)',
       }}
-      // NOT dismissible — no onClick on overlay
+    // NOT dismissible — no onClick on overlay
     >
       <div
         style={{
@@ -76,8 +75,8 @@ export function HumanRequiredModal() {
           <span style={{ fontSize: 13, fontFamily: 'monospace', color: '#F0F1F6', fontWeight: 700 }}>
             {hitlType === 'outline_approval' && 'APPROVAZIONE OUTLINE'}
             {hitlType === 'section_approval' && 'REVISIONE SEZIONE'}
-            {hitlType === 'escalation'       && 'ESCALATION — AZIONE RICHIESTA'}
-            {!hitlType                        && 'AZIONE RICHIESTA'}
+            {hitlType === 'escalation' && 'ESCALATION — AZIONE RICHIESTA'}
+            {!hitlType && 'AZIONE RICHIESTA'}
           </span>
           <span
             style={{
@@ -99,7 +98,7 @@ export function HumanRequiredModal() {
         <div style={{ flex: 1, overflow: 'hidden' }}>
           {hitlType === 'outline_approval' && <OutlineDragList docId={activeDocId} />}
           {hitlType === 'section_approval' && <SectionReviewSplit docId={activeDocId} />}
-          {hitlType === 'escalation'       && <EscalationBanner  docId={activeDocId} />}
+          {hitlType === 'escalation' && <EscalationBanner docId={activeDocId} />}
           {!hitlType && (
             <div style={{ padding: 24, fontSize: 13, color: '#8B8FA8', fontFamily: 'monospace' }}>
               Attendere i dati dalla pipeline…

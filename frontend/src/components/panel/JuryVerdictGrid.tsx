@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 export interface JudgeVerdict {
   judgeId: string   // r1,r2,r3,f1,f2,f3,s1,s2,s3

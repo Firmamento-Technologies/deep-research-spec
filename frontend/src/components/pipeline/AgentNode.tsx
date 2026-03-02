@@ -1,6 +1,6 @@
 import React from 'react'
 import { NodeDefinition, CLUSTER_COLORS } from '../../constants/pipeline-layout'
-import { NodeState } from '../../store/useRunStore'
+import type { NodeState } from '../../store/useRunStore'
 
 interface AgentNodeProps {
   definition: NodeDefinition
@@ -10,11 +10,11 @@ interface AgentNodeProps {
 }
 
 const STATUS_DOT_COLORS: Record<string, string> = {
-  waiting:   '#50536A',
-  running:   '#22C55E',
+  waiting: '#50536A',
+  running: '#22C55E',
   completed: '#4F6EF7',
-  failed:    '#EF4444',
-  skipped:   '#50536A',
+  failed: '#EF4444',
+  skipped: '#50536A',
 }
 
 export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeProps) {
@@ -46,9 +46,8 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
           height: 32,
           borderRadius: '50%',
           background: `${clusterColor}22`,
-          border: `2px solid ${
-            isSelected ? '#F0F1F6' : isRunning ? clusterColor : `${clusterColor}88`
-          }`,
+          border: `2px solid ${isSelected ? '#F0F1F6' : isRunning ? clusterColor : `${clusterColor}88`
+            }`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -56,8 +55,8 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
           boxShadow: isRunning
             ? `0 0 10px ${clusterColor}, 0 0 20px ${clusterColor}40`
             : isSelected
-            ? `0 0 0 2px ${clusterColor}80`
-            : 'none',
+              ? `0 0 0 2px ${clusterColor}80`
+              : 'none',
           animation: isRunning ? 'pulse-glow 1.5s ease-in-out infinite' : 'none',
           ['--node-color' as string]: clusterColor,
         }}
@@ -92,9 +91,8 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
             width: size * 0.7,
             height: size * 0.7,
             background: `${clusterColor}22`,
-            border: `2px solid ${
-              isSelected ? '#F0F1F6' : isRunning ? clusterColor : `${clusterColor}88`
-            }`,
+            border: `2px solid ${isSelected ? '#F0F1F6' : isRunning ? clusterColor : `${clusterColor}88`
+              }`,
             transform: 'rotate(45deg)',
             boxShadow: isRunning ? `0 0 10px ${clusterColor}` : 'none',
             animation: isRunning ? 'pulse-glow 1.5s ease-in-out infinite' : 'none',
@@ -126,15 +124,14 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
       style={{
         ...baseStyle,
         background: `${clusterColor}15`,
-        border: `1px solid ${
-          isSelected
+        border: `1px solid ${isSelected
             ? '#F0F1F6'
             : isRunning
-            ? clusterColor
-            : isSatellite
-            ? `${clusterColor}55`
-            : `${clusterColor}66`
-        }`,
+              ? clusterColor
+              : isSatellite
+                ? `${clusterColor}55`
+                : `${clusterColor}66`
+          }`,
         borderRadius: 8,
         borderStyle: isSatellite ? 'dashed' : 'solid',
         opacity: isInactive ? 0.3 : 1,
@@ -146,8 +143,8 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
         boxShadow: isRunning
           ? `0 0 8px ${clusterColor}, 0 0 24px ${clusterColor}40`
           : isSelected
-          ? `0 0 0 2px ${clusterColor}60`
-          : 'none',
+            ? `0 0 0 2px ${clusterColor}60`
+            : 'none',
         animation: isRunning ? 'pulse-glow 1.5s ease-in-out infinite' : 'none',
         ['--node-color' as string]: clusterColor,
         transition: 'box-shadow 0.2s, border-color 0.2s, opacity 0.2s',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 
@@ -11,11 +11,11 @@ export function EscalationBanner({ docId }: EscalationBannerProps) {
   const { activeRun } = useRunStore()
 
   const payload = (activeRun as any)?.hitlPayload ?? {}
-  const escalationType: string = payload.escalationType  ?? 'ESCALATION'
-  const description: string    = payload.description     ?? 'Azione richiesta per risolvere un conflitto nella pipeline.'
+  const escalationType: string = payload.escalationType ?? 'ESCALATION'
+  const description: string = payload.description ?? 'Azione richiesta per risolvere un conflitto nella pipeline.'
 
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError]           = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const resolve = async (action: 'auto' | 'manual' | 'skip', resolution?: string) => {
     setSubmitting(true)

@@ -16,13 +16,13 @@ import { useConversationStore } from '../../store/useConversationStore'
 import { SectionItem } from './SectionItem'
 
 export function DocumentSidebar() {
-  const collapsed     = useAppStore((s) => s.sidebarCollapsed)
-  const toggle        = useAppStore((s) => s.toggleSidebar)
-  const activeRun     = useRunStore((s) => s.activeRun)
+  const collapsed = useAppStore((s) => s.sidebarCollapsed)
+  const toggle = useAppStore((s) => s.toggleSidebar)
+  const activeRun = useRunStore((s) => s.activeRun)
   const completedRuns = useRunStore((s) => s.completedRuns)
-  const sendMessage   = useConversationStore((s) => s.sendMessage)
-  const setState      = useAppStore((s) => s.setState)
-  const appState      = useAppStore((s) => s.state)
+  const sendMessage = useConversationStore((s) => s.sendMessage)
+  const setState = useAppStore((s) => s.setState)
+  const appState = useAppStore((s) => s.state)
 
   const handleNewDoc = () => {
     if (appState === 'IDLE') setState('CONVERSING')
@@ -78,8 +78,17 @@ export function DocumentSidebar() {
                 {activeRun.sections.map((section) => (
                   <SectionItem
                     key={section.idx}
-                    section={section}
-                    isRunning={section.idx === activeRun.currentSection && activeRun.status === 'running'}
+                    idx={section.idx}
+                    title={section.title}
+                    status={
+                      section.idx === activeRun.currentSection && activeRun.status === 'running'
+                        ? 'running'
+                        : section.approved
+                          ? 'completed'
+                          : 'waiting'
+                    }
+                    docId={activeRun.docId}
+                    collapsed={false}
                   />
                 ))}
               </div>

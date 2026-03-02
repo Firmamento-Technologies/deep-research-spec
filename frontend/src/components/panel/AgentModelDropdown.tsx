@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { MODELS_BY_PROVIDER } from '../../constants/models'
 import { useAppStore } from '../../store/useAppStore'
-import { useRunStore } from '../../store/useRunStore'
 
 interface AgentModelDropdownProps {
   nodeId: string

@@ -1,4 +1,4 @@
-import React from 'react'
+// RlmCluster — optional RLM recursive language model overlay
 
 interface RlmClusterProps {
   active: boolean
@@ -10,9 +10,9 @@ export function RlmCluster({ active }: RlmClusterProps) {
   const opacity = active ? 1 : 0.3
 
   const nodes = [
-    { id: 'rlm_adapter',         label: 'RLM ADAPTER',       x: 1700, y: 1400 },
-    { id: 'deep_research_lm',    label: 'DEEP RESEARCH LM',  x: 1700, y: 1480 },
-    { id: 'section_budget_guard',label: 'SECTION BUDGET',    x: 1700, y: 1560 },
+    { id: 'rlm_adapter', label: 'RLM ADAPTER', x: 1700, y: 1400 },
+    { id: 'deep_research_lm', label: 'DEEP RESEARCH LM', x: 1700, y: 1480 },
+    { id: 'section_budget_guard', label: 'SECTION BUDGET', x: 1700, y: 1560 },
   ]
 
   return (
@@ -43,7 +43,7 @@ export function RlmCluster({ active }: RlmClusterProps) {
             width: 160,
             height: 56,
             background: `${RLM_COLOR}10`,
-            border: `1px dashed ${RLM_COLOR}${ active ? 'AA' : '44' }`,
+            border: `1px dashed ${RLM_COLOR}${active ? 'AA' : '44'}`,
             borderRadius: 8,
             display: 'flex',
             alignItems: 'center',

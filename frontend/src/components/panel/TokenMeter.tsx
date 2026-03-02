@@ -1,4 +1,4 @@
-import React from 'react'
+// TokenMeter — live token usage display
 
 interface TokenMeterProps {
   tokensIn?: number
@@ -37,7 +37,7 @@ export function TokenMeter({ tokensIn, tokensOut, tokensOutEst, costUsd, isLive 
           label="Output"
           value={
             tokensOut != null
-              ? `${formatK(tokensOut)}${ tokensOutEst != null && isLive ? ` / ~${formatK(tokensOutEst)} est.` : '' }`
+              ? `${formatK(tokensOut)}${tokensOutEst != null && isLive ? ` / ~${formatK(tokensOutEst)} est.` : ''}`
               : '—'
           }
           color={isLive ? '#22C55E' : '#8B8FA8'}

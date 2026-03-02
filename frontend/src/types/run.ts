@@ -57,6 +57,16 @@ export interface SectionResult {
   approved: boolean
   iterations: number
   cssScores: CSSScores
+  /** Individual CSS scores (flattened for convenience) */
+  cssContent?: number
+  cssStyle?: number
+  cssSource?: number
+  /** Computed status derived from pipeline state */
+  status?: 'waiting' | 'running' | 'approved' | 'failed'
+  /** Alias — some components use wordsCount instead of wordCount */
+  wordsCount?: number
+  /** Alias — some components use iterationsUsed instead of iterations */
+  iterationsUsed?: number
 }
 
 export interface RunState {

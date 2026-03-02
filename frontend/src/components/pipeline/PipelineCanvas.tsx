@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 import { PIPELINE_NODES } from '../../constants/pipeline-layout'
@@ -16,8 +16,8 @@ const MAX_ZOOM = 2.0
 
 export function PipelineCanvas() {
   const containerRef = useRef<HTMLDivElement>(null)
-  const { appState, selectedNodeId, setSelectedNode } = useAppStore()
-  const { activeRun, updateNode } = useRunStore()
+  const { state: appState, selectedNodeId, setSelectedNode } = useAppStore()
+  const { activeRun } = useRunStore()
 
   const [zoom, setZoom] = useState(0.35)
   const [panX, setPanX] = useState(-200)
@@ -37,7 +37,7 @@ export function PipelineCanvas() {
     if ((e.target as HTMLElement).closest('[data-node]')) return
     setIsDragging(true)
     dragStart.current = { x: e.clientX, y: e.clientY, panX, panY }
-    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+      ; (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
   }, [panX, panY])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -69,9 +69,8 @@ export function PipelineCanvas() {
       <PipelineHeader run={activeRun} />
       <div
         ref={containerRef}
-        className={`w-full h-full overflow-hidden relative ${
-          isDragging ? 'cursor-grabbing' : 'cursor-grab'
-        }`}
+        className={`w-full h-full overflow-hidden relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          }`}
         onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

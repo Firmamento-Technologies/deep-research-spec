@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 
 export interface Source {
   url: string
@@ -14,8 +14,8 @@ interface SourceListProps {
 function ReliabilityBadge({ score }: { score: number }) {
   const color =
     score >= 0.85 ? '#22C55E' :
-    score >= 0.70 ? '#EAB308' :
-    '#EF4444'
+      score >= 0.70 ? '#EAB308' :
+        '#EF4444'
   return (
     <span
       style={{

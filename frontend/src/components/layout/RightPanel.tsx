@@ -1,6 +1,7 @@
-import React from 'react'
+import type React from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
+import type { RunState } from '../../store/useRunStore'
 import { PIPELINE_NODES, CLUSTER_COLORS } from '../../constants/pipeline-layout'
 import { AgentLogPanel } from '../panel/AgentLogPanel'
 import { TokenMeter } from '../panel/TokenMeter'
@@ -9,7 +10,7 @@ import { SourceList } from '../panel/SourceList'
 import { PayloadTree } from '../panel/PayloadTree'
 import { AgentModelDropdown } from '../panel/AgentModelDropdown'
 
-const JURY_NODES = new Set(['jury', 'r1','r2','r3','f1','f2','f3','s1','s2','s3','aggregator'])
+const JURY_NODES = new Set(['jury', 'r1', 'r2', 'r3', 'f1', 'f2', 'f3', 's1', 's2', 's3', 'aggregator'])
 const RESEARCHER_NODES = new Set(['researcher', 'researcher_targeted'])
 const REFLECTOR_NODES = new Set(['reflector'])
 
@@ -97,7 +98,7 @@ export function RightPanel() {
 /* ------------------------------------------------------------------ */
 /* RunOverview — shown when no node is selected                         */
 /* ------------------------------------------------------------------ */
-function RunOverview({ run }: { run: ReturnType<typeof useRunStore>['activeRun'] }) {
+function RunOverview({ run }: { run: RunState | null }) {
   if (!run) {
     return (
       <div style={{ fontSize: 12, fontFamily: 'monospace', color: '#50536A' }}>
@@ -128,16 +129,16 @@ function RunOverview({ run }: { run: ReturnType<typeof useRunStore>['activeRun']
       {/* CSS Scores */}
       <Section label="CSS SCORES">
         <CSSScore label="Content" value={run.cssScores?.content ?? 0} threshold={0.65} />
-        <CSSScore label="Style"   value={run.cssScores?.style   ?? 0} threshold={0.80} />
-        <CSSScore label="Source"  value={run.cssScores?.source  ?? 0} threshold={0.70} />
+        <CSSScore label="Style" value={run.cssScores?.style ?? 0} threshold={0.80} />
+        <CSSScore label="Source" value={run.cssScores?.source ?? 0} threshold={0.70} />
       </Section>
 
       {/* Counters */}
       <Section label="CONTATORI">
-        <Counter label="Sezione corrente"  value={`${run.currentSection}/${run.totalSections}`} />
-        <Counter label="Iterazione"        value={`${run.currentIteration}`} />
-        <Counter label="Stato"             value={run.status} />
-        <Counter label="Preset"            value={run.qualityPreset} />
+        <Counter label="Sezione corrente" value={`${run.currentSection}/${run.totalSections}`} />
+        <Counter label="Iterazione" value={`${run.currentIteration}`} />
+        <Counter label="Stato" value={run.status} />
+        <Counter label="Preset" value={run.qualityPreset} />
       </Section>
     </div>
   )
@@ -146,7 +147,7 @@ function RunOverview({ run }: { run: ReturnType<typeof useRunStore>['activeRun']
 /* ------------------------------------------------------------------ */
 /* NodeDetail — shown when a node is selected                           */
 /* ------------------------------------------------------------------ */
-function NodeDetail({ nodeId, run }: { nodeId: string; run: NonNullable<ReturnType<typeof useRunStore>['activeRun']> }) {
+function NodeDetail({ nodeId, run }: { nodeId: string; run: RunState }) {
   const nodeDef = PIPELINE_NODES.find(n => n.id === nodeId)
   const nodeState = run.nodes[nodeId]
   const status = nodeState?.status ?? 'waiting'
@@ -163,8 +164,8 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: NonNullable<ReturnTy
     typeof nodeState?.output === 'string'
       ? nodeState.output
       : nodeState?.output != null
-      ? JSON.stringify(nodeState.output, null, 2).slice(0, 1000)
-      : ''
+        ? JSON.stringify(nodeState.output, null, 2).slice(0, 1000)
+        : ''
 
   const outputPreview = outputText.length > 200
     ? outputText.slice(0, 200) + '…'
@@ -196,28 +197,28 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: NonNullable<ReturnTy
       </div>
 
       {/* JURY special case */}
-      {isJury && (
+      {isJury ? (
         <JuryVerdictGrid
           verdicts={
             run.juryVerdicts
-              ?.flatMap(jv => (jv as any).judges ?? [])
+              ?.flatMap((jv: any) => (jv as any).judges ?? [])
             ?? []
           }
         />
-      )}
+      ) : null}
 
       {/* REFLECTOR special case */}
-      {isReflector && nodeState?.output && (
+      {isReflector && nodeState?.output ? (
         <ReflectorFeedback output={nodeState.output} />
-      )}
+      ) : null}
 
       {/* RESEARCHER special case */}
-      {isResearcher && nodeState?.output && (
+      {isResearcher && nodeState?.output ? (
         <SourceList sources={(nodeState.output as any)?.sources ?? []} />
-      )}
+      ) : null}
 
       {/* Live output */}
-      {status === 'running' && (
+      {status === 'running' ? (
         <>
           <AgentLogPanel text={outputText} isLive />
           <TokenMeter
@@ -227,7 +228,7 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: NonNullable<ReturnTy
             isLive
           />
         </>
-      )}
+      ) : null}
 
       {/* Completed output */}
       {status === 'completed' && !isJury && !isResearcher && !isReflector && (
@@ -356,8 +357,8 @@ function estimateTokens(val: unknown): number {
 function ProgressBar({ value }: { value: number }) {
   const color =
     value >= 90 ? '#EF4444' :
-    value >= 70 ? '#EAB308' :
-    '#22C55E'
+      value >= 70 ? '#EAB308' :
+        '#22C55E'
   return (
     <div
       style={{
@@ -416,11 +417,11 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string }> = {
-    waiting:   { label: 'WAITING',   color: '#50536A' },
-    running:   { label: 'RUNNING',   color: '#22C55E' },
-    completed: { label: 'DONE',      color: '#4F6EF7' },
-    failed:    { label: 'FAILED',    color: '#EF4444' },
-    skipped:   { label: 'SKIPPED',  color: '#50536A' },
+    waiting: { label: 'WAITING', color: '#50536A' },
+    running: { label: 'RUNNING', color: '#22C55E' },
+    completed: { label: 'DONE', color: '#4F6EF7' },
+    failed: { label: 'FAILED', color: '#EF4444' },
+    skipped: { label: 'SKIPPED', color: '#50536A' },
   }
   const { label, color } = map[status] ?? { label: status.toUpperCase(), color: '#8B8FA8' }
   return (

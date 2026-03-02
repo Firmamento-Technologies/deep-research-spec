@@ -4,6 +4,10 @@
 import { create } from 'zustand'
 import type { RunState, NodeState, CSSScores } from '../types/run'
 
+// Re-export types so consumers can import from this module
+export type { RunState, NodeState, CSSScores }
+export type { SectionResult, NodeStatus, RunStatus, QualityPreset, JudgeVerdict, JuryVerdict } from '../types/run'
+
 interface RunStore {
   activeRun: RunState | null
   completedRuns: RunState[]
@@ -32,7 +36,7 @@ function patchRun(
   return { activeRun: { ...prev.activeRun, ...patch } }
 }
 
-export const useRunStore = create<RunStore>((set, get) => ({
+export const useRunStore = create<RunStore>((set) => ({
   activeRun: null,
   completedRuns: [],
 

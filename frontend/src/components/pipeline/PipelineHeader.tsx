@@ -1,5 +1,4 @@
-import React from 'react'
-import { RunState } from '../../store/useRunStore'
+import type { RunState } from '../../store/useRunStore'
 
 interface PipelineHeaderProps {
   run: RunState | null
@@ -14,8 +13,8 @@ export function PipelineHeader({ run }: PipelineHeaderProps) {
   const budgetBarWidth = Math.min(100, budgetPct)
   const budgetColor =
     budgetPct >= 90 ? '#EF4444' :
-    budgetPct >= 70 ? '#EAB308' :
-    '#22C55E'
+      budgetPct >= 70 ? '#EAB308' :
+        '#22C55E'
 
   const filledBars = Math.round(budgetBarWidth / 10)
   const bar = '█'.repeat(filledBars) + '░'.repeat(10 - filledBars)

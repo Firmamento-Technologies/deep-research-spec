@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import { PIPELINE_EDGES } from '../../constants/pipeline-edges'
 import { PIPELINE_NODES, CLUSTER_COLORS, NodeDefinition } from '../../constants/pipeline-layout'
-import { NodeState } from '../../store/useRunStore'
+import type { NodeState } from '../../store/useRunStore'
 
 const CANVAS_WIDTH = 2400
 const CANVAS_HEIGHT = 3200
@@ -91,8 +91,8 @@ export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
 
         const strokeDasharray =
           edge.type === 'dashed' ? '6 4' :
-          edge.type === 'dotted' ? '2 4' :
-          undefined
+            edge.type === 'dotted' ? '2 4' :
+              undefined
 
         const pathId = `path-${edge.id}`
 

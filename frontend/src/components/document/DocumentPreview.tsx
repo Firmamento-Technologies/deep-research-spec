@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { useRunStore, SectionResult } from '../../store/useRunStore'
+import { useRunStore } from '../../store/useRunStore'
+import type { SectionResult } from '../../store/useRunStore'
 import { ChapterExportMenu } from './ChapterExportMenu'
 import { useAppStore } from '../../store/useAppStore'
 
@@ -59,7 +60,7 @@ export function DocumentPreview() {
           <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#50536A', marginTop: 2 }}>
             {approved.length}/{sections.length} sezioni approvate
             {activeRun.cssScores && (
-              <> • CSS 
+              <> • CSS
                 <span style={{ color: activeRun.cssScores.content >= 0.65 ? '#22C55E' : '#EF4444' }}>
                   {activeRun.cssScores.content.toFixed(2)}
                 </span>
@@ -107,8 +108,8 @@ interface SectionAccordionProps {
 function SectionAccordion({ section, docId, isExpanded, onToggle }: SectionAccordionProps) {
   const statusColor =
     section.status === 'approved' ? '#22C55E' :
-    section.status === 'failed'   ? '#EF4444' :
-    '#50536A'
+      section.status === 'failed' ? '#EF4444' :
+        '#50536A'
 
   return (
     <div
@@ -169,9 +170,9 @@ function SectionAccordion({ section, docId, isExpanded, onToggle }: SectionAccor
         )}
 
         {/* Word count */}
-        {section.wordsCount > 0 && (
+        {(section.wordsCount ?? section.wordCount) > 0 && (
           <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', flexShrink: 0 }}>
-            {section.wordsCount.toLocaleString()}w
+            {(section.wordsCount ?? section.wordCount).toLocaleString()}w
           </span>
         )}
 
@@ -236,10 +237,10 @@ function SectionAccordion({ section, docId, isExpanded, onToggle }: SectionAccor
               color: '#50536A',
             }}
           >
-            {section.cssContent   != null && <Metric label="CSS Content" value={section.cssContent.toFixed(2)}   color={section.cssContent >= 0.65 ? '#22C55E' : '#EF4444'} />}
-            {section.cssStyle     != null && <Metric label="CSS Style"   value={section.cssStyle.toFixed(2)}     color={section.cssStyle   >= 0.80 ? '#22C55E' : '#EF4444'} />}
-            {section.cssSource    != null && <Metric label="CSS Source"  value={section.cssSource.toFixed(2)}    color="#8B8FA8" />}
-            {section.iterationsUsed > 0   && <Metric label="Iterazioni"  value={String(section.iterationsUsed)} color="#8B8FA8" />}
+            {section.cssContent != null && <Metric label="CSS Content" value={section.cssContent.toFixed(2)} color={section.cssContent >= 0.65 ? '#22C55E' : '#EF4444'} />}
+            {section.cssStyle != null && <Metric label="CSS Style" value={section.cssStyle.toFixed(2)} color={section.cssStyle >= 0.80 ? '#22C55E' : '#EF4444'} />}
+            {section.cssSource != null && <Metric label="CSS Source" value={section.cssSource.toFixed(2)} color="#8B8FA8" />}
+            {(section.iterationsUsed ?? section.iterations) > 0 && <Metric label="Iterazioni" value={String(section.iterationsUsed ?? section.iterations)} color="#8B8FA8" />}
           </div>
         </div>
       )}

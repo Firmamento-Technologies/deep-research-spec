@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react'
 import { PIPELINE_NODES, CLUSTER_COLORS } from '../../constants/pipeline-layout'
-import { NodeState } from '../../store/useRunStore'
+import type { NodeState } from '../../store/useRunStore'
 
 const CANVAS_WIDTH = 2400
 const CANVAS_HEIGHT = 3200
