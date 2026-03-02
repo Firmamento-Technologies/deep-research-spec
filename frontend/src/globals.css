@@ -2,4 +2,75 @@
 @tailwind components;
 @tailwind utilities;
 
-/* @keyframes and design tokens added in STEP 2 */
+/* -------------------------------------------------------
+   DRS Global Styles — Design System tokens & animations
+   STEP 2: @keyframes + base resets
+------------------------------------------------------- */
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #0A0B0F;
+    color: #F0F1F6;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track  { background: transparent; }
+  ::-webkit-scrollbar-thumb  { background: #2A2D3A; border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3D4155; }
+}
+
+/* -------------------------------------------------------
+   Agent node running animation
+   Used by AgentNode (STEP 7) via .animate-pulse-glow class.
+   --node-color must be set inline on the element.
+------------------------------------------------------- */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px var(--node-color);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--node-color), 0 0 32px var(--node-color);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* -------------------------------------------------------
+   Status dot pulse (sidebar running section, minimap)
+------------------------------------------------------- */
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(1.3); }
+}
+
+.animate-dot-pulse {
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+/* -------------------------------------------------------
+   Draft chunk stream cursor blink (live output panel)
+------------------------------------------------------- */
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.animate-blink-cursor::after {
+  content: '█';
+  animation: blink-cursor 1s step-start infinite;
+  color: #7C8CFF;
+  font-size: 0.75em;
+  margin-left: 1px;
+}
