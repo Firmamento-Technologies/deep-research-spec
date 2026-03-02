@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from database.connection import get_db
 from database.models import Settings
-from pydantic import BaseModel
-from typing import Dict, List
+from pydantic import BaseModel, ConfigDict
+from typing import Dict, Any
 import json
 import os
 
@@ -15,11 +15,13 @@ router = APIRouter()
 # Pydantic model for Settings
 # ------------------------------------------------------------------ #
 class SettingsPayload(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+    
     api_keys: Dict[str, str]
     model_assignments: Dict[str, str]
-    default_config: Dict[str, any]
+    default_config: Dict[str, Any]
     connectors: Dict[str, bool]
-    webhooks: Dict[str, any]
+    webhooks: Dict[str, Any]
 
 
 # ------------------------------------------------------------------ #

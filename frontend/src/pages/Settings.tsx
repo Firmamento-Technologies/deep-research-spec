@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment, type ReactNode } from 'react'
 import { AVAILABLE_MODELS } from '../constants/models'
 
 // ------------------------------------------------------------------ //
@@ -27,17 +27,17 @@ interface SettingsData {
 }
 
 const DEFAULT_NODE_MODELS: Record<string, string> = {
-  planner:              'google/gemini-2.5-pro',
-  researcher:           'perplexity/sonar-pro',
-  source_synth:         'anthropic/claude-sonnet-4',
-  writer_a:             'anthropic/claude-opus-4-5',
-  writer_b:             'anthropic/claude-opus-4-5',
-  writer_c:             'anthropic/claude-opus-4-5',
-  writer_single:        'anthropic/claude-opus-4-5',
-  fusor:                'openai/o3',
-  post_draft_analyzer:  'google/gemini-2.5-pro',
-  researcher_targeted:  'perplexity/sonar-pro',
-  style_fixer:          'anthropic/claude-sonnet-4',
+  planner: 'google/gemini-2.5-pro',
+  researcher: 'perplexity/sonar-pro',
+  source_synth: 'anthropic/claude-sonnet-4',
+  writer_a: 'anthropic/claude-opus-4-5',
+  writer_b: 'anthropic/claude-opus-4-5',
+  writer_c: 'anthropic/claude-opus-4-5',
+  writer_single: 'anthropic/claude-opus-4-5',
+  fusor: 'openai/o3',
+  post_draft_analyzer: 'google/gemini-2.5-pro',
+  researcher_targeted: 'perplexity/sonar-pro',
+  style_fixer: 'anthropic/claude-sonnet-4',
   r1: 'openai/o3',
   r2: 'openai/o3-mini',
   r3: 'openai/o3-mini',
@@ -47,10 +47,10 @@ const DEFAULT_NODE_MODELS: Record<string, string> = {
   s1: 'anthropic/claude-sonnet-4',
   s2: 'anthropic/claude-haiku-3',
   s3: 'anthropic/claude-haiku-3',
-  context_compressor:   'qwen/qwen3-7b',
-  coherence_guard:      'google/gemini-2.5-pro',
-  reflector:            'openai/o3',
-  span_editor:          'anthropic/claude-sonnet-4',
+  context_compressor: 'qwen/qwen3-7b',
+  coherence_guard: 'google/gemini-2.5-pro',
+  reflector: 'openai/o3',
+  span_editor: 'anthropic/claude-sonnet-4',
 }
 
 const WEBHOOK_EVENT_OPTIONS = [
@@ -68,10 +68,10 @@ const WEBHOOK_EVENT_OPTIONS = [
 // Settings page
 // ------------------------------------------------------------------ //
 export function Settings() {
-  const [data, setData]       = useState<SettingsData | null>(null)
-  const [saving, setSaving]   = useState(false)
-  const [saved, setSaved]     = useState(false)
-  const [error, setError]     = useState<string | null>(null)
+  const [data, setData] = useState<SettingsData | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [showApiKey, setShowApiKey] = useState(false)
 
   useEffect(() => {
@@ -181,7 +181,7 @@ export function Settings() {
           {Object.entries(DEFAULT_NODE_MODELS).map(([nodeId, defaultModel]) => {
             const current = data.model_assignments[nodeId] ?? defaultModel
             return (
-              <React.Fragment key={nodeId}>
+              <Fragment key={nodeId}>
                 <Label>{nodeId.replace(/_/g, ' ').toUpperCase()}</Label>
                 <select
                   value={current}
@@ -203,7 +203,7 @@ export function Settings() {
                     </option>
                   ))}
                 </select>
-              </React.Fragment>
+              </Fragment>
             )
           })}
         </div>
@@ -388,7 +388,7 @@ export function Settings() {
 // ------------------------------------------------------------------ //
 // Helper components
 // ------------------------------------------------------------------ //
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div
       style={{
@@ -415,7 +415,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children }: { children: ReactNode }) {
   return (
     <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#8B8FA8' }}>
       {children}

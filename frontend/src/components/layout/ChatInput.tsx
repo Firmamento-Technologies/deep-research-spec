@@ -1,22 +1,14 @@
-// ChatInput — ALWAYS MOUNTED AND ALWAYS VISIBLE in every app state.
-// Fixed bottom, h-20. Never unmounted. Survives route changes and modal overlays.
-// Spec: UI_BUILD_PLAN.md Section 2, note 3.
-//
-// Layout:
-//   [Model selector] | [textarea auto-resize] | [↑ send]
-//
-// Enter = send  /  Shift+Enter = newline
-
 import { useState, useRef, useCallback, type KeyboardEvent, type ChangeEvent } from 'react'
 import { useConversationStore } from '../../store/useConversationStore'
 import { useAppStore } from '../../store/useAppStore'
+import { ModelBadge } from '../ui/ModelBadge'
 
 export function ChatInput() {
-  const [text, setText]           = useState('')
-  const textareaRef               = useRef<HTMLTextAreaElement>(null)
-  const sendMessage               = useConversationStore((s) => s.sendMessage)
-  const appState                  = useAppStore((s) => s.state)
-  const setState                  = useAppStore((s) => s.setState)
+  const [text, setText] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const sendMessage = useConversationStore((s) => s.sendMessage)
+  const appState = useAppStore((s) => s.state)
+  const setState = useAppStore((s) => s.setState)
 
   const handleSend = useCallback(async () => {
     const trimmed = text.trim()
@@ -27,7 +19,7 @@ export function ChatInput() {
       textareaRef.current.style.height = 'auto'
     }
     // State transitions on first message
-    if (appState === 'IDLE')      setState('CONVERSING')
+    if (appState === 'IDLE') setState('CONVERSING')
     if (appState === 'REVIEWING') setState('CONVERSING')
     await sendMessage(trimmed)
   }, [text, appState, setState, sendMessage])
@@ -57,17 +49,8 @@ export function ChatInput() {
         'flex items-center px-4 gap-3'
       }
     >
-      {/* Left: model selector — full dropdown wired in STEP 5 */}
-      <button
-        className={
-          'shrink-0 px-2.5 py-1 rounded ' +
-          'bg-drs-s2 border border-drs-border ' +
-          'text-drs-muted text-xs font-mono ' +
-          'hover:border-drs-border-bright transition-colors whitespace-nowrap'
-        }
-      >
-        Sonnet 4.6 ▾
-      </button>
+      {/* Left: model selector */}
+      <ModelBadge model="anthropic/claude-sonnet-4" />
 
       {/* Center: textarea */}
       <textarea

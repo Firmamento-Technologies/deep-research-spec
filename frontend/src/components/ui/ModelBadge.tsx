@@ -7,11 +7,13 @@ interface ModelBadgeProps {
   onClick?: () => void
 }
 
-/** 'anthropic/claude-sonnet-4-6' → 'Claude Sonnet 4.6' */
+/** 'anthropic/claude-sonnet-4' → 'Claude Sonnet 4' */
 function toDisplayName(model: string): string {
   const after = model.split('/').pop() ?? model
   return after
     .replace(/-/g, ' ')
+    // Merge digit sequences separated by spaces into dot-notation (e.g. "4 6" → "4.6")
+    .replace(/(\d)\s+(\d)/g, '$1.$2')
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 

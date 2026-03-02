@@ -4,14 +4,29 @@
 // Right:  System status dot + Settings icon ⚙
 // Spec: UI_BUILD_PLAN.md Section 2.
 
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ModelBadge } from '../ui/ModelBadge'
-import { useAppStore } from '../../store/useAppStore'
 
 export function Topbar() {
-  const navigate   = useNavigate()
-  const appState   = useAppStore((s) => s.state)
-  const isOnline   = appState !== 'IDLE'   // simplification — health-check added in STEP 5
+  const navigate = useNavigate()
+  const [isOnline, setIsOnline] = useState(false)
+
+  // Health-check polling — every 10s
+  const checkHealth = useCallback(async () => {
+    try {
+      const res = await fetch('/health', { method: 'GET', signal: AbortSignal.timeout(5000) })
+      setIsOnline(res.ok)
+    } catch {
+      setIsOnline(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    checkHealth()
+    const interval = setInterval(checkHealth, 10_000)
+    return () => clearInterval(interval)
+  }, [checkHealth])
 
   return (
     <header
@@ -29,7 +44,7 @@ export function Topbar() {
       {/* Center: companion model badge */}
       <div className="flex-1 flex justify-center">
         <ModelBadge
-          model="anthropic/claude-sonnet-4-6"
+          model="anthropic/claude-sonnet-4"
           onClick={() => { /* model change dropdown — wired in STEP 5 */ }}
         />
       </div>
@@ -39,9 +54,8 @@ export function Topbar() {
         {/* System status dot */}
         <div className="flex items-center gap-1.5" title={isOnline ? 'Online' : 'Offline'}>
           <span
-            className={`w-2 h-2 rounded-full ${
-              isOnline ? 'bg-drs-green' : 'bg-drs-red'
-            }`}
+            className={`w-2 h-2 rounded-full ${isOnline ? 'bg-drs-green' : 'bg-drs-red'
+              }`}
           />
           <span className="text-xs text-drs-faint hidden md:block">
             {isOnline ? 'Online' : 'Offline'}
