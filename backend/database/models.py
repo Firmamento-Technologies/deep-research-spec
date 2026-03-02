@@ -27,3 +27,14 @@ class Run(Base):
     created_at     = Column(DateTime,        server_default=func.now())
     completed_at   = Column(DateTime)
     output_paths   = Column(JSONB)
+
+
+class Settings(Base):
+    __tablename__ = "settings"
+
+    id = Column(Integer, primary_key=True, default=1)
+    api_keys = Column(JSONB, nullable=True)
+    model_assignments = Column(JSONB, nullable=True)
+    default_config = Column(JSONB, nullable=True)
+    connectors = Column(JSONB, nullable=True)
+    webhooks = Column(JSONB, nullable=True)

@@ -37,8 +37,21 @@ def upgrade() -> None:
     op.create_index("ix_runs_status",     "runs", ["status"])
     op.create_index("ix_runs_created_at", "runs", ["created_at"])
 
+    # Create Settings table
+    op.create_table(
+        "settings",
+        sa.Column("id", sa.Integer(), nullable=False),
+        sa.Column("api_keys", postgresql.JSONB(), nullable=True),
+        sa.Column("model_assignments", postgresql.JSONB(), nullable=True),
+        sa.Column("default_config", postgresql.JSONB(), nullable=True),
+        sa.Column("connectors", postgresql.JSONB(), nullable=True),
+        sa.Column("webhooks", postgresql.JSONB(), nullable=True),
+        sa.PrimaryKeyConstraint("id"),
+    )
+
 
 def downgrade() -> None:
+    op.drop_table("settings")
     op.drop_index("ix_runs_created_at", table_name="runs")
     op.drop_index("ix_runs_status",     table_name="runs")
     op.drop_table("runs")
