@@ -1,70 +1,28 @@
-const BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8000'
+// Typed API client — thin fetch wrapper around the FastAPI backend.
+// Base URL comes from VITE_API_BASE_URL (injected at build time in Docker,
+// or proxied to localhost:8000 via vite.config.ts in dev).
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    ...options,
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
-    const err = await res.text()
-    throw new Error(`API ${res.status}: ${err}`)
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`${method} ${path} → ${res.status}: ${text}`)
   }
+  // 204 No Content — return undefined cast to T
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
 export const api = {
-  // Runs
-  createRun: (body: unknown) =>
-    request<{ doc_id: string; status: string }>('/api/runs', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  listRuns: () => request<unknown[]>('/api/runs'),
-  getRun: (docId: string) => request<unknown>(`/api/runs/${docId}`),
-  approveOutline: (docId: string, body: unknown) =>
-    request<{ accepted: boolean }>(`/api/runs/${docId}/approve-outline`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  approveSection: (docId: string, body: unknown) =>
-    request<{ accepted: boolean }>(`/api/runs/${docId}/approve-section`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  resolveEscalation: (docId: string, body: unknown) =>
-    request<{ accepted: boolean }>(`/api/runs/${docId}/resolve-escalation`, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-  cancelRun: (docId: string) =>
-    request<{ cancelled: boolean }>(`/api/runs/${docId}`, { method: 'DELETE' }),
-  updateRunConfig: (docId: string, body: unknown) =>
-    request<{ updated: boolean }>(`/api/runs/${docId}/config`, {
-      method: 'PATCH',
-      body: JSON.stringify(body),
-    }),
-
-  // Companion
-  companionChat: (body: unknown) =>
-    request<{ reply: string; chips: unknown; action: unknown }>('/api/companion/chat', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  // Analytics
-  getAnalytics: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<unknown>(`/api/analytics${qs}`)
-  },
-
-  // Settings
-  getSettings: () => request<unknown>('/api/settings'),
-  updateSettings: (body: unknown) =>
-    request<{ updated: boolean }>('/api/settings', {
-      method: 'PUT',
-      body: JSON.stringify(body),
-    }),
-
-  // Health
-  health: () => request<{ status: string }>('/health'),
+  get:    <T>(path: string)                => request<T>('GET',    path),
+  post:   <T>(path: string, body: unknown) => request<T>('POST',   path, body),
+  put:    <T>(path: string, body: unknown) => request<T>('PUT',    path, body),
+  patch:  <T>(path: string, body: unknown) => request<T>('PATCH',  path, body),
+  delete: <T>(path: string)               => request<T>('DELETE', path),
 }
