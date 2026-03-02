@@ -77,10 +77,51 @@ services:
     ports:
       - "3000:3000"
     volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./config/grafana_dashboard.json:/var/lib/grafana/dashboards/drs.json:ro
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: drs-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://drs:${POSTGRES_PASSWORD:-drs_dev_password}@postgres:5432/drs
+      REDIS_URL: redis://redis:6379
+      MINIO_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-drs_admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-drs_secret_key}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    container_name: drs-frontend
+    ports:
+      - "3001:80"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

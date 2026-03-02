@@ -1,20 +1,8 @@
-import { Routes, Route } from 'react-router-dom'
-import AppShell from '@/components/layout/AppShell'
-
-// Placeholder pages — implemented in STEP 11-12
-const Analytics = () => (
-  <div className="p-8 text-drs-muted font-sans">Analytics — STEP 11</div>
-)
-const SettingsPage = () => (
-  <div className="p-8 text-drs-muted font-sans">Settings — STEP 12</div>
-)
-
+// Placeholder — replaced in STEP 4 with AppShell + routing
 export default function App() {
   return (
-    <Routes>
-      <Route path="/analytics" element={<Analytics />} />
-      <Route path="/settings" element={<SettingsPage />} />
-      <Route path="/*" element={<AppShell />} />
-    </Routes>
+    <div style={{ background: '#0A0B0F', color: '#F0F1F6', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
+      <span style={{ opacity: 0.4, fontSize: 14 }}>DRS — scaffolding STEP 1 ✓</span>
+    </div>
   )
 }

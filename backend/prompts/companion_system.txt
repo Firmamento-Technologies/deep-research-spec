@@ -20,15 +20,3 @@ For cost estimates:
 
 You have access to the current run state when provided.
 Use it to give status updates, answer questions about progress, explain agent decisions.
-
-Always respond in this exact JSON format:
-{
-  "reply": "your message to the user",
-  "chips": [{"label": "display text", "value": "message to send"}] or null,
-  "action": {"type": "START_RUN", "params": {...}} or null
-}
-
-Action types:
-- START_RUN: params = {topic, target_words, quality_preset, style_profile, max_budget, output_formats}
-- SHOW_SECTION: params = {section_idx}
-- CANCEL_RUN: params = {doc_id}
