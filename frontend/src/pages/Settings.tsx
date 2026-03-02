@@ -1,311 +1,424 @@
-// Settings page — Route: /settings
-// Spec: UI_BUILD_PLAN.md Section 12.
-//
-// Sections:
-//   1. API Keys       — OpenRouter key (password + show/hide)
-//   2. Model Assignments — one row per agent, model dropdown
-//   3. Default Config — preset, budget, style profile
-//   4. Connectors     — Perplexity / Tavily / Brave / Scraper toggles
-//   5. Webhooks       — URL + event type checkboxes
-// Save: PUT /api/settings (endpoint in STEP 12)
+import React, { useState, useEffect } from 'react'
+import { AVAILABLE_MODELS } from '../constants/models'
 
-import { useState } from 'react'
-import { AVAILABLE_MODELS, MODELS_BY_PROVIDER, DEFAULT_MODEL_ASSIGNMENTS } from '../constants/models'
-import { api } from '../lib/api'
-
-const AGENT_ROWS = [
-  { label: 'Planner',             nodeId: 'planner'             },
-  { label: 'Researcher',          nodeId: 'researcher'          },
-  { label: 'Researcher Targeted', nodeId: 'researcher_targeted' },
-  { label: 'Source Synthesizer',  nodeId: 'source_synth'        },
-  { label: 'Writer A (Coverage)', nodeId: 'writer_a'            },
-  { label: 'Writer B (Argument)', nodeId: 'writer_b'            },
-  { label: 'Writer C (Readab.)',  nodeId: 'writer_c'            },
-  { label: 'Writer Single',       nodeId: 'writer_single'       },
-  { label: 'Fusor',               nodeId: 'fusor'               },
-  { label: 'Post Draft Analyzer', nodeId: 'post_draft_analyzer' },
-  { label: 'Style Fixer',         nodeId: 'style_fixer'         },
-  { label: 'Jury R1',             nodeId: 'r1'                  },
-  { label: 'Jury R2',             nodeId: 'r2'                  },
-  { label: 'Jury R3',             nodeId: 'r3'                  },
-  { label: 'Jury F1',             nodeId: 'f1'                  },
-  { label: 'Jury F2',             nodeId: 'f2'                  },
-  { label: 'Jury F3',             nodeId: 'f3'                  },
-  { label: 'Jury S1',             nodeId: 's1'                  },
-  { label: 'Jury S2',             nodeId: 's2'                  },
-  { label: 'Jury S3',             nodeId: 's3'                  },
-  { label: 'Reflector',           nodeId: 'reflector'           },
-  { label: 'Span Editor',         nodeId: 'span_editor'         },
-  { label: 'Context Compressor',  nodeId: 'context_compressor'  },
-  { label: 'Coherence Guard',     nodeId: 'coherence_guard'     },
-]
-
-const WEBHOOK_EVENTS = [
-  'PIPELINE_DONE', 'PIPELINE_FAILED', 'SECTION_APPROVED',
-  'HUMAN_REQUIRED', 'BUDGET_ALARM', 'OSCILLATION_DETECTED',
-]
-
-interface SettingsState {
-  openrouterKey: string
-  showKey: boolean
-  modelAssignments: Record<string, string>
-  defaultPreset: 'Economy' | 'Balanced' | 'Premium'
-  defaultBudget: number
-  defaultStyleProfile: string
-  connectors: Record<string, boolean>
-  webhookUrl: string
-  webhookEvents: Record<string, boolean>
+// ------------------------------------------------------------------ //
+// Types
+// ------------------------------------------------------------------ //
+interface SettingsData {
+  api_keys: {
+    openrouter: string
+  }
+  model_assignments: Record<string, string>  // nodeId → modelId
+  default_config: {
+    preset: 'Economy' | 'Balanced' | 'Premium'
+    max_budget: number
+    style_profile: string
+  }
+  connectors: {
+    perplexity: boolean
+    tavily: boolean
+    brave: boolean
+    scraper: boolean
+  }
+  webhooks: {
+    url: string
+    events: string[]  // 'NODE_COMPLETED', 'SECTION_APPROVED', etc.
+  }
 }
 
-export function Settings() {
-  const [form, setForm] = useState<SettingsState>({
-    openrouterKey:      '',
-    showKey:            false,
-    modelAssignments:   { ...DEFAULT_MODEL_ASSIGNMENTS },
-    defaultPreset:      'Balanced',
-    defaultBudget:      50,
-    defaultStyleProfile:'academic',
-    connectors: {
-      'Perplexity Sonar': true,
-      'Tavily':           false,
-      'Brave Search':     false,
-      'Web Scraper':      false,
-    },
-    webhookUrl:    '',
-    webhookEvents: Object.fromEntries(WEBHOOK_EVENTS.map((e) => [e, false])),
-  })
-  const [saving, setSaving] = useState(false)
-  const [saved,  setSaved]  = useState(false)
+const DEFAULT_NODE_MODELS: Record<string, string> = {
+  planner:              'google/gemini-2.5-pro',
+  researcher:           'perplexity/sonar-pro',
+  source_synth:         'anthropic/claude-sonnet-4',
+  writer_a:             'anthropic/claude-opus-4-5',
+  writer_b:             'anthropic/claude-opus-4-5',
+  writer_c:             'anthropic/claude-opus-4-5',
+  writer_single:        'anthropic/claude-opus-4-5',
+  fusor:                'openai/o3',
+  post_draft_analyzer:  'google/gemini-2.5-pro',
+  researcher_targeted:  'perplexity/sonar-pro',
+  style_fixer:          'anthropic/claude-sonnet-4',
+  r1: 'openai/o3',
+  r2: 'openai/o3-mini',
+  r3: 'openai/o3-mini',
+  f1: 'google/gemini-2.5-pro',
+  f2: 'google/gemini-2.5-pro',
+  f3: 'google/gemini-2.5-pro',
+  s1: 'anthropic/claude-sonnet-4',
+  s2: 'anthropic/claude-haiku-3',
+  s3: 'anthropic/claude-haiku-3',
+  context_compressor:   'qwen/qwen3-7b',
+  coherence_guard:      'google/gemini-2.5-pro',
+  reflector:            'openai/o3',
+  span_editor:          'anthropic/claude-sonnet-4',
+}
 
-  const patch = (p: Partial<SettingsState>) => setForm((prev) => ({ ...prev, ...p }))
+const WEBHOOK_EVENT_OPTIONS = [
+  'NODE_STARTED',
+  'NODE_COMPLETED',
+  'NODE_FAILED',
+  'SECTION_APPROVED',
+  'CSS_UPDATE',
+  'BUDGET_UPDATE',
+  'HUMAN_REQUIRED',
+  'PIPELINE_DONE',
+]
+
+// ------------------------------------------------------------------ //
+// Settings page
+// ------------------------------------------------------------------ //
+export function Settings() {
+  const [data, setData]       = useState<SettingsData | null>(null)
+  const [saving, setSaving]   = useState(false)
+  const [saved, setSaved]     = useState(false)
+  const [error, setError]     = useState<string | null>(null)
+  const [showApiKey, setShowApiKey] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(json => setData(json))
+      .catch(e => setError(`Errore caricamento: ${e.message}`))
+  }, [])
 
   const handleSave = async () => {
+    if (!data) return
     setSaving(true)
+    setSaved(false)
+    setError(null)
     try {
-      await api.put('/api/settings', {
-        openrouter_api_key:   form.openrouterKey,
-        model_assignments:    form.modelAssignments,
-        default_preset:       form.defaultPreset,
-        default_budget:       form.defaultBudget,
-        default_style_profile:form.defaultStyleProfile,
-        connectors:           form.connectors,
-        webhook_url:          form.webhookUrl,
-        webhook_events:       form.webhookEvents,
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {
-      console.error('Salvataggio impostazioni fallito:', e)
+      setError((e as Error).message)
     } finally {
       setSaving(false)
     }
   }
 
+  const updateField = (path: string[], value: unknown) => {
+    setData(prev => {
+      if (!prev) return prev
+      const copy = JSON.parse(JSON.stringify(prev))
+      let ref: any = copy
+      for (let i = 0; i < path.length - 1; i++) ref = ref[path[i]]
+      ref[path[path.length - 1]] = value
+      return copy
+    })
+  }
+
+  const toggleWebhookEvent = (evt: string) => {
+    setData(prev => {
+      if (!prev) return prev
+      const current = prev.webhooks.events
+      const updated = current.includes(evt)
+        ? current.filter(e => e !== evt)
+        : [...current, evt]
+      return { ...prev, webhooks: { ...prev.webhooks, events: updated } }
+    })
+  }
+
+  if (!data) {
+    return (
+      <div style={{ flex: 1, background: '#0A0B0F', padding: 28, color: '#50536A', fontSize: 12, fontFamily: 'monospace' }}>
+        {error ? `Errore: ${error}` : 'Caricamento impostazioni…'}
+      </div>
+    )
+  }
+
   return (
-    <div className="w-full h-full overflow-y-auto bg-drs-bg">
-      <div className="max-w-2xl mx-auto px-6 py-10 flex flex-col gap-10">
+    <div style={{ flex: 1, background: '#0A0B0F', overflowY: 'auto', padding: '20px 28px' }}>
+      <div style={{ fontSize: 18, color: '#F0F1F6', fontWeight: 700, marginBottom: 24 }}>Impostazioni</div>
 
-        {/* Page title */}
-        <h1 className="text-xl font-semibold text-drs-text">Impostazioni</h1>
+      {/* API Keys */}
+      <Section title="API Keys">
+        <Label>OpenRouter API Key</Label>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type={showApiKey ? 'text' : 'password'}
+            value={data.api_keys.openrouter}
+            onChange={e => updateField(['api_keys', 'openrouter'], e.target.value)}
+            placeholder="sk-or-v1-..."
+            style={{
+              flex: 1,
+              background: '#111318',
+              border: '1px solid #2A2D3A',
+              borderRadius: 4,
+              color: '#F0F1F6',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              padding: '7px 10px',
+              outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => setShowApiKey(o => !o)}
+            style={{
+              background: 'transparent',
+              border: '1px solid #2A2D3A',
+              borderRadius: 4,
+              color: '#8B8FA8',
+              fontSize: 11,
+              fontFamily: 'monospace',
+              padding: '6px 12px',
+              cursor: 'pointer',
+            }}
+          >
+            {showApiKey ? 'Nascondi' : 'Mostra'}
+          </button>
+        </div>
+      </Section>
 
-        {/* ── 1. API Keys ────────────────────────────────────────────── */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xs text-drs-faint uppercase tracking-wider">
-            Chiavi API
-          </h2>
-          <div className="bg-drs-s1 border border-drs-border rounded-[8px] p-4 flex flex-col gap-3">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-drs-muted">OpenRouter API Key</span>
-              <div className="flex gap-2">
-                <input
-                  type={form.showKey ? 'text' : 'password'}
-                  value={form.openrouterKey}
-                  onChange={(e) => patch({ openrouterKey: e.target.value })}
-                  placeholder="sk-or-v1-..."
-                  className={
-                    'flex-1 bg-drs-s2 border border-drs-border rounded-[4px] ' +
-                    'px-3 py-2 text-sm text-drs-text placeholder:text-drs-faint ' +
-                    'outline-none focus:border-drs-border-bright transition-colors font-mono'
-                  }
-                />
-                <button
-                  onClick={() => patch({ showKey: !form.showKey })}
-                  className="px-3 py-2 rounded border border-drs-border text-drs-muted text-xs hover:text-drs-text transition-colors"
-                >
-                  {form.showKey ? 'Nascondi' : 'Mostra'}
-                </button>
-              </div>
-            </label>
-          </div>
-        </section>
-
-        {/* ── 2. Model Assignments ────────────────────────────────────── */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xs text-drs-faint uppercase tracking-wider">
-            Assegnazione Modelli
-          </h2>
-          <div className="bg-drs-s1 border border-drs-border rounded-[8px] overflow-hidden">
-            {AGENT_ROWS.map(({ label, nodeId }, i) => (
-              <div
-                key={nodeId}
-                className={
-                  'flex items-center justify-between px-4 py-2.5 ' +
-                  (i < AGENT_ROWS.length - 1 ? 'border-b border-drs-border' : '')
-                }
-              >
-                <span className="text-sm text-drs-muted w-44 shrink-0">{label}</span>
+      {/* Model Assignments */}
+      <Section title="Assegnazione Modelli">
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 8, alignItems: 'center' }}>
+          {Object.entries(DEFAULT_NODE_MODELS).map(([nodeId, defaultModel]) => {
+            const current = data.model_assignments[nodeId] ?? defaultModel
+            return (
+              <React.Fragment key={nodeId}>
+                <Label>{nodeId.replace(/_/g, ' ').toUpperCase()}</Label>
                 <select
-                  value={form.modelAssignments[nodeId] ?? ''}
-                  onChange={(e) =>
-                    patch({
-                      modelAssignments: { ...form.modelAssignments, [nodeId]: e.target.value },
-                    })
-                  }
-                  className={
-                    'bg-drs-s2 border border-drs-border rounded-[4px] ' +
-                    'px-2 py-1.5 text-xs text-drs-text font-mono ' +
-                    'outline-none focus:border-drs-border-bright transition-colors'
-                  }
+                  value={current}
+                  onChange={e => updateField(['model_assignments', nodeId], e.target.value)}
+                  style={{
+                    background: '#111318',
+                    border: '1px solid #2A2D3A',
+                    borderRadius: 4,
+                    color: '#F0F1F6',
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    padding: '6px 10px',
+                    outline: 'none',
+                  }}
                 >
-                  {Object.entries(MODELS_BY_PROVIDER).map(([provider, models]) => (
-                    <optgroup key={provider} label={provider}>
-                      {models.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </optgroup>
+                  {AVAILABLE_MODELS.map(m => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.provider}) — ${m.costIn}/{m.costOut}
+                    </option>
                   ))}
                 </select>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── 3. Default Config ─────────────────────────────────────── */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xs text-drs-faint uppercase tracking-wider">
-            Configurazione Default
-          </h2>
-          <div className="bg-drs-s1 border border-drs-border rounded-[8px] p-4 flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-drs-muted">Preset qualità</span>
-              <select
-                value={form.defaultPreset}
-                onChange={(e) => patch({ defaultPreset: e.target.value as SettingsState['defaultPreset'] })}
-                className="w-48 bg-drs-s2 border border-drs-border rounded-[4px] px-2 py-1.5 text-sm text-drs-text outline-none focus:border-drs-border-bright transition-colors"
-              >
-                <option value="Economy">Economy</option>
-                <option value="Balanced">Balanced</option>
-                <option value="Premium">Premium</option>
-              </select>
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-drs-muted">Budget default ($)</span>
-              <input
-                type="number"
-                min={1}
-                max={500}
-                value={form.defaultBudget}
-                onChange={(e) => patch({ defaultBudget: Number(e.target.value) })}
-                className="w-32 bg-drs-s2 border border-drs-border rounded-[4px] px-3 py-1.5 text-sm text-drs-text outline-none focus:border-drs-border-bright transition-colors"
-              />
-            </label>
-
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-drs-muted">Profilo di stile</span>
-              <input
-                type="text"
-                value={form.defaultStyleProfile}
-                onChange={(e) => patch({ defaultStyleProfile: e.target.value })}
-                placeholder="academic"
-                className="w-48 bg-drs-s2 border border-drs-border rounded-[4px] px-3 py-1.5 text-sm text-drs-text placeholder:text-drs-faint outline-none focus:border-drs-border-bright transition-colors"
-              />
-            </label>
-          </div>
-        </section>
-
-        {/* ── 4. Connectors ─────────────────────────────────────────── */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xs text-drs-faint uppercase tracking-wider">Connettori</h2>
-          <div className="bg-drs-s1 border border-drs-border rounded-[8px] p-4 flex flex-col gap-3">
-            {Object.keys(form.connectors).map((name) => (
-              <label key={name} className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.connectors[name]}
-                  onChange={(e) =>
-                    patch({ connectors: { ...form.connectors, [name]: e.target.checked } })
-                  }
-                  className="w-4 h-4 accent-drs-accent"
-                />
-                <span className="text-sm text-drs-muted">{name}</span>
-              </label>
-            ))}
-          </div>
-        </section>
-
-        {/* ── 5. Webhooks ───────────────────────────────────────────── */}
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xs text-drs-faint uppercase tracking-wider">Webhook</h2>
-          <div className="bg-drs-s1 border border-drs-border rounded-[8px] p-4 flex flex-col gap-4">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs text-drs-muted">URL</span>
-              <input
-                type="url"
-                value={form.webhookUrl}
-                onChange={(e) => patch({ webhookUrl: e.target.value })}
-                placeholder="https://..."
-                className={
-                  'bg-drs-s2 border border-drs-border rounded-[4px] ' +
-                  'px-3 py-1.5 text-sm text-drs-text placeholder:text-drs-faint ' +
-                  'outline-none focus:border-drs-border-bright transition-colors'
-                }
-              />
-            </label>
-
-            <div className="flex flex-col gap-2">
-              <span className="text-xs text-drs-muted">Eventi</span>
-              <div className="grid grid-cols-2 gap-2">
-                {WEBHOOK_EVENTS.map((event) => (
-                  <label key={event} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.webhookEvents[event] ?? false}
-                      onChange={(e) =>
-                        patch({
-                          webhookEvents: { ...form.webhookEvents, [event]: e.target.checked },
-                        })
-                      }
-                      className="w-3.5 h-3.5 accent-drs-accent"
-                    />
-                    <span className="text-xs text-drs-muted font-mono">{event}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Save button */}
-        <div className="flex items-center gap-3 pb-6">
-          <button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className={
-              'px-5 py-2 rounded text-sm font-medium transition-all ' +
-              (saving
-                ? 'bg-drs-s3 text-drs-faint cursor-not-allowed'
-                : 'bg-drs-accent text-white hover:opacity-90 cursor-pointer')
-            }
-          >
-            {saving ? 'Salvataggio...' : 'Salva impostazioni'}
-          </button>
-          {saved && (
-            <span className="text-xs text-drs-green">✓ Salvato</span>
-          )}
+              </React.Fragment>
+            )
+          })}
         </div>
+      </Section>
 
+      {/* Default Config */}
+      <Section title="Configurazione di Default">
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12, alignItems: 'center' }}>
+          <Label>Preset predefinito</Label>
+          <select
+            value={data.default_config.preset}
+            onChange={e => updateField(['default_config', 'preset'], e.target.value)}
+            style={{
+              background: '#111318',
+              border: '1px solid #2A2D3A',
+              borderRadius: 4,
+              color: '#F0F1F6',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              padding: '6px 10px',
+              outline: 'none',
+            }}
+          >
+            <option value="Economy">Economy</option>
+            <option value="Balanced">Balanced</option>
+            <option value="Premium">Premium</option>
+          </select>
+
+          <Label>Budget massimo ($)</Label>
+          <input
+            type="number"
+            value={data.default_config.max_budget}
+            onChange={e => updateField(['default_config', 'max_budget'], parseFloat(e.target.value))}
+            min={1}
+            max={1000}
+            step={5}
+            style={{
+              background: '#111318',
+              border: '1px solid #2A2D3A',
+              borderRadius: 4,
+              color: '#F0F1F6',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              padding: '6px 10px',
+              outline: 'none',
+              width: 120,
+            }}
+          />
+
+          <Label>Profilo stile</Label>
+          <select
+            value={data.default_config.style_profile}
+            onChange={e => updateField(['default_config', 'style_profile'], e.target.value)}
+            style={{
+              background: '#111318',
+              border: '1px solid #2A2D3A',
+              borderRadius: 4,
+              color: '#F0F1F6',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              padding: '6px 10px',
+              outline: 'none',
+            }}
+          >
+            <option value="academic">Academic</option>
+            <option value="technical">Technical</option>
+            <option value="journalistic">Journalistic</option>
+            <option value="conversational">Conversational</option>
+          </select>
+        </div>
+      </Section>
+
+      {/* Connectors */}
+      <Section title="Connettori">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {['perplexity', 'tavily', 'brave', 'scraper'].map(conn => (
+            <label key={conn} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={data.connectors[conn as keyof typeof data.connectors]}
+                onChange={e => updateField(['connectors', conn], e.target.checked)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#F0F1F6' }}>
+                {conn.charAt(0).toUpperCase() + conn.slice(1)}
+              </span>
+            </label>
+          ))}
+        </div>
+      </Section>
+
+      {/* Webhooks */}
+      <Section title="Webhooks">
+        <Label>URL Webhook</Label>
+        <input
+          type="url"
+          value={data.webhooks.url}
+          onChange={e => updateField(['webhooks', 'url'], e.target.value)}
+          placeholder="https://your-server.com/webhook"
+          style={{
+            background: '#111318',
+            border: '1px solid #2A2D3A',
+            borderRadius: 4,
+            color: '#F0F1F6',
+            fontSize: 12,
+            fontFamily: 'monospace',
+            padding: '7px 10px',
+            outline: 'none',
+            width: '100%',
+            marginBottom: 12,
+          }}
+        />
+        <Label>Eventi da inviare</Label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+          {WEBHOOK_EVENT_OPTIONS.map(evt => (
+            <label key={evt} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={data.webhooks.events.includes(evt)}
+                onChange={() => toggleWebhookEvent(evt)}
+                style={{ cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#8B8FA8' }}>{evt}</span>
+            </label>
+          ))}
+        </div>
+      </Section>
+
+      {/* Save button */}
+      <div
+        style={{
+          marginTop: 24,
+          paddingTop: 20,
+          borderTop: '1px solid #2A2D3A',
+          display: 'flex',
+          gap: 12,
+          alignItems: 'center',
+        }}
+      >
+        {error && <span style={{ fontSize: 11, color: '#EF4444', fontFamily: 'monospace' }}>{error}</span>}
+        {saved && <span style={{ fontSize: 11, color: '#22C55E', fontFamily: 'monospace' }}>✓ Salvato</span>}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: 'transparent',
+              border: '1px solid #2A2D3A',
+              borderRadius: 6,
+              color: '#8B8FA8',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              padding: '8px 16px',
+              cursor: 'pointer',
+            }}
+          >
+            Annulla
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              background: '#7C8CFF',
+              border: 'none',
+              borderRadius: 6,
+              color: '#0A0B0F',
+              fontSize: 12,
+              fontFamily: 'monospace',
+              fontWeight: 700,
+              padding: '8px 20px',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.5 : 1,
+            }}
+          >
+            {saving ? 'Salvataggio…' : 'Salva Impostazioni'}
+          </button>
+        </div>
       </div>
     </div>
+  )
+}
+
+// ------------------------------------------------------------------ //
+// Helper components
+// ------------------------------------------------------------------ //
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        background: '#111318',
+        border: '1px solid #2A2D3A',
+        borderRadius: 8,
+        padding: '16px 20px',
+        marginBottom: 16,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontFamily: 'monospace',
+          color: '#50536A',
+          letterSpacing: 1,
+          marginBottom: 14,
+        }}
+      >
+        {title.toUpperCase()}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function Label({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#8B8FA8' }}>
+      {children}
+    </span>
   )
 }
