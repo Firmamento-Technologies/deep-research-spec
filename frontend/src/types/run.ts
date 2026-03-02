@@ -1,3 +1,21 @@
+// Run & pipeline state types — used by all three Zustand stores and the SSE hook.
+
+export type NodeStatus = 'waiting' | 'running' | 'completed' | 'failed' | 'skipped'
+
+export interface NodeState {
+  id: string
+  status: NodeStatus
+  startedAt?: Date
+  completedAt?: Date
+  durationMs?: number
+  output?: unknown          // raw agent output (summary only, not full payload)
+  error?: string
+  model?: string
+  tokensIn?: number
+  tokensOut?: number
+  costUsd?: number
+}
+
 export type RunStatus =
   | 'initializing'
   | 'running'
@@ -9,52 +27,36 @@ export type RunStatus =
 
 export type QualityPreset = 'Economy' | 'Balanced' | 'Premium'
 
-export type HitlType = 'outline_approval' | 'section_approval' | 'escalation'
-
-export interface NodeState {
-  id: string
-  status: 'waiting' | 'running' | 'completed' | 'failed' | 'skipped'
-  startedAt?: string
-  completedAt?: string
-  durationMs?: number
-  output?: unknown
-  error?: string
-  model?: string
-  tokensIn?: number
-  tokensOut?: number
-  costUsd?: number
-}
-
 export interface CSSScores {
   content: number
   style: number
   source: number
 }
 
-export interface JuryVerdict {
-  judgeId: string // r1 | r2 | r3 | f1 | f2 | f3 | s1 | s2 | s3
+export interface JudgeVerdict {
+  judgeId: string        // 'r1'|'r2'|'r3'|'f1'|'f2'|'f3'|'s1'|'s2'|'s3'
   pass: boolean
-  cssScore: number
-  vetoCategory?: string
   reasoning?: string
-  missingEvidence?: string[]
+  vetoCategory?: string  // set when judge fires minority veto
 }
 
-export interface Source {
-  url: string
-  title: string
-  reliability: number
-  snippet?: string
+export interface JuryVerdict {
+  sectionIdx: number
+  iteration: number
+  judges: JudgeVerdict[]
+  cssScores: CSSScores
+  approved: boolean
+  ts: string
 }
 
 export interface SectionResult {
   idx: number
   title: string
   content: string
-  cssScores: CSSScores
+  wordCount: number
+  approved: boolean
   iterations: number
-  sources: Source[]
-  approvedAt: string
+  cssScores: CSSScores
 }
 
 export interface RunState {
@@ -80,6 +82,6 @@ export interface RunState {
   oscillationType?: string
   forceApprove: boolean
   outputPaths?: Record<string, string>
-  createdAt: string
-  completedAt?: string
+  /** Live draft text buffer — appended by DRAFT_CHUNK SSE events */
+  liveDraft?: string
 }
