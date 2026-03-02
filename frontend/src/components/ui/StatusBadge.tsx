@@ -1,39 +1,68 @@
-// StatusBadge — renders a coloured dot + label for a NodeState status.
-// Used in DocumentSidebar (SectionItem), AgentNode, and RightPanel.
+// StatusBadge — visual indicator for a node/section status.
+// Used in SectionItem (variant='dot') and AgentNode detail panel (STEP 8).
 
-type Status = 'waiting' | 'running' | 'completed' | 'failed' | 'skipped'
+import type { NodeStatus } from '../../types/run'
 
 interface StatusBadgeProps {
-  status: Status
-  /** 'dot' shows only the coloured circle (e.g. collapsed sidebar) */
-  variant?: 'full' | 'dot'
-  size?: 'sm' | 'md'
+  status: NodeStatus
+  variant?: 'dot' | 'icon' | 'text'
+  size?:    'sm' | 'md'
 }
 
-const STATUS_CONFIG: Record<
-  Status,
-  { label: string; dotCls: string; textCls: string; pulse: boolean }
-> = {
-  waiting:   { label: 'In attesa',  dotCls: 'bg-drs-faint',  textCls: 'text-drs-faint',  pulse: false },
-  running:   { label: 'In corso',   dotCls: 'bg-drs-green',  textCls: 'text-drs-green',  pulse: true  },
-  completed: { label: 'Completato', dotCls: 'bg-drs-green',  textCls: 'text-drs-green',  pulse: false },
-  failed:    { label: 'Fallito',    dotCls: 'bg-drs-red',    textCls: 'text-drs-red',    pulse: false },
-  skipped:   { label: 'Saltato',    dotCls: 'bg-drs-muted',  textCls: 'text-drs-muted',  pulse: false },
+const DOT_CLASS: Record<NodeStatus, string> = {
+  waiting:   'bg-drs-s3',
+  running:   'bg-drs-accent animate-dot-pulse',
+  completed: 'bg-drs-green',
+  failed:    'bg-drs-red',
+  skipped:   'bg-drs-muted opacity-40',
 }
 
-export function StatusBadge({ status, variant = 'full', size = 'md' }: StatusBadgeProps) {
-  const { label, dotCls, textCls, pulse } = STATUS_CONFIG[status]
-  const dotSize  = size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2'
-  const textSize = size === 'sm' ? 'text-xs'      : 'text-sm'
+const STATUS_ICON: Record<NodeStatus, string> = {
+  waiting:   '⏳',
+  running:   '▶',
+  completed: '✓',
+  failed:    '✕',
+  skipped:   '↦',
+}
 
+const STATUS_TEXT: Record<NodeStatus, string> = {
+  waiting:   'In attesa',
+  running:   'In corso',
+  completed: 'Completato',
+  failed:    'Fallito',
+  skipped:   'Saltato',
+}
+
+const STATUS_TEXT_COLOR: Record<NodeStatus, string> = {
+  waiting:   'text-drs-faint',
+  running:   'text-drs-accent',
+  completed: 'text-drs-green',
+  failed:    'text-drs-red',
+  skipped:   'text-drs-muted',
+}
+
+export function StatusBadge({ status, variant = 'dot', size = 'md' }: StatusBadgeProps) {
+  if (variant === 'icon') {
+    return (
+      <span className={`text-sm ${STATUS_TEXT_COLOR[status]}`}>
+        {STATUS_ICON[status]}
+      </span>
+    )
+  }
+
+  if (variant === 'text') {
+    return (
+      <span className={`text-xs font-mono ${STATUS_TEXT_COLOR[status]}`}>
+        {STATUS_TEXT[status]}
+      </span>
+    )
+  }
+
+  // dot (default)
+  const sizeClass = size === 'sm' ? 'w-1.5 h-1.5' : 'w-2 h-2'
   return (
-    <span className={`inline-flex items-center gap-1.5 ${textCls} ${textSize}`}>
-      <span
-        className={`rounded-full flex-shrink-0 ${dotSize} ${dotCls} ${
-          pulse ? 'animate-dot-pulse' : ''
-        }`}
-      />
-      {variant === 'full' && label}
-    </span>
+    <span
+      className={`inline-block rounded-full shrink-0 ${sizeClass} ${DOT_CLASS[status]}`}
+    />
   )
 }
