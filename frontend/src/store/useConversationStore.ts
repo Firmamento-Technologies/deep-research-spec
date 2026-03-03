@@ -10,20 +10,20 @@ import type { CompanionChatResponse } from '../types/api'
 import type { QualityPreset, RunState } from '../types/run'
 
 export interface Message {
-  id:        string
-  role:      'user' | 'companion'
-  content:   string
+  id: string
+  role: 'user' | 'companion'
+  content: string
   timestamp: Date
-  chips?:    { label: string; value: string }[]
+  chips?: { label: string; value: string }[]
 }
 
 interface ConversationStore {
-  messages:     Message[]
-  isTyping:     boolean
-  addMessage:   (msg: Message) => void
-  setTyping:    (v: boolean) => void
-  clearMessages:() => void
-  sendMessage:  (text: string) => Promise<void>
+  messages: Message[]
+  isTyping: boolean
+  addMessage: (msg: Message) => void
+  setTyping: (v: boolean) => void
+  clearMessages: () => void
+  sendMessage: (text: string) => Promise<void>
 }
 
 /** Build a minimal RunState skeleton from START_RUN action params. */
@@ -33,43 +33,43 @@ function buildInitialRunState(
 ): RunState {
   return {
     docId,
-    topic:               params.topic as string,
-    status:              'initializing',
-    qualityPreset:       (params.quality_preset as QualityPreset) ?? 'Balanced',
-    targetWords:         (params.target_words  as number) ?? 5_000,
-    maxBudget:           (params.max_budget    as number) ?? 50,
-    budgetSpent:         0,
-    budgetRemainingPct:  100,
-    totalSections:       0,
-    currentSection:      0,
-    currentIteration:    0,
-    nodes:               {},
-    cssScores:           { content: 0, style: 0, source: 0 },
-    juryVerdicts:        [],
-    sections:            [],
-    shineActive:         false,
-    rlmMode:             false,
-    hardStopFired:       false,
+    topic: params.topic as string,
+    status: 'initializing',
+    qualityPreset: (params.quality_preset as QualityPreset) ?? 'Balanced',
+    targetWords: (params.target_words as number) ?? 5_000,
+    maxBudget: (params.max_budget as number) ?? 50,
+    budgetSpent: 0,
+    budgetRemainingPct: 100,
+    totalSections: 0,
+    currentSection: 0,
+    currentIteration: 0,
+    nodes: {},
+    cssScores: { content: 0, style: 0, source: 0 },
+    juryVerdicts: [],
+    sections: [],
+    shineActive: false,
+    rlmMode: false,
+    hardStopFired: false,
     oscillationDetected: false,
-    forceApprove:        false,
-    outputPaths:         undefined,
+    forceApprove: false,
+    outputPaths: undefined,
   }
 }
 
 export const useConversationStore = create<ConversationStore>((set, get) => ({
-  messages:  [],
-  isTyping:  false,
+  messages: [],
+  isTyping: false,
 
-  addMessage:    (msg)  => set((prev) => ({ messages: [...prev.messages, msg] })),
-  setTyping:     (v)    => set({ isTyping: v }),
-  clearMessages: ()     => set({ messages: [] }),
+  addMessage: (msg) => set((prev) => ({ messages: [...prev.messages, msg] })),
+  setTyping: (v) => set({ isTyping: v }),
+  clearMessages: () => set({ messages: [] }),
 
   sendMessage: async (text: string) => {
     // Add user message immediately
     const userMsg: Message = {
-      id:        crypto.randomUUID(),
-      role:      'user',
-      content:   text,
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
       timestamp: new Date(),
     }
     get().addMessage(userMsg)
@@ -79,14 +79,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
     if (import.meta.env.VITE_MOCK_COMPANION === 'true') {
       await new Promise((r) => setTimeout(r, 800))
       get().addMessage({
-        id:        crypto.randomUUID(),
-        role:      'companion',
-        content:   `[MOCK] Hai scritto: "${text}". Seleziona un preset per continuare.`,
+        id: crypto.randomUUID(),
+        role: 'companion',
+        content: `[MOCK] Hai scritto: "${text}". Seleziona un preset per continuare.`,
         timestamp: new Date(),
         chips: [
-          { label: 'Economy',  value: 'Economy' },
+          { label: 'Economy', value: 'Economy' },
           { label: 'Balanced', value: 'Balanced' },
-          { label: 'Premium',  value: 'Premium' },
+          { label: 'Premium', value: 'Premium' },
         ],
       })
       set({ isTyping: false })
@@ -101,8 +101,8 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const resp = await api.post<CompanionChatResponse>('/api/companion/chat', {
         message: text,
         conversation_history: get().messages.slice(-10).map((m) => ({
-          id:      m.id,
-          role:    m.role,
+          id: m.id,
+          role: m.role,
           content: m.content,
         })),
         current_run_state: runStore.activeRun ?? undefined,
@@ -110,11 +110,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
       // Add companion reply
       get().addMessage({
-        id:        crypto.randomUUID(),
-        role:      'companion',
-        content:   resp.reply,
+        id: crypto.randomUUID(),
+        role: 'companion',
+        content: resp.reply,
         timestamp: new Date(),
-        chips:     resp.chips?.map((c) => ({ label: c.label, value: c.value })) ?? undefined,
+        chips: resp.chips?.map((c) => ({ label: c.label, value: c.value })) ?? undefined,
       })
 
       // ── Handle action ─────────────────────────────────────────────
@@ -150,10 +150,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
     } catch (err) {
       console.error('[companion] error:', err)
+      const errorMsg = String(err)
+      const isAuthError = errorMsg.includes('401') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('Authentication') || errorMsg.includes('API_KEY') || errorMsg.includes('not configured')
       get().addMessage({
-        id:        crypto.randomUUID(),
-        role:      'companion',
-        content:   'Mi dispiace, ho riscontrato un problema di connessione. Riprova tra qualche istante.',
+        id: crypto.randomUUID(),
+        role: 'companion',
+        content: isAuthError
+          ? '⚠️ La chiave API OpenRouter non è configurata o non è valida. Vai in ⚙ Impostazioni per inserire la tua chiave API, oppure configura la variabile OPENROUTER_API_KEY nel file .env e riavvia i container Docker.'
+          : 'Mi dispiace, ho riscontrato un problema di connessione. Riprova tra qualche istante.',
         timestamp: new Date(),
       })
     } finally {

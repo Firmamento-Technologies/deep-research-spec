@@ -1,16 +1,18 @@
 // Topbar — fixed top, h-12.
-// Left:   Logo ◈ DRS (accent colour)
+// Left:   Logo ◈ DRS (accent colour, links to home)
 // Center: Active model badge (companion model, clickable)
-// Right:  System status dot + Settings icon ⚙
-// Spec: UI_BUILD_PLAN.md Section 2.
+// Right:  System status dot + Settings icon ⚙ (toggles to/from /settings)
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { ModelBadge } from '../ui/ModelBadge'
 
 export function Topbar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [isOnline, setIsOnline] = useState(false)
+
+  const isSettings = location.pathname === '/settings'
 
   // Health-check polling — every 10s
   const checkHealth = useCallback(async () => {
@@ -36,10 +38,13 @@ export function Topbar() {
         'flex items-center px-4 gap-4'
       }
     >
-      {/* Left: logo */}
-      <span className="text-drs-accent font-mono text-sm font-semibold tracking-tight select-none shrink-0">
+      {/* Left: logo — clickable, navigates to home */}
+      <button
+        onClick={() => navigate('/')}
+        className="text-drs-accent font-mono text-sm font-semibold tracking-tight select-none shrink-0 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
+      >
         ◈ DRS
-      </span>
+      </button>
 
       {/* Center: companion model badge */}
       <div className="flex-1 flex justify-center">
@@ -62,17 +67,20 @@ export function Topbar() {
           </span>
         </div>
 
-        {/* Settings icon */}
+        {/* Settings icon — toggles between / and /settings */}
         <button
-          onClick={() => navigate('/settings')}
+          onClick={() => navigate(isSettings ? '/' : '/settings')}
           className={
             'w-8 h-8 flex items-center justify-center rounded ' +
-            'text-drs-muted hover:text-drs-text hover:bg-drs-s2 ' +
-            'transition-colors text-base'
+            'transition-colors text-base ' +
+            (isSettings
+              ? 'text-drs-accent bg-drs-s2'
+              : 'text-drs-muted hover:text-drs-text hover:bg-drs-s2')
           }
-          aria-label="Impostazioni"
+          aria-label={isSettings ? 'Torna alla home' : 'Impostazioni'}
+          title={isSettings ? 'Torna alla home' : 'Impostazioni'}
         >
-          ⚙
+          {isSettings ? '✕' : '⚙'}
         </button>
       </div>
     </header>

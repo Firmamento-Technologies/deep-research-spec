@@ -39,3 +39,17 @@ async def init_db() -> None:
     """Create all tables on startup (idempotent — does not drop existing tables)."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def get_async_session():
+    """Standalone async context manager for use outside FastAPI dependencies."""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+

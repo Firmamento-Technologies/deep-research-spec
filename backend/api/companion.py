@@ -11,8 +11,11 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import select
 
 from database.schemas import CompanionChatRequest, CompanionChatResponse
+from database.connection import get_async_session
+from database.models import Settings
 from config.settings import settings
 
 router = APIRouter()
@@ -21,14 +24,34 @@ _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "companion_system.txt"
 _SYSTEM_PROMPT: str = _PROMPT_PATH.read_text(encoding="utf-8")
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-COMPANION_MODEL = "anthropic/claude-sonnet-4-6"
+COMPANION_MODEL = "anthropic/claude-sonnet-4"
 MAX_HISTORY = 10   # last N messages sent as context
+
+
+async def _get_api_key() -> str:
+    """Read the OpenRouter API key, preferring the DB value over env var."""
+    try:
+        async with get_async_session() as session:
+            result = await session.execute(select(Settings).limit(1))
+            row = result.scalars().first()
+            if row and row.api_keys:
+                db_key = row.api_keys.get("openrouter", "")
+                if db_key and not db_key.startswith("or-xxxx"):
+                    return db_key
+    except Exception:
+        pass  # DB not available — fall through to env var
+
+    return settings.openrouter_api_key
 
 
 @router.post("/companion/chat", response_model=CompanionChatResponse)
 async def companion_chat(body: CompanionChatRequest) -> CompanionChatResponse:
-    if not settings.openrouter_api_key:
-        raise HTTPException(status_code=503, detail="OPENROUTER_API_KEY not configured")
+    api_key = await _get_api_key()
+    if not api_key or api_key.startswith("or-xxxx"):
+        raise HTTPException(
+            status_code=503,
+            detail="OPENROUTER_API_KEY not configured. Go to Settings and enter a valid API key.",
+        )
 
     # Build message list
     messages: list[dict] = [{"role": "system", "content": _SYSTEM_PROMPT}]
@@ -56,7 +79,7 @@ async def companion_chat(body: CompanionChatRequest) -> CompanionChatResponse:
         resp = await client.post(
             OPENROUTER_URL,
             headers={
-                "Authorization": f"Bearer {settings.openrouter_api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type":  "application/json",
                 "HTTP-Referer":  "http://localhost:3001",
                 "X-Title":       "DRS Companion",

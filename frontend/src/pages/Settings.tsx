@@ -1,4 +1,5 @@
 import { useState, useEffect, Fragment, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AVAILABLE_MODELS } from '../constants/models'
 
 // ------------------------------------------------------------------ //
@@ -68,6 +69,7 @@ const WEBHOOK_EVENT_OPTIONS = [
 // Settings page
 // ------------------------------------------------------------------ //
 export function Settings() {
+  const navigate = useNavigate()
   const [data, setData] = useState<SettingsData | null>(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -134,7 +136,26 @@ export function Settings() {
 
   return (
     <div style={{ flex: 1, background: '#0A0B0F', overflowY: 'auto', padding: '20px 28px' }}>
-      <div style={{ fontSize: 18, color: '#F0F1F6', fontWeight: 700, marginBottom: 24 }}>Impostazioni</div>
+      {/* Header with back button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            background: 'transparent',
+            border: '1px solid #2A2D3A',
+            borderRadius: 6,
+            color: '#8B8FA8',
+            fontSize: 12,
+            fontFamily: 'monospace',
+            padding: '6px 12px',
+            cursor: 'pointer',
+          }}
+          title="Torna alla home"
+        >
+          ← Indietro
+        </button>
+        <div style={{ fontSize: 18, color: '#F0F1F6', fontWeight: 700 }}>Impostazioni</div>
+      </div>
 
       {/* API Keys */}
       <Section title="API Keys">
