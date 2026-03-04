@@ -41,6 +41,11 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
+async def close_db() -> None:
+    """Dispose engine and close all connections on shutdown."""
+    await engine.dispose()
+
+
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
@@ -52,4 +57,3 @@ async def get_async_session():
         except Exception:
             await session.rollback()
             raise
-
