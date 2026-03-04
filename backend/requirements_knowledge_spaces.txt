@@ -6,9 +6,13 @@ sentence-transformers>=2.3.1
 torch>=2.1.0  # Required by sentence-transformers
 transformers>=4.36.0
 
-# Text extraction
-pypdf>=4.0.0  # PDF parsing
+# Text extraction (Task 2.1)
+PyPDF2>=3.0.0  # Primary PDF parser (fast)
+pdfplumber>=0.10.3  # Fallback PDF parser (robust)
 python-docx>=1.1.0  # DOCX parsing
+beautifulsoup4>=4.12.0  # HTML parsing
+lxml>=5.1.0  # BeautifulSoup backend
+chardet>=5.2.0  # Encoding detection for text files
 aiofiles>=23.2.1  # Async file I/O
 
 # Tokenization
@@ -18,6 +22,6 @@ tiktoken>=0.5.2  # OpenAI tokenizer for chunking
 asyncpg>=0.29.0  # Already in main requirements, listed for clarity
 pgvector>=0.2.4  # PostgreSQL vector extension support
 
-# Optional: For better PDF OCR (if needed)
+# Optional: For better PDF OCR (if text extraction fails)
 # pytesseract>=0.3.10
 # pdf2image>=1.16.3
