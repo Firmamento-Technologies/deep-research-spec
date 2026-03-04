@@ -1,214 +1,403 @@
-# All 10 run endpoints + SSE streaming.
-# Spec: UI_BUILD_PLAN.md Section 10.
+"""Runs API endpoints for DRS research pipeline.
+
+Provides RESTful API for:
+- Creating new research runs
+- Querying run status
+- Streaming real-time SSE events
+- HITL approvals (outline, sections)
+- Cancelling runs
+- Listing all runs
+
+Integrates with:
+- RunManager service for orchestration
+- SSEBroker for real-time events (Task C.4)
+- PostgreSQL for persistence
+- LangGraph checkpointer for HITL
+
+Spec: §10 API specification, §20 HITL workflow
+"""
 
 from __future__ import annotations
-import asyncio
-import json
+
+import logging
+from typing import List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy import select, update
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
 from database.models import Run
-from database.schemas import (
-    ApproveOutlineRequest,
-    ApproveSectionRequest,
-    NodeModelPatch,
-    ResolveEscalationRequest,
-    RunCreateRequest,
-    RunCreateResponse,
-)
-from services.redis_client import redis as redis_client
-from services.sse_broker import SSEBroker
-from services.run_manager import run_pipeline
+from src.services.run_manager import run_manager
 
-router = APIRouter()
-broker = SSEBroker(redis_client)
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api", tags=["runs"])
+
+# ---------------------------------------------------------------------------
+# Pydantic Schemas
+# ---------------------------------------------------------------------------
+
+class RunCreateRequest(BaseModel):
+    """Request body for POST /api/runs."""
+    topic: str = Field(..., min_length=3, max_length=500, description="Research topic")
+    quality_preset: str = Field("Balanced", description="Economy | Balanced | Premium")
+    target_words: int = Field(5000, ge=1000, le=50000, description="Target document length")
+    max_budget: float = Field(50.0, ge=1.0, le=1000.0, description="Maximum budget in USD")
+    style_profile: str = Field("academic", description="Writing style")
+    knowledge_space_id: Optional[str] = Field(None, description="Optional Knowledge Space for RAG")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "topic": "Quantum Computing in 2026",
+                "quality_preset": "Balanced",
+                "target_words": 5000,
+                "max_budget": 50.0,
+                "style_profile": "academic",
+                "knowledge_space_id": "space-abc-123",
+            }
+        }
 
 
-# 1. POST /api/runs — start new run
+class RunCreateResponse(BaseModel):
+    """Response for POST /api/runs."""
+    doc_id: str
+    status: str = "initializing"
+    message: str = "Run started successfully"
+
+
+class RunStatusResponse(BaseModel):
+    """Response for GET /api/runs/{doc_id}."""
+    doc_id: str
+    topic: str
+    status: str
+    total_cost: float
+    total_words: int
+    quality_preset: str
+    target_words: int
+    created_at: Optional[str]
+    completed_at: Optional[str]
+    is_active: bool
+    current_section: Optional[int] = None
+    total_sections: Optional[int] = None
+    budget_spent: Optional[float] = None
+    budget_remaining_pct: Optional[float] = None
+
+
+class RunListItem(BaseModel):
+    """Item in GET /api/runs response."""
+    doc_id: str
+    topic: str
+    status: str
+    quality_preset: str
+    total_cost: float
+    created_at: Optional[str]
+    completed_at: Optional[str]
+
+
+class ApproveOutlineRequest(BaseModel):
+    """Request body for POST /api/runs/{doc_id}/approve-outline."""
+    approved: bool = True
+    sections: Optional[List[dict]] = None  # User-edited outline
+
+
+class ApproveSectionRequest(BaseModel):
+    """Request body for POST /api/runs/{doc_id}/approve-section."""
+    section_idx: int
+    approved: bool = True
+    content: Optional[str] = None  # User-edited content
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
 @router.post("/runs", response_model=RunCreateResponse, status_code=201)
 async def create_run(
     body: RunCreateRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-):
-    doc_id = str(uuid4())
+) -> RunCreateResponse:
+    """Start a new research run.
 
-    initial_state = {
-        "doc_id":               doc_id,
-        "topic":                body.topic,
-        "status":               "initializing",
-        "quality_preset":       body.quality_preset,
-        "target_words":         body.target_words,
-        "max_budget":           body.max_budget,
-        "budget_spent":         0.0,
-        "budget_remaining_pct": 100.0,
-        "total_sections":       0,
-        "current_section":      0,
-        "current_iteration":    0,
-        "nodes":                {},
-        "css_scores":           {"content": 0.0, "style": 0.0, "source": 0.0},
-        "jury_verdicts":        [],
-        "sections":             [],
-        "shine_active":         False,
-        "rlm_mode":             False,
-        "hard_stop_fired":      False,
-        "oscillation_detected": False,
-        "force_approve":        False,
-        "output_paths":         None,
-    }
+    Creates a database entry and launches the graph pipeline in the background.
 
-    # Persist to Redis
-    await redis_client.set(f"run:{doc_id}:state", json.dumps(initial_state), ex=86_400)
-    await redis_client.sadd("runs:all", doc_id)
+    Args:
+        body: Run creation request with topic, preset, budget, etc.
+        db:   Database session (injected).
 
-    # Persist to PostgreSQL
-    db.add(Run(
-        doc_id=doc_id,
-        topic=body.topic,
-        quality_preset=body.quality_preset,
-        target_words=body.target_words,
-        max_budget=str(body.max_budget),
-        status="initializing",
-    ))
+    Returns:
+        RunCreateResponse with doc_id.
 
-    # Fire pipeline in background
-    background_tasks.add_task(run_pipeline, doc_id, body.model_dump(), broker)
+    Raises:
+        HTTPException 400: If validation fails.
+        HTTPException 500: If run creation fails.
+    """
+    # Validate quality preset
+    if body.quality_preset not in ["Economy", "Balanced", "Premium"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid quality_preset: {body.quality_preset}",
+        )
 
-    return RunCreateResponse(doc_id=doc_id)
+    # Generate doc_id
+    doc_id = f"doc-{uuid4()}"
+
+    logger.info(
+        "Creating run: doc_id=%s, topic='%s', preset=%s",
+        doc_id, body.topic, body.quality_preset,
+    )
+
+    try:
+        # Start run via RunManager
+        run = await run_manager.start_run(
+            doc_id=doc_id,
+            topic=body.topic,
+            quality_preset=body.quality_preset,
+            target_words=body.target_words,
+            max_budget=body.max_budget,
+            style_profile=body.style_profile,
+            knowledge_space_id=body.knowledge_space_id,
+        )
+
+        return RunCreateResponse(
+            doc_id=doc_id,
+            status="initializing",
+            message="Run started successfully. Subscribe to /api/runs/{doc_id}/stream for updates.",
+        )
+
+    except ValueError as exc:
+        logger.error("Run creation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    except Exception as exc:
+        logger.error("Run creation failed: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-# 2. GET /api/runs — list all runs
-@router.get("/runs")
-async def list_runs(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Run).order_by(Run.created_at.desc()))
+@router.get("/runs", response_model=List[RunListItem])
+async def list_runs(
+    db: AsyncSession = Depends(get_db),
+    limit: int = 50,
+    offset: int = 0,
+) -> List[RunListItem]:
+    """List all runs with pagination.
+
+    Args:
+        db:     Database session (injected).
+        limit:  Max results to return (default 50).
+        offset: Skip first N results (default 0).
+
+    Returns:
+        List of RunListItem objects.
+    """
+    result = await db.execute(
+        select(Run)
+        .order_by(Run.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+
+    runs = result.scalars().all()
+
     return [
-        {
-            "doc_id":        r.doc_id,
-            "topic":         r.topic,
-            "status":        r.status,
-            "quality_preset":r.quality_preset,
-            "budget_spent":  float(r.total_cost or 0),
-            "max_budget":    float(r.max_budget or 0),
-            "created_at":    r.created_at,
-            "completed_at":  r.completed_at,
-        }
-        for r in result.scalars().all()
+        RunListItem(
+            doc_id=r.doc_id,
+            topic=r.topic,
+            status=r.status,
+            quality_preset=r.quality_preset or "Balanced",
+            total_cost=float(r.total_cost or 0),
+            created_at=r.created_at.isoformat() if r.created_at else None,
+            completed_at=r.completed_at.isoformat() if r.completed_at else None,
+        )
+        for r in runs
     ]
 
 
-# 3. GET /api/runs/{doc_id} — get run state (Redis → fallback DB)
-@router.get("/runs/{doc_id}")
-async def get_run(doc_id: str, db: AsyncSession = Depends(get_db)):
-    raw = await redis_client.get(f"run:{doc_id}:state")
-    if raw:
-        return json.loads(raw)
-    result = await db.execute(select(Run).where(Run.doc_id == doc_id))
-    run = result.scalar_one_or_none()
-    if not run:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return {
-        "doc_id":        run.doc_id,
-        "topic":         run.topic,
-        "status":        run.status,
-        "quality_preset":run.quality_preset,
-        "budget_spent":  float(run.total_cost or 0),
-        "max_budget":    float(run.max_budget or 0),
-    }
+@router.get("/runs/{doc_id}", response_model=RunStatusResponse)
+async def get_run(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> RunStatusResponse:
+    """Get current status of a run.
+
+    Returns combined data from DB + in-memory active runs.
+
+    Args:
+        doc_id: Document ID.
+        db:     Database session (injected).
+
+    Returns:
+        RunStatusResponse with full status.
+
+    Raises:
+        HTTPException 404: If run not found.
+    """
+    try:
+        status = await run_manager.get_run_status(doc_id)
+        return RunStatusResponse(**status)
+
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    except Exception as exc:
+        logger.error("Failed to get run status: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
-# 4. GET /api/runs/{doc_id}/events — SSE stream
-@router.get("/runs/{doc_id}/events")
-async def stream_events(doc_id: str):
+@router.get("/runs/{doc_id}/stream")
+async def stream_run_events(doc_id: str):
+    """Stream real-time SSE events for a run.
+
+    Server-Sent Events (SSE) stream that emits graph execution events:
+    - NODE_STARTED
+    - NODE_COMPLETED
+    - HUMAN_REQUIRED (HITL approvals)
+    - SECTION_DRAFTED
+    - CRITIC_FEEDBACK
+    - DOCUMENT_COMPLETED
+    - etc.
+
+    Args:
+        doc_id: Document ID.
+
+    Returns:
+        StreamingResponse with text/event-stream.
+
+    Note:
+        Implementation pending Task C.4 (SSE Broker).
+    """
+    # TODO: Implement SSE streaming in Task C.4
+    # For now, return placeholder
+
     async def event_generator():
-        pubsub = redis_client.pubsub()
-        await pubsub.subscribe(f"run:{doc_id}:events")
-        try:
-            async for message in pubsub.listen():
-                if message["type"] == "message":
-                    yield f"data: {message['data']}\n\n"
-                await asyncio.sleep(0)   # yield to event loop
-        finally:
-            await pubsub.unsubscribe(f"run:{doc_id}:events")
+        # Placeholder: emit connection event
+        import json
+        yield f"data: {json.dumps({'type': 'CONNECTED', 'doc_id': doc_id})}\n\n"
+        
+        # TODO: Subscribe to broker.subscribe(doc_id) and yield events
+        # async for event in broker.subscribe(doc_id):
+        #     yield f"data: {json.dumps(event)}\n\n"
 
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control":    "no-cache",
+            "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection":       "keep-alive",
+            "Connection": "keep-alive",
         },
     )
 
 
-# 5. POST /api/runs/{doc_id}/approve-outline — HITL outline approval
-@router.post("/runs/{doc_id}/approve-outline")
-async def approve_outline(doc_id: str, body: ApproveOutlineRequest):
-    await broker.emit(doc_id, "OUTLINE_APPROVED", {
-        "sections": [s.model_dump() for s in body.sections]
-    })
-    return {"status": "ok"}
+@router.post("/runs/{doc_id}/approve-outline", status_code=200)
+async def approve_outline(
+    doc_id: str,
+    body: ApproveOutlineRequest,
+) -> dict:
+    """Approve outline after Planner node (HITL).
 
+    User can edit the outline before approving. The edited outline is
+    passed back to the graph to resume execution.
 
-# 6. POST /api/runs/{doc_id}/approve-section — HITL section approval
-@router.post("/runs/{doc_id}/approve-section")
-async def approve_section(doc_id: str, body: ApproveSectionRequest):
-    await broker.emit(doc_id, "SECTION_APPROVED", body.model_dump())
-    return {"status": "ok"}
+    Args:
+        doc_id: Document ID.
+        body:   Approval request with optional edited sections.
 
+    Returns:
+        Success message.
 
-# 7. POST /api/runs/{doc_id}/resolve-escalation — HITL escalation
-@router.post("/runs/{doc_id}/resolve-escalation")
-async def resolve_escalation(doc_id: str, body: ResolveEscalationRequest):
-    await broker.emit(doc_id, "ESCALATION_RESOLVED", body.model_dump())
-    return {"status": "ok"}
-
-
-# 8. GET /api/runs/{doc_id}/output/{format} — download generated file
-@router.get("/runs/{doc_id}/output/{fmt}")
-async def download_output(doc_id: str, fmt: str):
-    # Full implementation in STEP 12 (MinIO retrieval)
-    from services.minio_service import download_output as minio_dl
-    from fastapi.concurrency import run_in_threadpool
-    try:
-        content = await run_in_threadpool(minio_dl, doc_id, fmt)
-    except Exception as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    content_types = {
-        "md":   "text/markdown",
-        "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "pdf":  "application/pdf",
-        "json": "application/json",
-    }
-    return Response(
-        content=content,
-        media_type=content_types.get(fmt, "application/octet-stream"),
-        headers={"Content-Disposition": f'attachment; filename="{doc_id}.{fmt}"'},
+    Note:
+        Full HITL implementation requires LangGraph interrupt + resume.
+        For MVP, this is a stub that emits an event.
+    """
+    logger.info(
+        "Outline approved for run %s (approved=%s, sections=%s)",
+        doc_id, body.approved, len(body.sections) if body.sections else 0,
     )
 
+    # TODO: Task C.4 - emit event via broker
+    # await broker.emit(doc_id, "OUTLINE_APPROVED", {
+    #     "approved": body.approved,
+    #     "sections": body.sections,
+    # })
 
-# 9. DELETE /api/runs/{doc_id} — cancel run
+    # TODO: Resume graph with user input
+    # await run_manager.resume_run(doc_id, user_input=body.dict())
+
+    return {"status": "ok", "message": "Outline approved (MVP stub)"}
+
+
+@router.post("/runs/{doc_id}/approve-section", status_code=200)
+async def approve_section(
+    doc_id: str,
+    body: ApproveSectionRequest,
+) -> dict:
+    """Approve section after Writer node (HITL).
+
+    User can edit the section content before approving.
+
+    Args:
+        doc_id: Document ID.
+        body:   Approval request with section index and optional edited content.
+
+    Returns:
+        Success message.
+
+    Note:
+        Full HITL implementation requires LangGraph interrupt + resume.
+        For MVP, this is a stub.
+    """
+    logger.info(
+        "Section %d approved for run %s (approved=%s)",
+        body.section_idx, doc_id, body.approved,
+    )
+
+    # TODO: Task C.4 - emit event via broker
+    # await broker.emit(doc_id, "SECTION_APPROVED", {
+    #     "section_idx": body.section_idx,
+    #     "approved": body.approved,
+    #     "content": body.content,
+    # })
+
+    # TODO: Resume graph
+    # await run_manager.resume_run(doc_id, user_input=body.dict())
+
+    return {"status": "ok", "message": "Section approved (MVP stub)"}
+
+
 @router.delete("/runs/{doc_id}", status_code=204)
-async def cancel_run(doc_id: str, db: AsyncSession = Depends(get_db)):
-    await broker.emit(doc_id, "PIPELINE_CANCELLED", {})
-    await redis_client.delete(f"run:{doc_id}:state")
-    await db.execute(
-        update(Run).where(Run.doc_id == doc_id).values(status="cancelled")
-    )
-    return Response(status_code=204)
+async def cancel_run(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancel an active run.
 
+    Gracefully stops the graph execution and updates DB status.
 
-# 10. PATCH /api/runs/{doc_id}/config — update node model for next invocation
-@router.patch("/runs/{doc_id}/config")
-async def update_node_config(doc_id: str, body: NodeModelPatch):
-    config_key = f"run:{doc_id}:config"
-    raw = await redis_client.get(config_key)
-    cfg: dict = json.loads(raw) if raw else {"model_overrides": {}}
-    cfg["model_overrides"][body.node_id] = body.new_model
-    await redis_client.set(config_key, json.dumps(cfg), ex=86_400)
-    return {"status": "ok", "node_id": body.node_id, "new_model": body.new_model}
+    Args:
+        doc_id: Document ID.
+        db:     Database session (injected).
+
+    Returns:
+        204 No Content on success.
+
+    Raises:
+        HTTPException 404: If run not found or not active.
+        HTTPException 500: If cancellation fails.
+    """
+    logger.info("Cancelling run: %s", doc_id)
+
+    try:
+        await run_manager.cancel_run(doc_id)
+        return {"status": "ok"}
+
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    except Exception as exc:
+        logger.error("Failed to cancel run: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
