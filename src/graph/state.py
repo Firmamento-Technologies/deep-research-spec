@@ -249,6 +249,15 @@ class DocumentState(TypedDict):
     context_lora: Any | None
     rag_local_sources: list[Source]
 
+    # ── Knowledge Spaces (TH.2) ────────────────────────────────────────────────
+    # Lista di UUID degli spazi selezionati dall'utente per RAG retrieval.
+    # Usato da researcher_node (TH.3) per query pgvector chunks.
+    # Default: [] (nessun retrieval locale, comportamento legacy).
+    #
+    # CONTRATTO LANGGRAPH: campo OBBLIGATORIO nel TypedDict.
+    # Omettere questo campo causa perdita del valore dopo interrupt/resume.
+    space_ids: list[str]
+
     # ── RLM Mode (https://github.com/alexzhang13/rlm, arXiv:2512.24601) ───────────
     # Attiva il path RLM nel writer_node(): invece di llm_client.call()
     # singolo, RLM apre un REPL loop che decompone e processa il corpus

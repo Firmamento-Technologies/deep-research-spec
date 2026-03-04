@@ -15,6 +15,9 @@ class RunCreateRequest(BaseModel):
     target_words:   int   = Field(default=5_000, ge=500,  le=100_000)
     max_budget:     float = Field(default=50.0,  ge=0.1,  le=500.0)
     style_profile:  Optional[str] = None
+    # TH.2: Knowledge Spaces UUIDs for RAG retrieval.
+    # Empty list = no local knowledge (legacy behavior).
+    space_ids:      List[str] = Field(default_factory=list)
 
 
 class RunCreateResponse(BaseModel):
