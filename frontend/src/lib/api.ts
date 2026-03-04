@@ -1,21 +1,44 @@
 // Typed API client — thin fetch wrapper around the FastAPI backend.
-// Base URL comes from VITE_API_BASE_URL (injected at build time in Docker,
-// or proxied to localhost:8000 via vite.config.ts in dev).
+// Base URL da VITE_API_BASE_URL (iniettato in Docker) o proxied a
+// localhost:8000 via vite.config.ts in dev.
+//
+// Encoding: Content-Type sempre application/json; charset=utf-8 per
+// garantire la corretta trasmissione di caratteri non-ASCII (italiano).
 
 const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? ''
+
+const JSON_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Accept':       'application/json',
+} as const
+
+export interface ApiError extends Error {
+  status: number
+  body:   string
+}
+
+function makeError(method: string, path: string, status: number, body: string): ApiError {
+  const err = new Error(`${method} ${path} → ${status}: ${body}`) as ApiError
+  err.status = status
+  err.body   = body
+  return err
+}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : {},
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    headers: body !== undefined ? JSON_HEADERS : { Accept: 'application/json' },
+    body:    body !== undefined ? JSON.stringify(body) : undefined,
   })
+
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`${method} ${path} → ${res.status}: ${text}`)
+    throw makeError(method, path, res.status, text)
   }
-  // 204 No Content — return undefined cast to T
+
+  // 204 No Content — ritorna undefined castato a T
   if (res.status === 204) return undefined as T
+
   return res.json() as Promise<T>
 }
 

@@ -7,11 +7,14 @@
 //
 // Submit → POST /api/runs → setActiveRun → setState PROCESSING.
 // Il wizard si chiude e il run stream si attiva automaticamente (AppShell).
+//
+// Tastiera: N apre il wizard (via useKeyboardShortcuts).
 
 import { useState, useCallback, type ChangeEvent } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
-import type { RunCreateRequest } from '../../types/api'
+import { api } from '../../lib/api'
+import type { RunCreateRequest, RunCreateResponse } from '../../types/api'
 import type { QualityPreset } from '../../types/run'
 
 // ── Costanti dominio ───────────────────────────────────────────────────
@@ -63,7 +66,6 @@ const PRESET_DESC: Record<QualityPreset, string> = {
   Premium:  '9 giudici · 8 iterazioni · MoW+Fusor · ricerca completa',
 }
 
-// Approssimazione costo in base a parole e preset (mostrata come range indicativo)
 function estimateCost(words: number, preset: QualityPreset, maxBudget: number) {
   const low  = { Economy: 0.8, Balanced: 2.0, Premium:  5.5 }[preset]
   const high = { Economy: 1.8, Balanced: 5.0, Premium: 14.0 }[preset]
@@ -72,21 +74,6 @@ function estimateCost(words: number, preset: QualityPreset, maxBudget: number) {
     lo: Math.min(maxBudget, +(k * low ).toFixed(1)),
     hi: Math.min(maxBudget, +(k * high).toFixed(1)),
   }
-}
-
-// ── API helper ───────────────────────────────────────────────────────────
-async function apiCreateRun(params: RunCreateRequest): Promise<string> {
-  const res = await fetch('/api/runs', {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json; charset=utf-8' },
-    body:    JSON.stringify(params),
-  })
-  if (!res.ok) {
-    const msg = await res.text().catch(() => `HTTP ${res.status}`)
-    throw new Error(msg || `HTTP ${res.status}`)
-  }
-  const json = (await res.json()) as { docId: string }
-  return json.docId
 }
 
 // ── Stili condivisi ───────────────────────────────────────────────────────
@@ -101,13 +88,12 @@ type Step = 1 | 2 | 3
 
 // ── Componente ───────────────────────────────────────────────────────────
 export function RunWizard() {
-  const wizardOpen   = useAppStore((s) => s.wizardOpen)
-  const closeWizard  = useAppStore((s) => s.closeWizard)
-  const setAppState  = useAppStore((s) => s.setState)
+  const wizardOpen     = useAppStore((s) => s.wizardOpen)
+  const closeWizard    = useAppStore((s) => s.closeWizard)
+  const setAppState    = useAppStore((s) => s.setState)
   const setActiveDocId = useAppStore((s) => s.setActiveDocId)
-  const setActiveRun = useRunStore((s) => s.setActiveRun)
+  const setActiveRun   = useRunStore((s) => s.setActiveRun)
 
-  // Form state
   const [step,       setStep]       = useState<Step>(1)
   const [topic,      setTopic]      = useState('')
   const [budget,     setBudget]     = useState(50)
@@ -128,28 +114,17 @@ export function RunWizard() {
   }, [])
 
   const resetForm = useCallback(() => {
-    setStep(1)
-    setTopic('')
-    setBudget(50)
-    setWords(5_000)
-    setLanguage('it')
-    setStyle('academic')
-    setSources(['web', 'academic'])
-    setError(null)
-    setSubmitting(false)
+    setStep(1); setTopic(''); setBudget(50); setWords(5_000)
+    setLanguage('it'); setStyle('academic'); setSources(['web', 'academic'])
+    setError(null); setSubmitting(false)
   }, [])
 
-  const handleClose = useCallback(() => {
-    closeWizard()
-    resetForm()
-  }, [closeWizard, resetForm])
-
-  const handleBack = useCallback(() => {
+  const handleClose = useCallback(() => { closeWizard(); resetForm() }, [closeWizard, resetForm])
+  const handleBack  = useCallback(() => {
     if (step > 1) setStep((s) => (s - 1) as Step)
     else handleClose()
   }, [step, handleClose])
-
-  const handleNext = useCallback(() => {
+  const handleNext  = useCallback(() => {
     if (step < 3) setStep((s) => (s + 1) as Step)
   }, [step])
 
@@ -157,13 +132,14 @@ export function RunWizard() {
     setError(null)
     setSubmitting(true)
     try {
-      const docId = await apiCreateRun({
+      const body: RunCreateRequest = {
         topic:         topic.trim(),
         qualityPreset: preset,
         targetWords:   words,
         maxBudget:     budget,
         styleProfile:  style,
-      })
+      }
+      const { docId } = await api.post<RunCreateResponse>('/api/runs', body)
       setActiveDocId(docId)
       setActiveRun({
         docId,
@@ -173,7 +149,8 @@ export function RunWizard() {
         targetWords:         words,
         maxBudget:           budget,
         budgetSpent:         0,
-        budgetRemainingPct:  1,
+        // 100 per coerenza con useConversationStore (scala 0-100%)
+        budgetRemainingPct:  100,
         totalSections:       0,
         currentSection:      0,
         currentIteration:    0,
@@ -211,7 +188,7 @@ export function RunWizard() {
         className="relative w-full max-w-lg bg-drs-s1 border border-drs-border rounded-card shadow-2xl"
         style={{ maxHeight: 'calc(100vh - 140px)', display: 'flex', flexDirection: 'column' }}
       >
-        {/* ─ Header */}
+        {/* Header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-drs-border shrink-0">
           <div>
             <h2 className="text-sm font-semibold text-drs-text">Nuova ricerca</h2>
@@ -221,16 +198,19 @@ export function RunWizard() {
               {step === 3 && 'Passo 3 di 3 — Opzioni'}
             </p>
           </div>
-          <button
-            onClick={handleClose}
-            aria-label="Chiudi wizard"
-            className="text-drs-faint hover:text-drs-muted text-xl leading-none transition-colors mt-0.5"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-2">
+            <kbd className="text-xs font-mono text-drs-faint border border-drs-border rounded px-1 py-0.5">N</kbd>
+            <button
+              onClick={handleClose}
+              aria-label="Chiudi wizard"
+              className="text-drs-faint hover:text-drs-muted text-xl leading-none transition-colors mt-0.5"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
-        {/* ─ Progress bar */}
+        {/* Progress bar */}
         <div className="flex gap-1.5 px-6 pt-4 shrink-0">
           {([1, 2, 3] as Step[]).map((n) => (
             <div
@@ -242,7 +222,7 @@ export function RunWizard() {
           ))}
         </div>
 
-        {/* ─ Body */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
           {/* STEP 1 — Topic */}
@@ -275,29 +255,20 @@ export function RunWizard() {
           {/* STEP 2 — Budget + Parole */}
           {step === 2 && (
             <div className="space-y-6">
-              {/* Budget slider */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className={LABEL.replace('mb-1.5', '')}>Budget massimo</label>
                   <span className="text-sm font-mono font-semibold text-drs-text">${budget}</span>
                 </div>
-                <input
-                  type="range"
-                  min={BUDGET_MIN}
-                  max={BUDGET_MAX}
-                  step={1}
-                  value={budget}
-                  onChange={(e) => setBudget(Number(e.target.value))}
+                <input type="range" min={BUDGET_MIN} max={BUDGET_MAX} step={1}
+                  value={budget} onChange={(e) => setBudget(Number(e.target.value))}
                   className="w-full accent-[#7C8CFF] cursor-pointer h-1.5"
                 />
                 <div className="flex justify-between text-xs text-drs-faint mt-1">
-                  {['$1', '$50', '$150', '$350', '$500'].map((l) => (
-                    <span key={l}>{l}</span>
-                  ))}
+                  {['$1','$50','$150','$350','$500'].map((l) => <span key={l}>{l}</span>)}
                 </div>
               </div>
 
-              {/* Preset badge — auto-derivato, read-only */}
               <div className={`border rounded-input px-3 py-2.5 flex items-center justify-between ${PRESET_BORDER[preset]}`}>
                 <div>
                   <p className="text-xs font-semibold">{preset}</p>
@@ -306,7 +277,6 @@ export function RunWizard() {
                 <span className="text-xs opacity-40 italic shrink-0 ml-3">automatico</span>
               </div>
 
-              {/* Parole slider */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className={LABEL.replace('mb-1.5', '')}>Lunghezza documento</label>
@@ -314,23 +284,15 @@ export function RunWizard() {
                     {words >= 1_000 ? `${(words / 1_000).toFixed(1).replace('.0', '')}k` : words} parole
                   </span>
                 </div>
-                <input
-                  type="range"
-                  min={WORDS_MIN}
-                  max={WORDS_MAX}
-                  step={500}
-                  value={words}
-                  onChange={(e) => setWords(Number(e.target.value))}
+                <input type="range" min={WORDS_MIN} max={WORDS_MAX} step={500}
+                  value={words} onChange={(e) => setWords(Number(e.target.value))}
                   className="w-full accent-[#7C8CFF] cursor-pointer h-1.5"
                 />
                 <div className="flex justify-between text-xs text-drs-faint mt-1">
-                  {['1k', '5k', '15k', '30k', '50k'].map((l) => (
-                    <span key={l}>{l}</span>
-                  ))}
+                  {['1k','5k','15k','30k','50k'].map((l) => <span key={l}>{l}</span>)}
                 </div>
               </div>
 
-              {/* Stima costo */}
               <div className="bg-drs-s2 border border-drs-border rounded-input px-3 py-2.5 text-xs">
                 <span className="text-drs-faint">Stima costo: </span>
                 <span className="text-drs-text font-mono">${lo}–${hi}</span>
@@ -342,53 +304,38 @@ export function RunWizard() {
           {/* STEP 3 — Opzioni */}
           {step === 3 && (
             <div className="space-y-5">
-              {/* Lingua */}
               <div>
                 <label className={LABEL}>Lingua del documento</label>
-                <select
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                  className={INPUT}
-                >
+                <select value={language} onChange={(e) => setLanguage(e.target.value)} className={INPUT}>
                   {LANGUAGE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Stile */}
               <div>
                 <label className={LABEL}>Profilo stilistico</label>
                 <div className="grid grid-cols-2 gap-2">
                   {STYLE_OPTIONS.map((o) => (
                     <button
-                      key={o.value}
-                      type="button"
-                      onClick={() => setStyle(o.value)}
+                      key={o.value} type="button" onClick={() => setStyle(o.value)}
                       className={`px-3 py-2 rounded-input text-xs text-left transition-colors border ${
                         style === o.value
                           ? 'bg-drs-s3 border-drs-accent text-drs-accent'
                           : 'bg-drs-s2 border-drs-border text-drs-muted hover:border-drs-border-bright hover:text-drs-text'
                       }`}
-                    >
-                      {o.label}
-                    </button>
+                    >{o.label}</button>
                   ))}
                 </div>
               </div>
 
-              {/* Fonti */}
               <div>
                 <label className={LABEL}>Fonti da abilitare</label>
                 <div className="space-y-2.5">
                   {SOURCE_OPTIONS.map((o) => (
-                    <label
-                      key={o.value}
-                      className="flex items-center gap-2.5 cursor-pointer group select-none"
-                    >
+                    <label key={o.value} className="flex items-center gap-2.5 cursor-pointer group select-none">
                       <input
-                        type="checkbox"
-                        checked={sources.includes(o.value)}
+                        type="checkbox" checked={sources.includes(o.value)}
                         onChange={() => toggleSource(o.value)}
                         className="accent-[#7C8CFF] w-3.5 h-3.5 cursor-pointer shrink-0"
                       />
@@ -402,7 +349,6 @@ export function RunWizard() {
             </div>
           )}
 
-          {/* Errore */}
           {error && (
             <div className="text-xs text-drs-red bg-drs-s2 border border-drs-red rounded-input px-3 py-2">
               {error}
@@ -410,7 +356,7 @@ export function RunWizard() {
           )}
         </div>
 
-        {/* ─ Footer */}
+        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-drs-border shrink-0">
           <button
             onClick={handleBack}
