@@ -11,3 +11,18 @@ httpx==0.27.0
 minio==7.2.7
 prometheus-client==0.20.0
 python-dotenv==1.0.1
+
+# ── Spaces / RAG ─────────────────────────────────────────────────────────────
+# PDF → Markdown: rileva automaticamente PDF programmatici vs scansionati
+pymupdf4llm>=0.0.17
+# DOCX parsing (puro Python, nessuna dipendenza ML)
+python-docx>=1.1.0
+# OCR per PDF scansionati e immagini (richiede tesseract-ocr installato nel container)
+pillow>=10.4.0
+pytesseract>=0.3.10
+# URL → Markdown: scraper senza API key, puro Python
+trafilatura>=1.9.0
+# Embedded vector store: file-based, Apache Arrow, sub-5ms query
+lancedb>=0.10.0
+# Embeddings locali: all-MiniLM-L6-v2 (~90MB), 384-dim, gratis
+sentence-transformers>=3.2.0
