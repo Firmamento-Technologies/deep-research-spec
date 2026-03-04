@@ -1,11 +1,13 @@
-// AppShell — the root layout component. Always rendered, survives route changes.
+// AppShell — root layout component. Always rendered, survives route changes.
 // Structure:
 //   Topbar (fixed top, h-12)
 //   Sidebar + MainArea + RightPanel (flex-1, overflow-hidden)
 //   ChatInput (fixed bottom, h-20) — ALWAYS MOUNTED, NEVER UNMOUNTED
 //
-// useRunStream replaces useSSE as the primary stream hook.
-// RunStreamContext exposes stream state to all child components.
+// Mounts:
+//   useRunStream  — stream SSE attivo durante PROCESSING / AWAITING_HUMAN
+//   RunWizard     — modal, visibile quando wizardOpen === true
+//   RunStreamContext — espone stream state a tutti i componenti figli
 
 import { createContext, useContext, useMemo } from 'react'
 import { useAppStore } from '../../store/useAppStore'
@@ -15,11 +17,12 @@ import { Topbar } from './Topbar'
 import { DocumentSidebar } from './DocumentSidebar'
 import { MainArea } from './MainArea'
 import { ChatInput } from './ChatInput'
+import { RunWizard } from '../wizard/RunWizard'
 import type { UseRunStreamResult } from '../../hooks/useRunStream'
 
-// ── Context ────────────────────────────────────────────────────────────────
-// Lets PipelineTimeline, RunCompanion and other deep children read stream
-// state without prop drilling.
+// ── RunStreamContext ───────────────────────────────────────────────────────────
+// Espone i dati dello stream a PipelineTimeline, RunCompanion e altri
+// componenti profondi, senza prop drilling.
 const RunStreamContext = createContext<UseRunStreamResult>({
   connected:   false,
   activeAgent: null,
@@ -37,39 +40,39 @@ export function AppShell() {
   const appState    = useAppStore((s) => s.state)
   const activeDocId = useAppStore((s) => s.activeDocId)
 
-  // Stream is active during pipeline execution and HITL pauses.
-  // Passing null when idle prevents EventSource from opening.
+  // Stream aperto solo durante esecuzione e pause HITL
   const streamDocId =
     appState === 'PROCESSING' || appState === 'AWAITING_HUMAN' ? activeDocId : null
 
   const stream = useRunStream(streamDocId)
 
-  // Global keyboard shortcuts (K, [, ])
   useKeyboardShortcuts()
 
-  const contextValue = useMemo(() => stream, [
-    stream.connected,
-    stream.activeAgent,
-    stream.activePhase,
-    stream.activityLog,
-    stream.lastEvent,
-  ])
+  // Stabilizza il context value per evitare re-render non necessari
+  const contextValue = useMemo(
+    () => stream,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [stream.connected, stream.activeAgent, stream.activePhase, stream.activityLog, stream.lastEvent],
+  )
 
   return (
     <RunStreamContext.Provider value={contextValue}>
       <div className="flex flex-col h-screen bg-drs-bg text-drs-text">
-        {/* Fixed top bar — h-12 */}
+        {/* Barra superiore fissa — h-12 */}
         <Topbar />
 
-        {/* Content area — fills remaining height between topbar and chat input */}
+        {/* Area contenuto — occupa l'altezza tra topbar e chat input */}
         <div className="flex flex-1 overflow-hidden pt-12 pb-20">
           <DocumentSidebar />
           <MainArea />
-          {/* RightPanel (RunCompanion) added in T4 */}
+          {/* RunCompanion (pannello destro) aggiunto in T4 */}
         </div>
 
-        {/* CRITICAL: ChatInput is always mounted and always visible */}
+        {/* CRITICO: ChatInput sempre montato e visibile */}
         <ChatInput />
+
+        {/* RunWizard — modal overlay, visibile quando wizardOpen === true */}
+        <RunWizard />
       </div>
     </RunStreamContext.Provider>
   )
