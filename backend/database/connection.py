@@ -2,6 +2,7 @@
 
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -22,6 +23,15 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+def get_async_engine() -> AsyncEngine:
+    """Return the global async engine instance.
+    
+    Used by RAG retriever and other components that need direct
+    engine access (e.g., raw SQL queries for pgvector).
+    """
+    return engine
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
