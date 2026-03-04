@@ -10,6 +10,7 @@ from api.knowledge_spaces import router as spaces_router
 from api.companion import router as companion_router
 from api.metrics import router as metrics_router
 from api.exports import router as exports_router
+from api.auth import router as auth_router
 from api.middleware import RequestIDMiddleware, TimingMiddleware
 from database.connection import init_db, close_db
 
@@ -26,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Deep Research System",
-    description="AI-powered research document generation",
+    description="AI-powered research document generation with multi-user authentication",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -43,11 +44,12 @@ app.add_middleware(RequestIDMiddleware)
 app.add_middleware(TimingMiddleware)
 
 # Routers
-app.include_router(runs_router)
-app.include_router(spaces_router)
-app.include_router(companion_router)
-app.include_router(metrics_router)
-app.include_router(exports_router)
+app.include_router(auth_router)  # Authentication (public)
+app.include_router(runs_router)  # Protected
+app.include_router(spaces_router)  # Protected
+app.include_router(companion_router)  # Protected
+app.include_router(metrics_router)  # Protected
+app.include_router(exports_router)  # Protected
 
 # Prometheus metrics
 metrics_app = make_asgi_app()
