@@ -13,16 +13,56 @@ prometheus-client==0.20.0
 python-dotenv==1.0.1
 
 # ── Spaces / RAG ─────────────────────────────────────────────────────────────
-# PDF → Markdown: rileva automaticamente PDF programmatici vs scansionati
+# PARSER LAYER
+# ─────────────
+# Fast-path: PDF programmatici (testo estraibile) → Markdown puro Python
+# Usato come primary per PDF semplici e come fallback veloce.
 pymupdf4llm>=0.0.17
-# DOCX parsing (puro Python, nessuna dipendenza ML)
+
+# Dual-track PDF/DOCX/PPTX/HTML → Markdown con layout preservation.
+# Rileva automaticamente PDF programmatico vs scansionato:
+#   programmatico  → dlparse_v2 backend (~0.05s/pag, 10× più veloce di v1)
+#   scansionato    → attiva OCR on-demand (pytesseract)
+# Superiore a pymupdf4llm per tabelle, colonne multi-layout, figure.
+docling>=2.5.0
+
+# DOCX nativo (puro Python, nessuna dipendenza ML).
 python-docx>=1.1.0
-# OCR per PDF scansionati e immagini (richiede tesseract-ocr installato nel container)
+
+# OCR per PDF scansionati e immagini.
+# Richiede `tesseract-ocr` installato nel container (via apt).
 pillow>=10.4.0
 pytesseract>=0.3.10
-# URL → Markdown: scraper senza API key, puro Python
+
+# URL → Markdown: scraping multi-strategy senza API key.
+# Extraction intelligente: tenta readability-lxml, poi htmldate,
+# poi fallback BeautifulSoup. Nessun server esterno necessario.
 trafilatura>=1.9.0
-# Embedded vector store: file-based, Apache Arrow, sub-5ms query
+
+# INGESTION PIPELINE LAYER
+# ─────────────────────────
+# Core pipeline con:
+#   - HybridChunker: chunking semantico sentence-aware
+#   - IngestionPipeline: cache hash-based → zero re-embed su file identici
+#   - DocumentStore: deduplication automatica per hash
+# Dependency minima: solo llama-index-core, senza LangChain overhead.
+llama-index-core>=0.11.0
+
+# Connector LlamaIndex ↔ LanceDB: scrive/legge Node objects
+# nella collection LanceDB senza codice boilerplate.
+# Una collection per Space → retrieval isolato per knowledge base.
+llama-index-vector-stores-lancedb>=0.3.0
+
+# VECTOR STORE LAYER
+# ───────────────────
+# Embedded, disk-based, Apache Arrow columnar.
+# Zero server separato. Query p95 < 5ms su milioni di vettori (mmap).
+# Hybrid search: vettoriale (HNSW) + BM25 full-text → RRF fusion.
 lancedb>=0.10.0
-# Embeddings locali: all-MiniLM-L6-v2 (~90MB), 384-dim, gratis
+
+# EMBEDDING LAYER
+# ────────────────
+# Modello: all-MiniLM-L6-v2 (default, ~90MB, 384-dim, Apache 2)
+# Modello alternativo configurabile via Settings: BAAI/bge-base-en-v1.5
+# (~438MB, 768-dim, migliore recall) selezionabile da Settings.tsx.
 sentence-transformers>=3.2.0
