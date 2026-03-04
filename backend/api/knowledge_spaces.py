@@ -11,10 +11,11 @@ Endpoints:
 - GET    /spaces/:id/sources            - List sources
 - DELETE /spaces/:id/sources/:source_id - Delete source
 - POST   /spaces/:id/reindex            - Re-index all sources
+- POST   /spaces/:id/search             - Semantic search
 - GET    /spaces/:id/sources/:source_id/progress - SSE progress stream
 
 Author: DRS Implementation Team
-Spec: §17 Knowledge Spaces, Task 2.6
+Spec: §17 Knowledge Spaces, Task 2.6 + 3.1
 """
 
 import logging
@@ -34,6 +35,7 @@ from database.connection import get_db_session
 from database.models import Space, Source, Chunk
 from services.space_indexer import SpaceIndexer, IndexingError
 from services.db_inserter import get_chunk_count
+from services.semantic_search import search_chunks, SearchError
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +94,21 @@ class IndexingResultResponse(BaseModel):
     total_tokens: int
     elapsed_seconds: float
     status: str
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(5, ge=1, le=100)
+    min_similarity: float = Field(0.0, ge=0.0, le=1.0)
+
+
+class SearchResultResponse(BaseModel):
+    id: str
+    content: str
+    similarity: float
+    metadata: dict
+    source_id: str
+    space_id: str
 
 
 # ============================================================================
@@ -410,6 +427,56 @@ async def reindex_space(
         "failed": len(sources) - len(results),
     }
 
+
+# ============================================================================
+# Search Endpoint
+# ============================================================================
+
+@router.post("/{space_id}/search", response_model=list[SearchResultResponse])
+async def search_space(
+    space_id: str,
+    request: SearchRequest,
+    session: AsyncSession = Depends(get_db_session),
+):
+    """Search for relevant chunks in a Knowledge Space using semantic similarity."""
+    # Validate space
+    stmt = select(Space).where(Space.id == space_id)
+    result = await session.execute(stmt)
+    space = result.scalar_one_or_none()
+    
+    if not space:
+        raise HTTPException(status_code=404, detail="Space not found")
+    
+    # Search
+    try:
+        results = await search_chunks(
+            session,
+            query=request.query,
+            space_id=space_id,
+            top_k=request.top_k,
+            min_similarity=request.min_similarity,
+        )
+        
+        return [
+            SearchResultResponse(
+                id=r["id"],
+                content=r["content"],
+                similarity=r["similarity"],
+                metadata=r["metadata"],
+                source_id=r["source_id"],
+                space_id=r["space_id"],
+            )
+            for r in results
+        ]
+    
+    except SearchError as e:
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+
+# ============================================================================
+# Progress Endpoint
+# ============================================================================
 
 @router.get("/{space_id}/sources/{source_id}/progress")
 async def source_indexing_progress(
