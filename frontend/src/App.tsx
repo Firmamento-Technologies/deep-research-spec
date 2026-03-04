@@ -1,9 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Layout } from './components/Layout';
+import { AuthProvider } from './contexts/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { LoginPage } from './pages/Login';
+import { RegisterPage } from './pages/Register';
 import { Dashboard } from './pages/Dashboard';
-import { RunList } from './pages/RunList';
-import { RunDetail } from './pages/RunDetail';
 import { KnowledgeSpaces } from './pages/KnowledgeSpaces';
 import { SpaceDetail } from './pages/SpaceDetail';
 import { SpaceSearch } from './pages/SpaceSearch';
@@ -15,7 +17,6 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
@@ -23,23 +24,79 @@ const queryClient = new QueryClient({
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="runs" element={<RunList />} />
-            <Route path="runs/:id" element={<RunDetail />} />
-            
-            {/* Knowledge Spaces */}
-            <Route path="spaces" element={<KnowledgeSpaces />} />
-            <Route path="spaces/:id" element={<SpaceDetail />} />
-            <Route path="spaces/:id/search" element={<SpaceSearch />} />
-            
-            <Route path="analytics" element={<Analytics />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <Router>
+        <AuthProvider>
+          <Routes>
+            {/* Public routes */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+
+            {/* Protected routes */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spaces"
+              element={
+                <ProtectedRoute>
+                  <KnowledgeSpaces />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spaces/:spaceId"
+              element={
+                <ProtectedRoute>
+                  <SpaceDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spaces/:spaceId/search"
+              element={
+                <ProtectedRoute>
+                  <SpaceSearch />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute>
+                  <Analytics />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Admin-only routes */}
+            <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <div>Admin Users Management</div>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Redirects */}
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </AuthProvider>
+      </Router>
     </QueryClientProvider>
   );
 }
