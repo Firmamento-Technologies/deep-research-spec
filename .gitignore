@@ -1,45 +1,65 @@
-# === Python bytecode ===
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-*.egg
-*.egg-info/
-dist/
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
 .eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# === Env / secrets (NEVER commit real .env) ===
-.env
-.env.local
-.env.production
-!.env.example
-*.pem
-*.key
+# Virtual Environment
+venv/
+env/
+ENV/
 
-# === IDE ===
+# IDEs
+.vscode/
 .idea/
 *.swp
 *.swo
-*.orig
+*~
 
-# === Test artifacts ===
-.pytest_cache/
-.coverage
-htmlcov/
+# Environment variables (SECURITY)
+.env
+.env.local
+.env.production
 
-# === Logs ===
-*.log
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Logs
 logs/
+*.log
 
-# === OS ===
+# OS
 .DS_Store
 Thumbs.db
 
-# === RLM Runtime Artifacts ===
-logs/rlm/
+# Database
+*.db
+*.sqlite3
 
-# === SHINE Runtime Artifacts ===
-*.lora_tmp
-shine_cache/
+# MinIO data
+minio_data/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Alembic
+alembic/versions/*.pyc
