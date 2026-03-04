@@ -1,8 +1,13 @@
 """Application settings from environment variables."""
 
 import os
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import Field
+
+# Get backend directory path
+BACKEND_DIR = Path(__file__).parent.parent
+ENV_FILE = BACKEND_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -65,8 +70,15 @@ class Settings(BaseSettings):
     max_concurrent_runs: int = Field(default=5, alias="MAX_CONCURRENT_RUNS")
     
     class Config:
-        env_file = ".env"
+        env_file = str(ENV_FILE)
         env_file_encoding = "utf-8"
+        case_sensitive = False
 
 
 settings = Settings()
+
+# Debug output
+if os.getenv("DEBUG") == "true":
+    print(f"[Settings] .env file: {ENV_FILE}")
+    print(f"[Settings] .env exists: {ENV_FILE.exists()}")
+    print(f"[Settings] DATABASE_URL loaded: {settings.database_url[:50]}...")
