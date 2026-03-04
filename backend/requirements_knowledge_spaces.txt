@@ -15,8 +15,10 @@ lxml>=5.1.0  # BeautifulSoup backend
 chardet>=5.2.0  # Encoding detection for text files
 aiofiles>=23.2.1  # Async file I/O
 
-# Tokenization
-tiktoken>=0.5.2  # OpenAI tokenizer for chunking
+# Text chunking (Task 2.2)
+langchain>=0.1.0  # Semantic text splitting
+langchain-text-splitters>=0.0.1  # Split module
+tiktoken>=0.5.2  # OpenAI tokenizer for accurate token counting
 
 # Database
 asyncpg>=0.29.0  # Already in main requirements, listed for clarity
