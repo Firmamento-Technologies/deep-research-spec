@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api import runs, companion, metrics, settings
+from api import runs, companion, metrics, settings, knowledge_spaces
 from database.connection import init_db
 from services.redis_client import redis as redis_client
 
@@ -23,10 +23,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(runs.router,      prefix="/api")
-app.include_router(companion.router, prefix="/api")
-app.include_router(metrics.router,   prefix="/api")
-app.include_router(settings.router,  prefix="/api")
+app.include_router(runs.router,             prefix="/api")
+app.include_router(companion.router,        prefix="/api")
+app.include_router(metrics.router,          prefix="/api")
+app.include_router(settings.router,         prefix="/api")
+app.include_router(knowledge_spaces.router, prefix="/api")  # Knowledge Spaces
 
 
 @app.get("/health")
