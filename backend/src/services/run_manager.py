@@ -325,10 +325,17 @@ class RunManager:
         try:
             logger.info("[%s] Graph execution started", doc_id)
 
-            # Inject SSE broker (TODO: implement in C.4)
-            # from services.sse_broker import get_broker
-            # broker = get_broker()
-            # initial_state["broker"] = broker
+            # Inject SSE broker
+            from services.sse_broker import get_broker
+            broker = get_broker()
+            initial_state["broker"] = broker
+
+            # Emit start event
+            await broker.emit(doc_id, "PIPELINE_STARTED", {
+                "topic": initial_state["topic"],
+                "quality_preset": initial_state["quality_preset"],
+                "target_words": initial_state["target_words"],
+            })
 
             # Update DB: initializing → planning
             await self._update_run_status(doc_id, "planning")
@@ -356,6 +363,12 @@ class RunManager:
                 )
                 await db.commit()
 
+            # Emit completion event
+            await broker.emit(doc_id, "PIPELINE_COMPLETED", {
+                "total_words": total_words,
+                "total_cost": total_cost,
+            })
+
             logger.info(
                 "[%s] Graph execution completed (words=%d, cost=$%.4f)",
                 doc_id, total_words, total_cost,
@@ -364,11 +377,19 @@ class RunManager:
         except asyncio.CancelledError:
             logger.info("[%s] Graph execution cancelled", doc_id)
             await self._update_run_status(doc_id, "cancelled")
+            # Emit cancellation event
+            from services.sse_broker import get_broker
+            await get_broker().emit(doc_id, "PIPELINE_CANCELLED", {})
             raise
 
         except Exception as exc:
             logger.error("[%s] Graph execution failed: %s", doc_id, exc, exc_info=True)
             await self._update_run_status(doc_id, "error")
+            # Emit error event
+            from services.sse_broker import get_broker
+            await get_broker().emit(doc_id, "PIPELINE_FAILED", {
+                "error": str(exc),
+            })
 
         finally:
             # Cleanup active runs

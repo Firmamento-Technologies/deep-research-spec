@@ -10,7 +10,7 @@ Provides RESTful API for:
 
 Integrates with:
 - RunManager service for orchestration
-- SSEBroker for real-time events (Task C.4)
+- SSEBroker for real-time events
 - PostgreSQL for persistence
 - LangGraph checkpointer for HITL
 
@@ -19,6 +19,7 @@ Spec: §10 API specification, §20 HITL workflow
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import List, Optional
 from uuid import uuid4
@@ -32,6 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.connection import get_db
 from database.models import Run
 from src.services.run_manager import run_manager
+from services.sse_broker import get_broker
 
 logger = logging.getLogger(__name__)
 
@@ -266,21 +268,26 @@ async def stream_run_events(doc_id: str):
 
     Returns:
         StreamingResponse with text/event-stream.
-
-    Note:
-        Implementation pending Task C.4 (SSE Broker).
     """
-    # TODO: Implement SSE streaming in Task C.4
-    # For now, return placeholder
+    broker = get_broker()
 
     async def event_generator():
-        # Placeholder: emit connection event
-        import json
-        yield f"data: {json.dumps({'type': 'CONNECTED', 'doc_id': doc_id})}\n\n"
-        
-        # TODO: Subscribe to broker.subscribe(doc_id) and yield events
-        # async for event in broker.subscribe(doc_id):
-        #     yield f"data: {json.dumps(event)}\n\n"
+        """Generate SSE events from broker subscription."""
+        try:
+            async for event in broker.subscribe(doc_id):
+                # SSE format: "data: {json}\n\n"
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as exc:
+            logger.error(
+                "[%s] SSE stream error: %s",
+                doc_id, exc, exc_info=True,
+            )
+            # Send error event and close
+            error_event = {
+                "type": "ERROR",
+                "payload": {"message": "Stream error"},
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
 
     return StreamingResponse(
         event_generator(),
@@ -312,23 +319,24 @@ async def approve_outline(
 
     Note:
         Full HITL implementation requires LangGraph interrupt + resume.
-        For MVP, this is a stub that emits an event.
+        For MVP, this emits an event and logs.
     """
     logger.info(
         "Outline approved for run %s (approved=%s, sections=%s)",
         doc_id, body.approved, len(body.sections) if body.sections else 0,
     )
 
-    # TODO: Task C.4 - emit event via broker
-    # await broker.emit(doc_id, "OUTLINE_APPROVED", {
-    #     "approved": body.approved,
-    #     "sections": body.sections,
-    # })
+    # Emit event via broker
+    broker = get_broker()
+    await broker.emit(doc_id, "OUTLINE_APPROVED", {
+        "approved": body.approved,
+        "sections": body.sections,
+    })
 
     # TODO: Resume graph with user input
     # await run_manager.resume_run(doc_id, user_input=body.dict())
 
-    return {"status": "ok", "message": "Outline approved (MVP stub)"}
+    return {"status": "ok", "message": "Outline approved"}
 
 
 @router.post("/runs/{doc_id}/approve-section", status_code=200)
@@ -349,24 +357,25 @@ async def approve_section(
 
     Note:
         Full HITL implementation requires LangGraph interrupt + resume.
-        For MVP, this is a stub.
+        For MVP, this emits an event.
     """
     logger.info(
         "Section %d approved for run %s (approved=%s)",
         body.section_idx, doc_id, body.approved,
     )
 
-    # TODO: Task C.4 - emit event via broker
-    # await broker.emit(doc_id, "SECTION_APPROVED", {
-    #     "section_idx": body.section_idx,
-    #     "approved": body.approved,
-    #     "content": body.content,
-    # })
+    # Emit event via broker
+    broker = get_broker()
+    await broker.emit(doc_id, "SECTION_APPROVED", {
+        "section_idx": body.section_idx,
+        "approved": body.approved,
+        "content": body.content,
+    })
 
     # TODO: Resume graph
     # await run_manager.resume_run(doc_id, user_input=body.dict())
 
-    return {"status": "ok", "message": "Section approved (MVP stub)"}
+    return {"status": "ok", "message": "Section approved"}
 
 
 @router.delete("/runs/{doc_id}", status_code=204)
