@@ -1,29 +1,42 @@
+"""Application settings from environment variables."""
+
 import os
-from functools import lru_cache
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 
-class Settings:
-    """Runtime configuration read from environment variables."""
+class Settings(BaseSettings):
+    """Application configuration from environment."""
+    
+    # Database
+    database_url: str = Field(
+        default="postgresql+asyncpg://drs:drs@localhost/drs",
+        alias="DATABASE_URL",
+    )
+    
+    # Redis
+    redis_url: str = Field(
+        default="redis://localhost:6379",
+        alias="REDIS_URL",
+    )
+    
+    # LLM APIs
+    openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
+    brave_api_key: str = Field(default="", alias="BRAVE_API_KEY")
+    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
+    
+    # CORS
+    allowed_origins: str = Field(default="", alias="ALLOWED_ORIGINS")
+    
+    # Debug
+    debug: bool = Field(default=False, alias="DEBUG")
+    
+    # Concurrency
+    max_concurrent_runs: int = Field(default=5, alias="MAX_CONCURRENT_RUNS")
+    
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
 
-    def __init__(self) -> None:
-        db_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql://drs:drs_dev_password@localhost:5432/drs",
-        )
-        # SQLAlchemy async requires the asyncpg driver prefix
-        if db_url.startswith("postgresql://"):
-            db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        self.database_url: str = db_url
-        self.redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
-        self.minio_url: str = os.getenv("MINIO_URL", "http://localhost:9000")
-        self.minio_access_key: str = os.getenv("MINIO_ACCESS_KEY", "drs_admin")
-        self.minio_secret_key: str = os.getenv("MINIO_SECRET_KEY", "drs_secret_key")
-        self.openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
 
-
-@lru_cache(maxsize=1)
-def get_settings() -> Settings:
-    return Settings()
-
-
-settings: Settings = get_settings()
+settings = Settings()
