@@ -10,10 +10,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from services.sse_broker import SSEBroker
 
-# Make src/ importable so LangGraph graph modules can be imported
-_src_path = os.path.join(os.path.dirname(__file__), "..", "..", "src")
-if _src_path not in sys.path:
-    sys.path.insert(0, _src_path)
+# Make src/ importable: add /app (parent of src/) to sys.path so that the
+# `from src.graph.X import Y` absolute imports used in graph.py and all node
+# files resolve correctly inside the Docker container.
+_app_path = os.path.join(os.path.dirname(__file__), "..")
+if _app_path not in sys.path:
+    sys.path.insert(0, _app_path)
 
 
 async def run_pipeline(doc_id: str, params: dict, broker: "SSEBroker") -> None:
@@ -21,15 +23,15 @@ async def run_pipeline(doc_id: str, params: dict, broker: "SSEBroker") -> None:
     Start the LangGraph pipeline for a given run.
     Emits SSE events via broker throughout execution.
 
-    When src/graph/main.py is available, invokes build_graph().ainvoke().
-    Until then, emits a stub HUMAN_REQUIRED (outline approval) so the
-    frontend HITL flow can be exercised.
+    Invokes build_graph().ainvoke() from src/graph/graph.py.
+    Falls back to a stub HUMAN_REQUIRED (outline approval) only if the
+    import fails (e.g. during local development without src/ mounted).
     """
     try:
         await broker.emit(doc_id, "PIPELINE_STARTED", {"doc_id": doc_id})
 
         try:
-            from graph.main import build_graph  # src/graph/main.py
+            from src.graph.graph import build_graph  # src/graph/graph.py
             graph = build_graph()
             initial = {
                 "doc_id":          doc_id,
@@ -42,8 +44,8 @@ async def run_pipeline(doc_id: str, params: dict, broker: "SSEBroker") -> None:
             await graph.ainvoke(initial)
 
         except ImportError:
-            # src/ pipeline not yet wired — run a minimal stub sequence
-            # so the frontend can exercise layout and HITL
+            # src/ not available — run a minimal stub sequence so the
+            # frontend can exercise layout and HITL without the full pipeline.
             await asyncio.sleep(0.5)
             await broker.emit(doc_id, "NODE_STARTED",   {"node": "preflight"})
             await asyncio.sleep(0.8)

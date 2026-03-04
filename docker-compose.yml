@@ -98,6 +98,10 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-drs_admin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-drs_secret_key}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+    volumes:
+      # Mount src/ so the LangGraph pipeline code is available inside the
+      # container at /app/src — required by run_manager.py
+      - ./src:/app/src
     depends_on:
       postgres:
         condition: service_healthy
