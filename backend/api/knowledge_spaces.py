@@ -31,7 +31,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, func as sql_func, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.connection import get_db_session
+from database.connection import get_db  # FIXED: was get_db_session
 from database.models import Space, Source, Chunk
 from services.space_indexer import SpaceIndexer, IndexingError
 from services.db_inserter import get_chunk_count
@@ -118,7 +118,7 @@ class SearchResultResponse(BaseModel):
 @router.post("", response_model=SpaceResponse, status_code=201)
 async def create_space(
     request: CreateSpaceRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Create a new Knowledge Space."""
     space = Space(
@@ -149,7 +149,7 @@ async def create_space(
 @router.get("", response_model=list[SpaceResponse])
 async def list_spaces(
     user_id: Optional[str] = Query(None),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """List all Knowledge Spaces (optionally filtered by user)."""
     stmt = select(Space)
@@ -187,7 +187,7 @@ async def list_spaces(
 @router.get("/{space_id}", response_model=SpaceResponse)
 async def get_space(
     space_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Get a specific Knowledge Space."""
     stmt = select(Space).where(Space.id == space_id)
@@ -218,7 +218,7 @@ async def get_space(
 @router.delete("/{space_id}", status_code=204)
 async def delete_space(
     space_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Delete a Knowledge Space (cascades to sources and chunks)."""
     stmt = select(Space).where(Space.id == space_id)
@@ -244,7 +244,7 @@ async def delete_space(
 async def upload_source(
     space_id: str,
     file: UploadFile = File(...),
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Upload a file to a Knowledge Space and trigger indexing."""
     # Validate space exists
@@ -317,7 +317,7 @@ async def upload_source(
 @router.get("/{space_id}/sources", response_model=list[SourceResponse])
 async def list_sources(
     space_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """List all sources in a Knowledge Space."""
     # Validate space
@@ -356,7 +356,7 @@ async def list_sources(
 async def delete_source(
     space_id: str,
     source_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Delete a source (cascades to chunks)."""
     stmt = select(Source).where(Source.id == source_id, Source.space_id == space_id)
@@ -386,7 +386,7 @@ async def delete_source(
 @router.post("/{space_id}/reindex", response_model=dict)
 async def reindex_space(
     space_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Re-index all sources in a space."""
     # Validate space
@@ -436,7 +436,7 @@ async def reindex_space(
 async def search_space(
     space_id: str,
     request: SearchRequest,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """Search for relevant chunks in a Knowledge Space using semantic similarity."""
     # Validate space
@@ -482,7 +482,7 @@ async def search_space(
 async def source_indexing_progress(
     space_id: str,
     source_id: str,
-    session: AsyncSession = Depends(get_db_session),
+    session: AsyncSession = Depends(get_db),
 ):
     """SSE stream for indexing progress (for future UI integration)."""
     # Validate source
