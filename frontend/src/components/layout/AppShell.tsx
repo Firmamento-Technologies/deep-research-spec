@@ -12,10 +12,12 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts'
 import { Topbar } from './Topbar'
 import { DocumentSidebar } from './DocumentSidebar'
 import { MainArea } from './MainArea'
+import { RightPanel } from './RightPanel'
 import { ChatInput } from './ChatInput'
+import { HumanRequiredModal } from '../hitl/HumanRequiredModal'
 
 export function AppShell() {
-  const appState   = useAppStore((s) => s.state)
+  const appState    = useAppStore((s) => s.state)
   const activeDocId = useAppStore((s) => s.activeDocId)
 
   // SSE active during pipeline execution and HITL pauses
@@ -35,11 +37,18 @@ export function AppShell() {
       <div className="flex flex-1 overflow-hidden pt-12 pb-20">
         <DocumentSidebar />
         <MainArea />
-        {/* RightPanel added in STEP 8 */}
+        <RightPanel />
       </div>
 
       {/* CRITICAL: ChatInput is always mounted and always visible (Section 16 note 3) */}
       <ChatInput />
+
+      {/*
+        HITL overlay — position:fixed full-screen, NOT dismissible by clicking
+        outside or pressing Escape. Renders only when appState === AWAITING_HUMAN.
+        Must be outside the scrollable content area so it covers everything.
+      */}
+      <HumanRequiredModal />
     </div>
   )
 }
