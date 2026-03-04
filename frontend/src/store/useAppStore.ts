@@ -25,8 +25,10 @@ interface AppStore {
   /** HITL modal type — set by SSE HUMAN_REQUIRED, cleared after resolution */
   hitlType:    'outline_approval' | 'section_approval' | 'escalation' | null
   hitlPayload: unknown
-  /** RunWizard modal visibility */
+  /** RunWizard modal */
   wizardOpen: boolean
+  /** RunCompanion panel — aperto di default, utente può collassare */
+  companionOpen: boolean
 
   // Actions
   setState:         (s: AppState) => void
@@ -38,6 +40,7 @@ interface AppStore {
   closeHitl:        () => void
   openWizard:       () => void
   closeWizard:      () => void
+  toggleCompanion:  () => void
 }
 
 export const useAppStore = create<AppStore>((set) => ({
@@ -49,6 +52,7 @@ export const useAppStore = create<AppStore>((set) => ({
   hitlType:            null,
   hitlPayload:         null,
   wizardOpen:          false,
+  companionOpen:       true,
 
   setState:         (s)    => set({ state: s }),
   setActiveDocId:   (id)   => set({ activeDocId: id }),
@@ -57,6 +61,7 @@ export const useAppStore = create<AppStore>((set) => ({
   toggleRightPanel: ()     => set((prev) => ({ rightPanelCollapsed: !prev.rightPanelCollapsed })),
   openHitl:  (type, payload) => set({ hitlType: type, hitlPayload: payload }),
   closeHitl: ()              => set({ hitlType: null, hitlPayload: null }),
-  openWizard:  () => set({ wizardOpen: true }),
-  closeWizard: () => set({ wizardOpen: false }),
+  openWizard:      () => set({ wizardOpen: true }),
+  closeWizard:     () => set({ wizardOpen: false }),
+  toggleCompanion: () => set((prev) => ({ companionOpen: !prev.companionOpen })),
 }))
