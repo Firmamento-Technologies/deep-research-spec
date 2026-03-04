@@ -1,12 +1,28 @@
 # Async SQLAlchemy engine, session factory, and convenience helpers.
 
+import os
 from typing import AsyncGenerator
+from pathlib import Path
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 from .models import Base
+
+# CRITICAL FIX: Load .env BEFORE importing settings
+# This ensures subprocess (uvicorn --reload) picks up env vars
+from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).parent.parent
+ENV_FILE = BACKEND_DIR / ".env"
+
+if ENV_FILE.exists():
+    load_dotenv(ENV_FILE, override=True)
+    print(f"[Connection] Loaded .env from: {ENV_FILE}")
+else:
+    print(f"[Connection] WARNING: .env not found at {ENV_FILE}")
+
 from config.settings import settings
 
 engine = create_async_engine(
