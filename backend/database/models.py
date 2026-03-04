@@ -6,6 +6,16 @@ from sqlalchemy.orm import DeclarativeBase, relationship
 from sqlalchemy.sql import func
 import uuid
 
+# pgvector support (Task 1.2)
+try:
+    from pgvector.sqlalchemy import Vector
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    PGVECTOR_AVAILABLE = False
+    # Fallback: define dummy Vector to avoid import errors
+    def Vector(dim):
+        return Text  # Graceful degradation
+
 
 class Base(DeclarativeBase):
     pass
@@ -109,8 +119,10 @@ class Chunk(Base):
     created_at = Column(DateTime, server_default=func.now())
     metadata   = Column(JSONB, nullable=True)  # {"chunk_idx": 0, "token_count": 512}
     
-    # NOTE: embedding column added in migration 003 (pgvector)
-    # embedding = Column(Vector(384))  # Uncomment after Task 1.2
+    # pgvector embedding column (Task 1.2)
+    # 384 dimensions from all-MiniLM-L6-v2 (sentence-transformers)
+    # Supports cosine similarity queries: ORDER BY embedding <=> query_vector
+    embedding = Column(Vector(384), nullable=True)
     
     # Relationships
     space  = relationship("Space",  back_populates="chunks")
