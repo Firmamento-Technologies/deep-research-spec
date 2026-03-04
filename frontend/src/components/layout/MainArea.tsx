@@ -1,11 +1,12 @@
-// MainArea — flex-1 content area between sidebar and right panel.
-// Routes: / (HomeView), /settings, /analytics.
-// HomeView: Chat view ↔ Pipeline view switch based on appState.
-// Spec: UI_BUILD_PLAN.md Section 2, note 7 (visibility:hidden, not unmount).
+// MainArea — area contenuto flex-1 tra sidebar e pannello destro.
+// Route: / (HomeView), /settings, /analytics.
+// HomeView: ChatThread ↔ PipelineTimeline in base all'appState.
+// visibility:hidden (non unmount) preserva lo stato dell'activity log.
 
 import { Routes, Route } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { ChatThread } from '../chat/ChatThread'
+import { PipelineTimeline } from '../pipeline/PipelineTimeline'
 import { Settings }  from '../../pages/Settings'
 import { Analytics } from '../../pages/Analytics'
 
@@ -21,40 +22,34 @@ export function MainArea() {
   )
 }
 
-/** Overlays Chat and Pipeline — only one is visible at a time. */
+/** Sovrappone Chat e PipelineTimeline — una sola visibile alla volta. */
 function HomeView() {
-  const appState    = useAppStore((s) => s.state)
-  const showPipeline = appState === 'PROCESSING' || appState === 'AWAITING_HUMAN'
+  const appState     = useAppStore((s) => s.state)
+  const showTimeline = appState === 'PROCESSING' || appState === 'AWAITING_HUMAN'
 
   return (
     <div className="relative w-full h-full">
-      {/* ── CHAT VIEW ───────────────────────────────────────────────── */}
+
+      {/* ── CHAT VIEW ──────────────────────────────────────────────── */}
       <div
         className="absolute inset-0 transition-opacity duration-200"
         style={{
-          opacity:       showPipeline ? 0 : 1,
-          pointerEvents: showPipeline ? 'none' : 'auto',
+          opacity:       showTimeline ? 0 : 1,
+          pointerEvents: showTimeline ? 'none' : 'auto',
         }}
       >
         <ChatThread />
       </div>
 
-      {/* ── PIPELINE CANVAS ──────────────────────────────────────────── */}
-      {/* visibility:hidden (not unmount) preserves animation state */}
+      {/* ── PIPELINE TIMELINE ────────────────────────────────────────── */}
+      {/* visibility:hidden (non unmount) mantiene activityLog e stato scroll */}
       <div
         className="absolute inset-0"
-        style={{ visibility: showPipeline ? 'visible' : 'hidden' }}
+        style={{ visibility: showTimeline ? 'visible' : 'hidden' }}
       >
-        <PipelineCanvasPlaceholder />
+        <PipelineTimeline />
       </div>
-    </div>
-  )
-}
 
-function PipelineCanvasPlaceholder() {
-  return (
-    <div className="w-full h-full flex items-center justify-center bg-drs-bg">
-      <p className="text-drs-faint text-xs font-mono">PipelineCanvas — STEP 7</p>
     </div>
   )
 }
