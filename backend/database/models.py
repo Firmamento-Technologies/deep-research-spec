@@ -38,7 +38,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     last_login = Column(DateTime, nullable=True)
-    metadata = Column(JSONB, nullable=True)
+    user_metadata = Column(JSONB, nullable=True)  # FIXED: renamed from metadata
     
     # Relationships
     runs = relationship("Run", back_populates="user", cascade="all, delete-orphan")
@@ -101,7 +101,7 @@ class Section(Base):
     title = Column(Text, nullable=False)
     content = Column(Text)
     status = Column(String(30), default="pending")
-    metadata = Column(JSONB)
+    section_metadata = Column(JSONB)  # FIXED: renamed from metadata
     created_at = Column(DateTime, server_default=func.now())
 
 
@@ -149,7 +149,7 @@ class Source(Base):
     storage_path = Column(Text, nullable=True)
     status       = Column(String(30), default="pending")
     created_at   = Column(DateTime, server_default=func.now())
-    metadata     = Column(JSONB, nullable=True)
+    source_metadata = Column(JSONB, nullable=True)  # FIXED: renamed from metadata
     
     # Relationships
     space  = relationship("Space", back_populates="sources")
@@ -165,7 +165,7 @@ class Chunk(Base):
     source_id  = Column(String(36), ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
     content    = Column(Text, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
-    metadata   = Column(JSONB, nullable=True)
+    chunk_metadata = Column(JSONB, nullable=True)  # FIXED: renamed from metadata
     embedding  = Column(Vector(384), nullable=True)
     
     # Relationships
