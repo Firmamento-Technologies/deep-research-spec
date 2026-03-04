@@ -2,22 +2,22 @@
 //
 // Step 1: Topic
 // Step 2: Budget ($1-$500) + Lunghezza (1k-50k parole)
-//         Quality preset auto-derivato dal budget (non esposto all'utente)
-// Step 3: Opzioni facoltative (lingua, stile, fonti)
+// Step 3: Opzioni facoltative (lingua, stile, fonti web)
+// Step 4: Knowledge Space (opzionale) — seleziona uno spazio esistente
+//          il cui contenuto il Researcher agent userà come contesto RAG
 //
 // Submit → POST /api/runs → setActiveRun → setState PROCESSING.
-// Il wizard si chiude e il run stream si attiva automaticamente (AppShell).
-//
 // Tastiera: N apre il wizard (via useKeyboardShortcuts).
 
-import { useState, useCallback, type ChangeEvent } from 'react'
-import { useAppStore } from '../../store/useAppStore'
-import { useRunStore } from '../../store/useRunStore'
-import { api } from '../../lib/api'
+import { useState, useCallback, useEffect, type ChangeEvent } from 'react'
+import { useAppStore }   from '../../store/useAppStore'
+import { useRunStore }   from '../../store/useRunStore'
+import { useSpaceStore } from '../../store/useSpaceStore'
+import { api }           from '../../lib/api'
 import type { RunCreateRequest, RunCreateResponse } from '../../types/api'
 import type { QualityPreset } from '../../types/run'
 
-// ── Costanti dominio ───────────────────────────────────────────────────
+// ── Costanti dominio ─────────────────────────────────────────────────────────────────
 const BUDGET_MIN = 1
 const BUDGET_MAX = 500
 const WORDS_MIN  = 1_000
@@ -34,9 +34,9 @@ const STYLE_OPTIONS = [
 const LANGUAGE_OPTIONS = [
   { value: 'it', label: 'Italiano' },
   { value: 'en', label: 'English' },
-  { value: 'fr', label: 'Français' },
+  { value: 'fr', label: 'Fran\u00e7ais' },
   { value: 'de', label: 'Deutsch' },
-  { value: 'es', label: 'Español' },
+  { value: 'es', label: 'Espa\u00f1ol' },
 ]
 
 const SOURCE_OPTIONS = [
@@ -47,7 +47,7 @@ const SOURCE_OPTIONS = [
   { value: 'patents',    label: 'Brevetti' },
 ]
 
-// ── Quality preset ──────────────────────────────────────────────────────
+// ── Quality preset ─────────────────────────────────────────────────────────────────
 function derivePreset(budget: number): QualityPreset {
   if (budget < 30)  return 'Economy'
   if (budget < 120) return 'Balanced'
@@ -61,9 +61,9 @@ const PRESET_BORDER: Record<QualityPreset, string> = {
 }
 
 const PRESET_DESC: Record<QualityPreset, string> = {
-  Economy:  '3 giudici · 3 iterazioni max · ricerca base',
-  Balanced: '5 giudici · 5 iterazioni · MoW attivo · ricerca avanzata',
-  Premium:  '9 giudici · 8 iterazioni · MoW+Fusor · ricerca completa',
+  Economy:  '3 giudici \u00B7 3 iterazioni max \u00B7 ricerca base',
+  Balanced: '5 giudici \u00B7 5 iterazioni \u00B7 MoW attivo \u00B7 ricerca avanzata',
+  Premium:  '9 giudici \u00B7 8 iterazioni \u00B7 MoW+Fusor \u00B7 ricerca completa',
 }
 
 function estimateCost(words: number, preset: QualityPreset, maxBudget: number) {
@@ -76,7 +76,7 @@ function estimateCost(words: number, preset: QualityPreset, maxBudget: number) {
   }
 }
 
-// ── Stili condivisi ───────────────────────────────────────────────────────
+// ── Stili condivisi ──────────────────────────────────────────────────────────────────
 const INPUT =
   'w-full bg-drs-s2 border border-drs-border rounded-input ' +
   'px-3 py-2 text-sm text-drs-text placeholder:text-drs-faint ' +
@@ -84,15 +84,20 @@ const INPUT =
 
 const LABEL = 'block text-xs font-medium text-drs-muted mb-1.5'
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 4
+const TOTAL_STEPS = 4
 
-// ── Componente ───────────────────────────────────────────────────────────
+// ── Componente ───────────────────────────────────────────────────────────────────────
 export function RunWizard() {
   const wizardOpen     = useAppStore((s) => s.wizardOpen)
   const closeWizard    = useAppStore((s) => s.closeWizard)
   const setAppState    = useAppStore((s) => s.setState)
   const setActiveDocId = useAppStore((s) => s.setActiveDocId)
   const setActiveRun   = useRunStore((s) => s.setActiveRun)
+
+  // Spaces
+  const { spaces, fetchSpaces }   = useSpaceStore()
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null)
 
   const [step,       setStep]       = useState<Step>(1)
   const [topic,      setTopic]      = useState('')
@@ -107,6 +112,11 @@ export function RunWizard() {
   const preset = derivePreset(budget)
   const { lo, hi } = estimateCost(words, preset, budget)
 
+  // Carica spazi al mount del wizard (lazy, non blocca)
+  useEffect(() => {
+    if (wizardOpen) void fetchSpaces()
+  }, [wizardOpen, fetchSpaces])
+
   const toggleSource = useCallback((val: string) => {
     setSources((prev) =>
       prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val],
@@ -116,7 +126,7 @@ export function RunWizard() {
   const resetForm = useCallback(() => {
     setStep(1); setTopic(''); setBudget(50); setWords(5_000)
     setLanguage('it'); setStyle('academic'); setSources(['web', 'academic'])
-    setError(null); setSubmitting(false)
+    setSelectedSpaceId(null); setError(null); setSubmitting(false)
   }, [])
 
   const handleClose = useCallback(() => { closeWizard(); resetForm() }, [closeWizard, resetForm])
@@ -125,19 +135,20 @@ export function RunWizard() {
     else handleClose()
   }, [step, handleClose])
   const handleNext  = useCallback(() => {
-    if (step < 3) setStep((s) => (s + 1) as Step)
+    if (step < TOTAL_STEPS) setStep((s) => (s + 1) as Step)
   }, [step])
 
   const handleSubmit = useCallback(async () => {
     setError(null)
     setSubmitting(true)
     try {
-      const body: RunCreateRequest = {
+      const body: RunCreateRequest & { space_ids?: string[] } = {
         topic:         topic.trim(),
         qualityPreset: preset,
         targetWords:   words,
         maxBudget:     budget,
         styleProfile:  style,
+        ...(selectedSpaceId ? { space_ids: [selectedSpaceId] } : {}),
       }
       const { docId } = await api.post<RunCreateResponse>('/api/runs', body)
       setActiveDocId(docId)
@@ -149,7 +160,6 @@ export function RunWizard() {
         targetWords:         words,
         maxBudget:           budget,
         budgetSpent:         0,
-        // 100 per coerenza con useConversationStore (scala 0-100%)
         budgetRemainingPct:  100,
         totalSections:       0,
         currentSection:      0,
@@ -171,12 +181,18 @@ export function RunWizard() {
       setError(e instanceof Error ? e.message : 'Errore sconosciuto')
       setSubmitting(false)
     }
-  }, [topic, preset, words, budget, style,
+  }, [topic, preset, words, budget, style, selectedSpaceId,
       setActiveDocId, setActiveRun, setAppState, closeWizard, resetForm])
 
   if (!wizardOpen) return null
 
   const canNext1 = topic.trim().length >= 10
+  const stepLabels: Record<Step, string> = {
+    1: `Passo 1 di ${TOTAL_STEPS} \u2014 Argomento`,
+    2: `Passo 2 di ${TOTAL_STEPS} \u2014 Budget e lunghezza`,
+    3: `Passo 3 di ${TOTAL_STEPS} \u2014 Opzioni`,
+    4: `Passo 4 di ${TOTAL_STEPS} \u2014 Knowledge Space (opzionale)`,
+  }
 
   return (
     <div
@@ -192,11 +208,7 @@ export function RunWizard() {
         <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-drs-border shrink-0">
           <div>
             <h2 className="text-sm font-semibold text-drs-text">Nuova ricerca</h2>
-            <p className="text-xs text-drs-faint mt-0.5">
-              {step === 1 && 'Passo 1 di 3 — Argomento'}
-              {step === 2 && 'Passo 2 di 3 — Budget e lunghezza'}
-              {step === 3 && 'Passo 3 di 3 — Opzioni'}
-            </p>
+            <p className="text-xs text-drs-faint mt-0.5">{stepLabels[step]}</p>
           </div>
           <div className="flex items-center gap-2">
             <kbd className="text-xs font-mono text-drs-faint border border-drs-border rounded px-1 py-0.5">N</kbd>
@@ -204,15 +216,13 @@ export function RunWizard() {
               onClick={handleClose}
               aria-label="Chiudi wizard"
               className="text-drs-faint hover:text-drs-muted text-xl leading-none transition-colors mt-0.5"
-            >
-              ×
-            </button>
+            >\u00D7</button>
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — 4 segmenti */}
         <div className="flex gap-1.5 px-6 pt-4 shrink-0">
-          {([1, 2, 3] as Step[]).map((n) => (
+          {([1, 2, 3, 4] as Step[]).map((n) => (
             <div
               key={n}
               className={`h-0.5 flex-1 rounded-full transition-all duration-300 ${
@@ -295,8 +305,8 @@ export function RunWizard() {
 
               <div className="bg-drs-s2 border border-drs-border rounded-input px-3 py-2.5 text-xs">
                 <span className="text-drs-faint">Stima costo: </span>
-                <span className="text-drs-text font-mono">${lo}–${hi}</span>
-                <span className="text-drs-faint"> — calcolato esattamente dal Budget Controller all&apos;avvio</span>
+                <span className="text-drs-text font-mono">${lo}\u2013${hi}</span>
+                <span className="text-drs-faint"> \u2014 calcolato esattamente dal Budget Controller all&apos;avvio</span>
               </div>
             </div>
           )}
@@ -349,6 +359,96 @@ export function RunWizard() {
             </div>
           )}
 
+          {/* STEP 4 — Knowledge Space */}
+          {step === 4 && (
+            <div className="space-y-4">
+              <p className="text-xs text-drs-muted leading-relaxed">
+                Associa un <strong className="text-drs-text">Knowledge Space</strong> a questa ricerca.
+                Il Researcher agent userà le fonti indicizzate come contesto RAG prioritario,
+                prima di cercare sul web. Puoi saltare questo step.
+              </p>
+
+              {spaces.length === 0 ? (
+                <div className="bg-drs-s2 border border-drs-border rounded-input px-4 py-5 text-center">
+                  <p className="text-sm mb-1">\uD83D\uDDC2\uFE0F</p>
+                  <p className="text-xs text-drs-faint">Nessuno spazio disponibile.</p>
+                  <p className="text-xs text-drs-faint mt-0.5">
+                    Crea uno spazio in <strong className="text-drs-muted">Knowledge Spaces</strong> e carica le fonti prima di avviare la ricerca.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {/* Opzione “nessuno spazio” */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSpaceId(null)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-input
+                      border text-left transition-colors text-xs ${
+                        selectedSpaceId === null
+                          ? 'border-drs-accent bg-drs-s3 text-drs-text'
+                          : 'border-drs-border bg-drs-s2 text-drs-muted hover:border-drs-border-bright hover:text-drs-text'
+                      }`}
+                  >
+                    <span className="text-base">\uD83D\uDD0D</span>
+                    <div>
+                      <p className="font-medium">Solo ricerca web</p>
+                      <p className="text-drs-faint mt-0.5">Nessun Knowledge Space</p>
+                    </div>
+                    {selectedSpaceId === null && (
+                      <span className="ml-auto text-drs-accent">\u2713</span>
+                    )}
+                  </button>
+
+                  {/* Lista spazi */}
+                  {spaces.map((sp) => (
+                    <button
+                      key={sp.id}
+                      type="button"
+                      onClick={() => setSelectedSpaceId(sp.id)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-input
+                        border text-left transition-colors text-xs ${
+                          selectedSpaceId === sp.id
+                            ? 'border-drs-accent bg-drs-s3 text-drs-text'
+                            : 'border-drs-border bg-drs-s2 text-drs-muted hover:border-drs-border-bright hover:text-drs-text'
+                        }`}
+                    >
+                      <span className="text-base">\uD83D\uDDC2\uFE0F</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{sp.name}</p>
+                        {sp.description && (
+                          <p className="text-drs-faint truncate mt-0.5">{sp.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono text-drs-faint">
+                          {sp.sourceCount} {sp.sourceCount === 1 ? 'fonte' : 'fonti'}
+                        </span>
+                        {selectedSpaceId === sp.id && (
+                          <span className="text-drs-accent">\u2713</span>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Avviso spazio senza fonti */}
+              {selectedSpaceId && (() => {
+                const sp = spaces.find((s) => s.id === selectedSpaceId)
+                return sp && sp.sourceCount === 0 ? (
+                  <div className="flex items-start gap-2 text-xs text-drs-yellow
+                    bg-drs-s2 border border-drs-yellow rounded-input px-3 py-2">
+                    <span>\u26A0\uFE0F</span>
+                    <p>
+                      Lo spazio selezionato non ha fonti indicizzate.
+                      Il Researcher userà solo la ricerca web.
+                    </p>
+                  </div>
+                ) : null
+              })()}
+            </div>
+          )}
+
           {error && (
             <div className="text-xs text-drs-red bg-drs-s2 border border-drs-red rounded-input px-3 py-2">
               {error}
@@ -362,10 +462,10 @@ export function RunWizard() {
             onClick={handleBack}
             className="px-4 py-2 text-xs text-drs-muted border border-drs-border rounded-input hover:border-drs-border-bright transition-colors"
           >
-            {step === 1 ? 'Annulla' : '← Indietro'}
+            {step === 1 ? 'Annulla' : '\u2190 Indietro'}
           </button>
 
-          {step < 3 ? (
+          {step < TOTAL_STEPS ? (
             <button
               onClick={handleNext}
               disabled={step === 1 && !canNext1}
@@ -375,7 +475,7 @@ export function RunWizard() {
                   : 'bg-drs-accent text-white hover:opacity-90 cursor-pointer'
               }`}
             >
-              Avanti →
+              Avanti \u2192
             </button>
           ) : (
             <button
@@ -387,7 +487,7 @@ export function RunWizard() {
                   : 'bg-drs-green text-white hover:opacity-90 cursor-pointer'
               }`}
             >
-              {submitting ? 'Avvio in corso…' : '⚡ Avvia ricerca'}
+              {submitting ? 'Avvio in corso\u2026' : '\u26A1 Avvia ricerca'}
             </button>
           )}
         </div>
