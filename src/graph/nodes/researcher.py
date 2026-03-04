@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import logging
 from typing import Any
+from uuid import uuid4
 
 from src.connectors.base import SourceConnector, SourceRanker, DiversityAnalyzer
 from src.connectors.memvid_connector import MemvidConnector
+from src.rag import retrieve_chunks_for_spaces  # TH.3
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_MAX_SOURCES = 15
 
 
-# ── Default connector cascade (§RAG_SHINE_INTEGRATION §1) ────────────────────
+# ── Default connector cascade (§RAG_SHINE_INTEGRATION §1) ────────────────────────
 # memvid_local is checked FIRST; external connectors cascade after.
 
 def get_default_connectors(
@@ -36,7 +38,10 @@ def get_default_connectors(
 class ResearcherNode:
     """§5.2 — Retrieve and rank sources for a single section.
 
-    Connector cascade: memvid_local → academic → institutional → web → social.
+    Retrieval cascade (TH.3):
+      1. Knowledge Spaces (pgvector RAG) if space_ids present
+      2. memvid_local → academic → institutional → web → social
+
     Uses SourceRanker (§17.9) for scoring/dedup and DiversityAnalyzer (§17.8).
     """
 
@@ -63,8 +68,46 @@ class ResearcherNode:
         logger.info("Researcher: section_idx=%d, scope='%s', max_sources=%d",
                      section_idx, scope[:60], max_sources)
 
-        # Collect from all enabled connectors
         all_sources: list[dict] = []
+
+        # ── TH.3: RAG retrieval from Knowledge Spaces (PRIORITY 1) ────────────────
+        space_ids = state.get("space_ids", [])
+        if space_ids:
+            try:
+                chunks = await retrieve_chunks_for_spaces(
+                    space_ids=space_ids,
+                    query=scope,
+                    top_k=max_sources,  # Retrieve up to max_sources from local KB
+                )
+                # Convert chunks to Source schema
+                for chunk in chunks:
+                    all_sources.append({
+                        "source_id":         str(uuid4()),
+                        "url":               None,
+                        "doi":               None,
+                        "isbn":              None,
+                        "title":             f"Knowledge Space chunk (space={chunk['space_id'][:8]})",
+                        "authors":           [],
+                        "year":              None,
+                        "source_type":       "upload",  # Canonical type for user-uploaded content
+                        "publisher":         None,
+                        "reliability_score": 0.95,      # High reliability (user-curated)
+                        "abstract":          chunk["content"][:500],  # First 500 chars as abstract
+                        "nli_entailment":    None,
+                        "http_verified":     False,
+                        "ghost_flag":        False,
+                        # TH.3 metadata (non-standard fields for debugging)
+                        "_rag_chunk_id":     chunk["id"],
+                        "_rag_space_id":     chunk["space_id"],
+                        "_rag_distance":     chunk["distance"],
+                        "_rag_content":      chunk["content"],  # Full content for synthesis
+                    })
+                logger.info("RAG retrieval: %d chunks from %d spaces", len(chunks), len(space_ids))
+            except Exception as e:
+                logger.error("RAG retrieval failed: %s", e, exc_info=True)
+                # Non-fatal: continue with external connectors
+
+        # ── Connector cascade (memvid → external) ───────────────────────────────────
         for connector in self.connectors:
             if not getattr(connector, "enabled", True):
                 continue
@@ -112,7 +155,7 @@ class ResearcherNode:
         return unique
 
 
-# ── Node function for graph registration ─────────────────────────────────────
+# ── Node function for graph registration ─────────────────────────────────────────────
 
 # Default instance (connectors injected at runtime)
 _default_node = ResearcherNode()

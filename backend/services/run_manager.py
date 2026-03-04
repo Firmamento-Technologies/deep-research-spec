@@ -37,6 +37,7 @@ async def run_pipeline(doc_id: str, params: dict, broker: "SSEBroker") -> None:
                 "quality_preset":  params.get("quality_preset", "Balanced"),
                 "target_words":    params.get("target_words", 5_000),
                 "max_budget":      params.get("max_budget", 50.0),
+                "space_ids":       params.get("space_ids", []),  # TH.3
                 "broker":          broker,
             }
             await graph.ainvoke(initial)

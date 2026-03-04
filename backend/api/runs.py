@@ -45,6 +45,7 @@ async def create_run(
         "quality_preset":       body.quality_preset,
         "target_words":         body.target_words,
         "max_budget":           body.max_budget,
+        "space_ids":            body.space_ids,  # TH.3
         "budget_spent":         0.0,
         "budget_remaining_pct": 100.0,
         "total_sections":       0,
