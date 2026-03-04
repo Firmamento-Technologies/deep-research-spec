@@ -5,6 +5,110 @@ All notable changes to the Deep Research Spec (DRS) project will be documented i
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-04
+
+### Added
+
+**Knowledge Spaces — Private Document RAG Integration** ([TH.1-3](https://github.com/lucadidomenicodopehubs/deep-research-spec/issues/XXX))
+
+Utenti possono ora caricare documenti privati (PDF/DOCX/TXT/MD) in "Knowledge Spaces" per farli usare dal Researcher durante le run con alta affidabilità (0.95).
+
+#### Database
+
+- **Migration 0003**: `chunks` table con pgvector per vector embeddings
+  - Embedding dimension: 384 (sentence-transformers/all-MiniLM-L6-v2)
+  - IVFFlat index per cosine similarity search
+  - Foreign keys a `spaces` e `sources` con cascade delete
+  - Metadata JSONB per estensioni future
+
+#### Services
+
+- **SpaceIndexer** ([backend/src/services/space_indexer.py](backend/src/services/space_indexer.py))
+  - Text extraction da PDF (pypdf), DOCX (python-docx), TXT/MD
+  - Semantic chunking: 512 token window, 50 token overlap
+  - Batch embedding generation con sentence-transformers
+  - Progress tracking e error handling
+  - Support per re-indexing (delete + re-create)
+
+- **RAGRetriever** ([backend/src/services/rag_retriever.py](backend/src/services/rag_retriever.py))
+  - Query embedding con sentence-transformers
+  - Cosine similarity search via pgvector (`<=>` operator)
+  - Filtering per `space_ids` con IN clause
+  - Top-K retrieval con similarity threshold (default 0.70)
+  - Conversion a `Source` objects per DocumentState
+  - Deduplication by content hash
+
+#### API Endpoints
+
+- **POST /spaces/:id/sources** — Upload file e trigger indexing
+  - Validation: PDF/DOCX/TXT/MD, max 50MB
+  - Async background indexing con SSE progress events
+  - File storage: `/app/data/knowledge_spaces/{space_id}/`
+
+- **GET /spaces/:id/sources** — List sources con chunk counts
+- **POST /spaces/:id/reindex** — Re-index tutti i sources
+- **DELETE /spaces/:id/sources/:source_id** — Delete source + chunks
+
+#### Integration
+
+- **Researcher Node** (§5.2) ora chiama `retrieve_chunks_for_spaces()`
+  - Recupera top-5 chunks rilevanti per query
+  - Aggiunge a `current_sources` con `reliability=0.95`
+  - Priority: RAG chunks → memvid → sonar-pro → tavily
+
+#### Documentation
+
+- [Setup Guide](docs/KNOWLEDGE_SPACES_SETUP.md)
+  - Installation (dependencies + pgvector)
+  - Database migration steps
+  - API usage examples (curl)
+  - Testing commands (local + integration)
+  - Troubleshooting guide
+  - Architecture diagram
+
+- [Requirements](backend/requirements_knowledge_spaces.txt)
+  - sentence-transformers >= 2.3.1
+  - pypdf >= 4.0.0
+  - python-docx >= 1.1.0
+  - tiktoken >= 0.5.2
+  - aiofiles >= 23.2.1
+  - pgvector >= 0.2.4
+
+### Performance
+
+| Operation | CPU | GPU |
+|-----------|-----|-----|
+| Extract 10-page PDF | 0.8s | 0.8s |
+| Chunk 5k words | 0.2s | 0.2s |
+| Embed 10 chunks | 1.2s | 0.06s |
+| Insert 10 chunks (DB) | 0.05s | 0.05s |
+| **Total per file** | **~2.3s** | **~1.1s** |
+| Vector search (top-5) | 0.02s | 0.02s |
+
+**Storage:**
+- 1k chunks ≈ 5 MB (embeddings only)
+- IVFFlat index ≈ 10% overhead
+
+### Changed
+
+- DocumentState schema: `space_ids` field now used by Researcher
+- Source priority in Researcher: RAG chunks have highest reliability (0.95)
+
+### Dependencies
+
+- Added: `sentence-transformers`, `pypdf`, `python-docx`, `tiktoken`, `aiofiles`, `pgvector`
+- PostgreSQL extension: `vector` (pgvector)
+
+### References
+
+- Task: TH.1-3 Knowledge Spaces
+- PR: `fix/ui-issues-and-docker-config`
+- Commits: [1c3cc70](https://github.com/lucadidomenicodopehubs/deep-research-spec/commit/1c3cc70b563d89e040aa278af758c6cc1df05e8b), [15742744](https://github.com/lucadidomenicodopehubs/deep-research-spec/commit/15742744c253d54e80ab34c5dd1cf391041f0893), [7f76e996](https://github.com/lucadidomenicodopehubs/deep-research-spec/commit/7f76e996af7987f12769b2ca27819c41b00df753), [2dc47de5](https://github.com/lucadidomenicodopehubs/deep-research-spec/commit/2dc47de50c77889d539b68d6cbd364f59e2d3d9e)
+- pgvector: [github.com/pgvector/pgvector](https://github.com/pgvector/pgvector)
+- sentence-transformers: [sbert.net](https://www.sbert.net/)
+
+---
+
 ## [2.0.0] - 2026-03-04
 
 ### 🚨 BREAKING CHANGES
