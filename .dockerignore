@@ -1,0 +1,40 @@
+# Root-level .dockerignore
+# Applied to the entire build context
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.so
+
+# Tests
+**/tests/
+**/htmlcov/
+**/.coverage
+**/coverage.xml
+**/.pytest_cache/
+
+# Dev config
+.git/
+.gitignore
+.env
+!.env.example
+.vscode/
+.idea/
+.devcontainer/
+
+# Node
+**/node_modules/
+
+# Output / logs
+output/
+logs/
+*.log
+
+# Docs
+docs/
+*.md
+!README.md
+
+# Misc
+*.DS_Store
+Thumbs.db

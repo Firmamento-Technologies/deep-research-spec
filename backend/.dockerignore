@@ -1,0 +1,49 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+
+# Tests and coverage
+tests/
+htmlcov/
+.coverage
+.pytest_cache/
+coverage.xml
+
+# Dev tooling
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Logs
+*.log
+logs/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Node (if any frontend assets)
+node_modules/
+
+# CI config
+.github/
+.circleci/
+
+# Misc
+*.DS_Store
+Thumbs.db
