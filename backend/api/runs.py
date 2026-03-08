@@ -326,17 +326,19 @@ async def approve_outline(
         doc_id, body.approved, len(body.sections) if body.sections else 0,
     )
 
-    # Emit event via broker
-    broker = get_broker()
-    await broker.emit(doc_id, "OUTLINE_APPROVED", {
-        "approved": body.approved,
-        "sections": body.sections,
-    })
+    try:
+        await run_manager.resume_run(
+            doc_id,
+            user_input={
+                "type": "outline_approval",
+                "approved": body.approved,
+                "sections": body.sections,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    # TODO: Resume graph with user input
-    # await run_manager.resume_run(doc_id, user_input=body.dict())
-
-    return {"status": "ok", "message": "Outline approved"}
+    return {"status": "ok", "message": "Outline approval received"}
 
 
 @router.post("/runs/{doc_id}/approve-section", status_code=200)
@@ -364,18 +366,20 @@ async def approve_section(
         body.section_idx, doc_id, body.approved,
     )
 
-    # Emit event via broker
-    broker = get_broker()
-    await broker.emit(doc_id, "SECTION_APPROVED", {
-        "section_idx": body.section_idx,
-        "approved": body.approved,
-        "content": body.content,
-    })
+    try:
+        await run_manager.resume_run(
+            doc_id,
+            user_input={
+                "type": "section_approval",
+                "section_idx": body.section_idx,
+                "approved": body.approved,
+                "content": body.content,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    # TODO: Resume graph
-    # await run_manager.resume_run(doc_id, user_input=body.dict())
-
-    return {"status": "ok", "message": "Section approved"}
+    return {"status": "ok", "message": "Section approval received"}
 
 
 @router.delete("/runs/{doc_id}", status_code=204)

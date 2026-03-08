@@ -102,6 +102,11 @@ export function useSSE(docId: string | null): UseSSEResult {
         appendDraftChunk(data.chunk as string)
         break
 
+
+      case 'RUN_RESUMED':
+        appSetState('PROCESSING')
+        break
+
       case 'PIPELINE_DONE':
         setRunStatus('completed')
         appSetState('REVIEWING')
