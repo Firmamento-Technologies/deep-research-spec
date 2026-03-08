@@ -122,6 +122,30 @@ async def test_approve_outline(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_approve_section(async_client: AsyncClient):
+    """Test POST /api/runs/{doc_id}/approve-section."""
+    create_response = await async_client.post(
+        "/api/runs",
+        json={"topic": "Test"},
+    )
+    doc_id = create_response.json()["doc_id"]
+
+    response = await async_client.post(
+        f"/api/runs/{doc_id}/approve-section",
+        json={
+            "section_idx": 0,
+            "approved": True,
+            "content": "Edited section content",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+
+
+
+@pytest.mark.asyncio
 async def test_cancel_run(async_client: AsyncClient):
     """Test DELETE /api/runs/{doc_id} cancels run."""
     # Create run

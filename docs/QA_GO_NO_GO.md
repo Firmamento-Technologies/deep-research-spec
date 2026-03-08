@@ -29,10 +29,10 @@ Questa checklist definisce il gate minimo per dichiarare il software pronto al t
 - [ ] Minimap coerente con subset visibile.
 - [ ] Leggibilità verificata (lane di fase + labels non sovraccariche).
 
-## 5) API/HITL (NO-GO condizionale)
+## 5) API/HITL (bloccante funzionale)
 
 - [ ] Endpoint `approve-outline`/`approve-section` testati.
-- [ ] **Nota:** resume del grafo da HITL ancora parziale (TODO) => se richiesto E2E completo, resta NO-GO.
+- [ ] Resume del grafo da HITL verificato end-to-end (outline + section approval).
 
 ## 6) Test automatici minimi richiesti
 
@@ -44,5 +44,5 @@ Questa checklist definisce il gate minimo per dichiarare il software pronto al t
 
 ## Criterio finale
 
-- **GO QA**: sezioni 1,2,3,4,6 complete; sezione 5 accettata in base allo scope QA.
+- **GO QA**: sezioni 1,2,3,4,5,6 complete.
 - **NO-GO QA**: fallimento di uno qualsiasi dei gate bloccanti o regressioni runtime.

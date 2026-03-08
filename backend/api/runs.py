@@ -318,8 +318,8 @@ async def approve_outline(
         Success message.
 
     Note:
-        Full HITL implementation requires LangGraph interrupt + resume.
-        For MVP, this emits an event and logs.
+        The endpoint forwards the approval payload to RunManager which resolves
+        broker waiters so planner/writer nodes can continue execution.
     """
     logger.info(
         "Outline approved for run %s (approved=%s, sections=%s)",
@@ -358,8 +358,8 @@ async def approve_section(
         Success message.
 
     Note:
-        Full HITL implementation requires LangGraph interrupt + resume.
-        For MVP, this emits an event.
+        The endpoint forwards the approval payload to RunManager which resolves
+        broker waiters so writer flow can continue execution.
     """
     logger.info(
         "Section %d approved for run %s (approved=%s)",

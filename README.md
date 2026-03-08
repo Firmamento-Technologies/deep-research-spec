@@ -80,9 +80,9 @@ cd backend && uvicorn main:app --host 0.0.0.0 --port 8000
 # Docs: http://localhost:8000/docs
 
 # Endpoints:
-# POST /api/v1/runs        — Start pipeline
-# GET  /api/v1/runs/{id}   — Check status
-# GET  /api/v1/runs        — List runs
+# POST /api/runs           — Start pipeline
+# GET  /api/runs/{id}      — Check status
+# GET  /api/runs           — List runs
 # GET  /health             — Health check
 # GET  :9090/metrics       — Prometheus metrics
 ```
