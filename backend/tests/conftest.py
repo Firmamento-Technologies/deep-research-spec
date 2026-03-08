@@ -11,6 +11,7 @@ from database.models import Base
 from database.connection import get_db
 from api.dependencies import require_user
 from api.runs import router as runs_router
+from api.auth import router as auth_router
 from fastapi import FastAPI
 
 # ---------------------------------------------------------------------------
@@ -62,6 +63,7 @@ async def async_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, Non
     # Create test app
     app = FastAPI()
     app.include_router(runs_router)
+    app.include_router(auth_router)
     
     # Override DB dependency
     async def override_get_db():
