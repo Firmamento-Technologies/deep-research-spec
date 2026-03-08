@@ -12,16 +12,17 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 
 from database.schemas import CompanionChatRequest, CompanionChatResponse, Chip
 from database.connection import get_async_session
 from database.models import Settings
+from api.dependencies import require_user
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+router = APIRouter(prefix="/api", tags=["companion"], dependencies=[Depends(require_user)])
 
 _PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "companion_system.txt"
 _SYSTEM_PROMPT: str = _PROMPT_PATH.read_text(encoding="utf-8")

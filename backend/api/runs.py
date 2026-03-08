@@ -32,12 +32,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
 from database.models import Run
+from api.dependencies import require_user
 from src.services.run_manager import run_manager
 from services.sse_broker import get_broker
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["runs"])
+router = APIRouter(prefix="/api", tags=["runs"], dependencies=[Depends(require_user)])
 
 # ---------------------------------------------------------------------------
 # Pydantic Schemas

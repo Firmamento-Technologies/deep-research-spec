@@ -26,6 +26,13 @@ async def test_create_run_success(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_runs_requires_authentication(unauthenticated_client: AsyncClient):
+    """Test /api/runs endpoints reject unauthenticated requests."""
+    response = await unauthenticated_client.get("/api/runs")
+    assert response.status_code in (401, 403)
+
+
+@pytest.mark.asyncio
 async def test_create_run_validation_error(async_client: AsyncClient):
     """Test POST /api/runs with invalid data."""
     # Invalid quality preset

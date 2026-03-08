@@ -5,6 +5,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.dependencies import require_user
 from database.connection import get_db
 from database.models import Run, Section
 from services.export_service import (
@@ -14,7 +15,11 @@ from services.export_service import (
     CitationStyle,
 )
 
-router = APIRouter(prefix="/api/runs", tags=["exports"])
+router = APIRouter(
+    prefix="/api/runs",
+    tags=["exports"],
+    dependencies=[Depends(require_user)],
+)
 
 
 @router.get("/{doc_id}/export/pdf")
