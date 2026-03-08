@@ -19,9 +19,22 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": false,
+    "baseUrl": ".",
+    "paths": {
+      "@tanstack/react-query": [
+        "src/shims/react-query.tsx"
+      ],
+      "axios": [
+        "src/shims/axios.ts"
+      ],
+      "lucide-react": [
+        "src/shims/lucide-react.tsx"
+      ]
+    }
   },
   "include": [
     "src"

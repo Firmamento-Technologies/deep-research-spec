@@ -39,7 +39,7 @@ from services.semantic_search import search_chunks, SearchError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/spaces", tags=["Knowledge Spaces"])
+router = APIRouter(prefix="/api/spaces", tags=["Knowledge Spaces"])
 
 # Configuration
 UPLOAD_DIR = Path("/data/spaces")  # Or from env: os.getenv("SPACES_UPLOAD_DIR")

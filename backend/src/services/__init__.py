@@ -1,7 +1,6 @@
-"""DRS services package."""
-from src.services.run_manager import run_manager, configure_run_manager
+"""DRS services package.
 
-__all__ = [
-    "run_manager",
-    "configure_run_manager",
-]
+Avoid importing heavy runtime dependencies at package import time.
+"""
+
+__all__ = []

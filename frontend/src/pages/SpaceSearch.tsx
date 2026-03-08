@@ -16,7 +16,7 @@ interface SearchResult {
 }
 
 export const SpaceSearch: React.FC = () => {
-  const { id: spaceId } = useParams<{ id: string }>();
+  const { spaceId } = useParams<{ spaceId: string }>();
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
 

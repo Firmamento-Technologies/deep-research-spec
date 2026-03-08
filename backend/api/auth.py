@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
@@ -31,6 +31,8 @@ class LoginRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     username: str
@@ -47,6 +49,10 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -179,11 +185,11 @@ async def logout(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
-    refresh_token: str,
+    request: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """Refresh access token using refresh token."""
-    payload = AuthService.decode_token(refresh_token)
+    payload = AuthService.decode_token(request.refresh_token)
     
     if payload.get("type") != "refresh":
         raise HTTPException(

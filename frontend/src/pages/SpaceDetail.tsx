@@ -23,7 +23,7 @@ interface Space {
 }
 
 export const SpaceDetail: React.FC = () => {
-  const { id: spaceId } = useParams<{ id: string }>();
+  const { spaceId } = useParams<{ spaceId: string }>();
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Map<string, number>>(new Map());
   const queryClient = useQueryClient();
