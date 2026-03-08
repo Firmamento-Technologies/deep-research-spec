@@ -4,18 +4,19 @@ import type { NodeState } from '../../store/useRunStore'
 
 const CANVAS_WIDTH = 2400
 const CANVAS_HEIGHT = 3200
-const MAP_W = 160
-const MAP_H = 100
+const MAP_W = 180
+const MAP_H = 112
 const SCALE_X = MAP_W / CANVAS_WIDTH
 const SCALE_Y = MAP_H / CANVAS_HEIGHT
 
 interface PipelineMinimapProps {
   nodeStates: Record<string, NodeState>
+  visibleNodeIds: Set<string>
   viewport: { zoom: number; panX: number; panY: number }
   onMinimapClick: (nx: number, ny: number) => void
 }
 
-export function PipelineMinimap({ nodeStates, viewport, onMinimapClick }: PipelineMinimapProps) {
+export function PipelineMinimap({ nodeStates, visibleNodeIds, viewport, onMinimapClick }: PipelineMinimapProps) {
   const { zoom, panX, panY } = viewport
 
   const handleClick = useCallback(
@@ -28,7 +29,6 @@ export function PipelineMinimap({ nodeStates, viewport, onMinimapClick }: Pipeli
     [onMinimapClick]
   )
 
-  // Viewport rect in minimap coords
   const containerW = typeof window !== 'undefined' ? window.innerWidth : 1200
   const containerH = typeof window !== 'undefined' ? window.innerHeight : 800
   const vpW = (containerW / zoom) * SCALE_X
@@ -51,14 +51,8 @@ export function PipelineMinimap({ nodeStates, viewport, onMinimapClick }: Pipeli
         zIndex: 20,
       }}
     >
-      <svg
-        width={MAP_W}
-        height={MAP_H}
-        style={{ cursor: 'pointer' }}
-        onClick={handleClick}
-      >
-        {/* Node dots */}
-        {PIPELINE_NODES.map(node => {
+      <svg width={MAP_W} height={MAP_H} style={{ cursor: 'pointer' }} onClick={handleClick}>
+        {PIPELINE_NODES.filter((node) => visibleNodeIds.has(node.id)).map(node => {
           const status = nodeStates[node.id]?.status ?? 'waiting'
           const color = CLUSTER_COLORS[node.cluster]
           const mx = node.x * SCALE_X
@@ -76,7 +70,6 @@ export function PipelineMinimap({ nodeStates, viewport, onMinimapClick }: Pipeli
           )
         })}
 
-        {/* Viewport indicator */}
         <rect
           x={Math.max(0, vpX)}
           y={Math.max(0, vpY)}
