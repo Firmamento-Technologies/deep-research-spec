@@ -9,17 +9,27 @@ const client = axios.create({
   },
 });
 
-function withAuthHeaders(headers: Record<string, string> = {}) {
+function withAuthHeaders(headers = {}) {
   const token = localStorage.getItem('access_token');
   if (!token) return headers;
   return { ...headers, Authorization: `Bearer ${token}` };
 }
 
+function withConfig(config: any = {}) {
+  return {
+    ...config,
+    headers: withAuthHeaders(config.headers || {}),
+  };
+}
+
 export const api = {
-  get: (url: string, config: Record<string, unknown> = {}) =>
-    client.get(url, { ...(config as object), headers: withAuthHeaders((config.headers as Record<string, string>) || {}) }),
-  post: (url: string, data?: unknown, config: Record<string, unknown> = {}) =>
-    client.post(url, data as object, { ...(config as object), headers: withAuthHeaders((config.headers as Record<string, string>) || {}) }),
-  delete: (url: string, config: Record<string, unknown> = {}) =>
-    client.delete(url, { ...(config as object), headers: withAuthHeaders((config.headers as Record<string, string>) || {}) }),
+  get(url: string, config = {}) {
+    return client.get(url, withConfig(config));
+  },
+  post(url: string, data?: unknown, config = {}) {
+    return client.post(url, data, withConfig(config));
+  },
+  delete(url: string, config = {}) {
+    return client.delete(url, withConfig(config));
+  },
 };

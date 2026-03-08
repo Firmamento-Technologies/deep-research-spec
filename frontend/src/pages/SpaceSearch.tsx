@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery } from '../lib/query';
 import { Search, FileText } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { api } from '../lib/api';
@@ -16,7 +16,7 @@ interface SearchResult {
 }
 
 export const SpaceSearch: React.FC = () => {
-  const { spaceId } = useParams<{ spaceId: string }>();
+  const { spaceId } = useParams() as { spaceId?: string };
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebounce(query, 500);
 
