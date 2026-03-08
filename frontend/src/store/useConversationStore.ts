@@ -3,7 +3,7 @@
 // Spec: UI_BUILD_PLAN.md Section 6.
 
 import { create } from 'zustand'
-import { api } from '../lib/api'
+import { api, ApiError } from '../lib/api'
 import { useAppStore } from './useAppStore'
 import { useRunStore } from './useRunStore'
 import type { QualityPreset, RunState } from '../types/run'
@@ -120,18 +120,14 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
       const action = resp.data.action as Record<string, unknown> | null | undefined
 
       if (action?.type === 'START_RUN') {
-        // 1. Create run on backend
-        const params = action.params as Record<string, unknown>
-        const runResp = await api.post(
-          '/api/runs',
-          params,
-        )
+        const params = action.params as Record<string, unknown> | undefined
+        if (!params || typeof params.topic !== 'string') {
+          throw new Error('Companion action START_RUN missing valid params')
+        }
 
-        // 2. Update app state
+        const runResp = await api.post('/api/runs', params)
         appStore.setActiveDocId(runResp.data.doc_id)
         appStore.setState('PROCESSING')
-
-        // 3. Seed run store (real-time updates come via SSE)
         runStore.setActiveRun(buildInitialRunState(runResp.data.doc_id, params))
 
       } else if (action?.type === 'SHOW_SECTION') {
@@ -149,14 +145,24 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
 
     } catch (err) {
       console.error('[companion] error:', err)
-      const errorMsg = String(err)
-      const isAuthError = errorMsg.includes('401') || errorMsg.includes('502') || errorMsg.includes('503') || errorMsg.includes('Authentication') || errorMsg.includes('API_KEY') || errorMsg.includes('not configured')
+
+      const isApiError = err instanceof ApiError
+      const status = isApiError ? err.status : undefined
+      const message = isApiError ? err.message : String(err)
+
+      const isAuthError = status === 401 || status === 403 || status === 503 || /API_KEY|not configured|auth/i.test(message)
+      const isRateLimit = status === 429
+
+      const content = isAuthError
+        ? '⚠️ La chiave API OpenRouter non è configurata o non è valida. Vai in ⚙ Impostazioni per inserirla.'
+        : isRateLimit
+          ? '⚠️ Companion temporaneamente limitato (rate limit). Attendi qualche secondo e riprova.'
+          : 'Mi dispiace, ho riscontrato un problema di connessione con Companion. Riprova tra poco.'
+
       get().addMessage({
         id: crypto.randomUUID(),
         role: 'companion',
-        content: isAuthError
-          ? '⚠️ La chiave API OpenRouter non è configurata o non è valida. Vai in ⚙ Impostazioni per inserire la tua chiave API, oppure configura la variabile OPENROUTER_API_KEY nel file .env e riavvia i container Docker.'
-          : 'Mi dispiace, ho riscontrato un problema di connessione. Riprova tra qualche istante.',
+        content,
         timestamp: new Date(),
       })
     } finally {
