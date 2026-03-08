@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '../lib/query';
-import { Search, FileText } from 'lucide-react';
+import { Search, FileText } from '../lib/icons';
 import { Card } from '../components/ui/Card';
 import { api } from '../lib/api';
 import { useDebounce } from '../hooks/useDebounce';

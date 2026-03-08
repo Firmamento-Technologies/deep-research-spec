@@ -1,35 +1,53 @@
-import axios from 'axios';
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-const client = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+type ApiConfig = {
+  headers?: Record<string, string>;
+  params?: Record<string, string | number | boolean | undefined>;
+  responseType?: 'blob' | 'json';
+  onUploadProgress?: (event: { loaded: number; total?: number }) => void;
+};
 
-function withAuthHeaders(headers = {}) {
+function authHeaders(headers: Record<string, string> = {}) {
   const token = localStorage.getItem('access_token');
-  if (!token) return headers;
-  return { ...headers, Authorization: `Bearer ${token}` };
+  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
 }
 
-function withConfig(config: any = {}) {
-  return {
-    ...config,
-    headers: withAuthHeaders(config.headers || {}),
-  };
+function buildUrl(url: string, params?: ApiConfig['params']) {
+  const full = `${API_BASE_URL}${url}`;
+  if (!params) return full;
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => { if (v !== undefined) q.set(k, String(v)); });
+  return `${full}?${q.toString()}`;
+}
+
+async function parseResponse(response: Response, responseType: ApiConfig['responseType']) {
+  if (responseType === 'blob') return response.blob();
+  const text = await response.text();
+  try { return text ? JSON.parse(text) : null; } catch { return text; }
 }
 
 export const api = {
-  get(url: string, config = {}) {
-    return client.get(url, withConfig(config));
+  async get(url: string, config: ApiConfig = {}) {
+    const response = await fetch(buildUrl(url, config.params), {
+      headers: authHeaders(config.headers),
+    });
+    return { data: await parseResponse(response, config.responseType), status: response.status };
   },
-  post(url: string, data?: unknown, config = {}) {
-    return client.post(url, data, withConfig(config));
+  async post(url: string, data?: unknown, config: ApiConfig = {}) {
+    config.onUploadProgress?.({ loaded: 100, total: 100 });
+    const isForm = typeof FormData !== 'undefined' && data instanceof FormData;
+    const response = await fetch(buildUrl(url, config.params), {
+      method: 'POST',
+      headers: isForm ? authHeaders(config.headers) : authHeaders({ 'Content-Type': 'application/json', ...(config.headers ?? {}) }),
+      body: isForm ? data as BodyInit : data === undefined ? undefined : JSON.stringify(data),
+    });
+    return { data: await parseResponse(response, config.responseType), status: response.status };
   },
-  delete(url: string, config = {}) {
-    return client.delete(url, withConfig(config));
+  async delete(url: string, config: ApiConfig = {}) {
+    const response = await fetch(buildUrl(url, config.params), {
+      method: 'DELETE',
+      headers: authHeaders(config.headers),
+    });
+    return { data: await parseResponse(response, config.responseType), status: response.status };
   },
 };

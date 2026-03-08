@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '../lib/query';
-import { Upload, FileText, Trash2, Search } from 'lucide-react';
+import { Upload, FileText, Trash2, Search } from '../lib/icons';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { api } from '../lib/api';
