@@ -61,11 +61,18 @@ log_step "Runbook step: QA P0" "make qa-p0"
 log_step "Runbook step: QA P2" "make qa-p2"
 log_step "Runbook step: backend smoke" "curl -sf http://localhost:8000/health" warn
 log_step "Runbook step: SSE/HITL verification (unit reliability)" \
-  "python3 -m pytest tests/unit/test_hitl_approval_roundtrip.py tests/unit/test_sse_broker_reliability.py -q"
+  "python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py tests/unit/test_hitl_approval_roundtrip.py -q"
 
 if [[ "${ENABLE_STAGING_DEPLOY:-0}" == "1" ]]; then
-  log_step "Runbook step: deploy staging" "make deploy-staging"
-  log_step "Runbook step: health-check after staging deploy" "make health-check"
+  if docker info >/dev/null 2>&1; then
+    log_step "Runbook step: deploy staging" "make deploy-staging"
+    log_step "Runbook step: health-check after staging deploy" "make health-check"
+  else
+    log_step "Runbook step: deploy staging (docker unavailable in current env)" \
+      "echo 'Docker non disponibile: staging deploy non eseguibile in questo ambiente'" warn
+    log_step "Runbook step: health-check after staging deploy (docker unavailable in current env)" \
+      "echo 'Docker non disponibile: health-check post deploy staging non eseguibile'" warn
+  fi
 else
   log_step "Runbook step: deploy staging (disabled)" \
     "echo 'Set ENABLE_STAGING_DEPLOY=1 to execute make deploy-staging && make health-check' && exit 1" warn

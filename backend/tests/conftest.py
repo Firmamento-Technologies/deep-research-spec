@@ -3,7 +3,51 @@
 import asyncio
 import pytest
 from typing import AsyncGenerator
-from httpx import AsyncClient
+try:
+    from httpx import AsyncClient
+except ModuleNotFoundError:
+    from fastapi.testclient import TestClient
+
+    class _StreamResponse:
+        def __init__(self, response):
+            self._response = response
+            self.status_code = response.status_code
+            self.headers = response.headers
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aiter_lines(self):
+            for line in self._response.text.splitlines():
+                yield line
+
+    class AsyncClient:  # fallback for environments without httpx
+        def __init__(self, app, base_url="http://test"):
+            self._client = TestClient(app, base_url=base_url)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            self._client.close()
+            return False
+
+        async def get(self, url, **kwargs):
+            return self._client.get(url, **kwargs)
+
+        async def post(self, url, **kwargs):
+            return self._client.post(url, **kwargs)
+
+        async def delete(self, url, **kwargs):
+            return self._client.delete(url, **kwargs)
+
+        def stream(self, method, url, **kwargs):
+            response = self._client.request(method, url, **kwargs)
+            return _StreamResponse(response)
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
