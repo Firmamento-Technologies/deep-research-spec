@@ -251,9 +251,11 @@ async def get_run(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/runs/{doc_id}/stream")
-async def stream_run_events(doc_id: str):
+def _build_sse_response(doc_id: str) -> StreamingResponse:
     """Stream real-time SSE events for a run.
+
+    Shared implementation used by both `/stream` and `/events` routes
+    to keep backward compatibility across clients.
 
     Server-Sent Events (SSE) stream that emits graph execution events:
     - NODE_STARTED
@@ -299,6 +301,18 @@ async def stream_run_events(doc_id: str):
             "Connection": "keep-alive",
         },
     )
+
+
+@router.get("/runs/{doc_id}/stream")
+async def stream_run_events(doc_id: str):
+    """Legacy SSE endpoint for run events."""
+    return _build_sse_response(doc_id)
+
+
+@router.get("/runs/{doc_id}/events")
+async def stream_run_events_alias(doc_id: str):
+    """Frontend-compatible SSE endpoint alias for run events."""
+    return _build_sse_response(doc_id)
 
 
 @router.post("/runs/{doc_id}/approve-outline", status_code=200)
