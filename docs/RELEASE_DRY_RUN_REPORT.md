@@ -1,7 +1,7 @@
 # Release Dry-Run Report
 
-- Run ID: 20260309T162814Z
-- Generated (UTC): 2026-03-09T16:28:14Z
+- Run ID: 20260309T185752Z
+- Generated (UTC): 2026-03-09T18:57:52Z
 - Scope: qa-p0 + qa-p2(strict) + smoke + SSE/HITL verification + deploy-staging + health-check
 
 ## Runbook step: QA P0
@@ -32,6 +32,11 @@ QA_STRICT_RELEASE=1 make qa-p2
 make[1]: Entering directory '/workspace/deep-research-spec'
 [36mRunning P2 QA checks...[0m
 [qa-p2] Strict release mode enabled: frontend build and health smoke are blocking
+
+==> Frontend runtime bootstrap
+[frontend-runtime] Missing/incomplete frontend runtime
+[frontend-runtime] Run with BOOTSTRAP_FRONTEND_DEPS=1 or execute: npm --prefix frontend ci
+[FAIL] Frontend runtime bootstrap
 Missing backend test dependencies: pytest_asyncio, fastapi
 Install with: pip install -r backend/requirements.txt -r backend/requirements-test.txt
 [qa-p2] Backend test dependencies missing: enabling fallback API contract checks
@@ -46,7 +51,7 @@ Fallback API contract checks passed
 
 ==> Backend reliability/HITL race unit suite (fallback)
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.08s
+21 passed, 3 skipped in 0.10s
 [PASS] Backend reliability/HITL race unit suite (fallback)
 
 ==> Frontend typecheck
@@ -87,7 +92,7 @@ Node.js v22.21.1
 P2 QA summary
 PASS: 3
 WARN: 0
-FAIL: 3
+FAIL: 4
 ===============================
 make[1]: *** [Makefile:211: qa-p2] Error 1
 make[1]: Leaving directory '/workspace/deep-research-spec'
@@ -114,7 +119,7 @@ python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_bro
 
 ```text
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.08s
+21 passed, 3 skipped in 0.10s
 ```
 
 ## Runbook step: deploy staging

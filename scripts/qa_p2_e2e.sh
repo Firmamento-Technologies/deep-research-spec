@@ -89,6 +89,8 @@ check_frontend_toolchain() {
   fi
 }
 
+run_check fail "Frontend runtime bootstrap" bash scripts/ensure_frontend_runtime.sh
+
 if check_backend_test_dependencies; then
   echo "[qa-p2] Backend test dependencies available: full backend suites enabled"
 else

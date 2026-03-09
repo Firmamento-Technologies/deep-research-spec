@@ -49,6 +49,9 @@ action() {
 
 cd "$ROOT_DIR"
 
+action "Frontend runtime bootstrap" \
+  "bash scripts/ensure_frontend_runtime.sh"
+
 action "Unit suite (budget + SSE + cancel race + HITL roundtrip)" \
   "python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py tests/unit/test_hitl_approval_roundtrip.py -q"
 

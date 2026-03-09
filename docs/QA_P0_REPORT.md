@@ -1,6 +1,19 @@
 # QA P0 Gate Report
 
-Generated: 2026-03-09T16:28:16Z
+Generated: 2026-03-09T18:57:54Z
+
+## Frontend runtime bootstrap
+
+\`\`\`bash
+bash scripts/ensure_frontend_runtime.sh
+\`\`\`
+
+- Status: FAIL ❌
+
+\`\`\`text
+[frontend-runtime] Missing/incomplete frontend runtime
+[frontend-runtime] Run with BOOTSTRAP_FRONTEND_DEPS=1 or execute: npm --prefix frontend ci
+\`\`\`
 
 ## Unit suite (budget + SSE + cancel race + HITL roundtrip)
 
@@ -12,7 +25,7 @@ python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_bro
 
 \`\`\`text
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.08s
+21 passed, 3 skipped in 0.11s
 \`\`\`
 
 ## Frontend TypeScript check
@@ -77,4 +90,4 @@ curl -sf http://localhost:8000/health
 
 - PASS: 2
 - WARN: 0
-- FAIL: 2
+- FAIL: 3
