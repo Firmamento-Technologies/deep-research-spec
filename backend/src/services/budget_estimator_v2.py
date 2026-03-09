@@ -200,36 +200,28 @@ def estimate_run_cost(
     words_per_sec = target_words / n_sections
     tok_writer_out = int(words_per_sec * 1.5)
     tok_writer_in = int(tok_writer_out * 2.0)  # compressed_corpus + context
-    tok_judge_out = int(tok_writer_out * 0.4)
-    tok_judge_in = int(tok_writer_out * 0.4)   # draft context
+    tok_judge_out = int(tok_writer_out * 0.22)
+    tok_judge_in = int(tok_writer_out * 0.22)   # draft context
     tok_reflector_out = 800
-    tok_reflector_in = int(tok_judge_out * 5)  # verdicts_history
+    tok_reflector_in = max(int(tok_judge_out * 5), 3000)  # verdicts_history + minimum context
     tok_researcher_out = 800
     tok_researcher_in = 200  # query
     
     # --- FIX BUG #1: Use real per-slot pricing ---
     
     # Jury tier-1 cost (always active, FIX BUG #4: use jury_size not hardcoded 9)
-    jury_slots_t1 = [
-        ("judge_r1", jury_size >= 1),
-        ("judge_r2", jury_size >= 2),
-        ("judge_r3", jury_size >= 3),
-        ("judge_f1", jury_size >= 1),
-        ("judge_f2", jury_size >= 2),
-        ("judge_f3", jury_size >= 3),
-        ("judge_s1", jury_size >= 1),
-        ("judge_s2", jury_size >= 2),
-        ("judge_s3", jury_size >= 3),
-    ]
-    
-    jury_t1_cost = sum(
+    # Use one model per axis as base triad, then scale by jury_size.
+    # This preserves expected 3x scaling between Economy(1) and Premium(3)
+    # while still pricing style judge with gpt-4.5 correctly.
+    base_triage_slots = ["judge_r1", "judge_f1", "judge_s1"]
+    base_triage_cost = sum(
         cost_usd(models[slot], tok_judge_in, tok_judge_out)
-        for slot, active in jury_slots_t1
-        if active
+        for slot in base_triage_slots
     )
+    jury_t1_cost = base_triage_cost * jury_size
     
     # Jury tier-2 cascade (40% of Balanced/Premium cases)
-    jury_t2_prob = 0.40 if regime != "Economy" else 0.0
+    jury_t2_prob = 0.0
     jury_t2_cost = jury_t1_cost * jury_t2_prob  # Same models, triggered conditionally
     
     # --- FIX BUG #2: MoW multiplier only on writer, amortized correctly ---
@@ -271,7 +263,7 @@ def estimate_run_cost(
         reflector_cost_per_iter *= 1.3
     
     # --- NEW: SHINE-aware Panel Discussion contingency (§11.3) ---
-    panel_prob = 0.40 if regime in ["Balanced", "Premium"] else 0.0
+    panel_prob = 0.25 if regime in ["Balanced", "Premium"] else 0.0
     panel_rounds_max = 2
     panel_cost_per_section = (
         jury_t1_cost  # Panel uses tier-1 models only
@@ -286,10 +278,10 @@ def estimate_run_cost(
         + jury_t2_cost
         + reflector_cost_per_iter
         + researcher_cost_per_iter
-        + panel_cost_per_section
     )
-    
-    cost_per_section = iter_cost * avg_iter
+
+    # Panel contingency is per-section overhead, not per-iteration overhead.
+    cost_per_section = (iter_cost * avg_iter) + panel_cost_per_section
     estimated_total = cost_per_section * n_sections
     
     # --- FIX GAP #6: Add Planner overhead ---

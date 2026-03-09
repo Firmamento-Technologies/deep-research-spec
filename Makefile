@@ -5,7 +5,7 @@
 .PHONY: deploy-dev deploy-staging deploy-prod health-check rollback
 .PHONY: ci-build ci-test ci-lint ci-deploy
 .PHONY: logs-backend logs-frontend logs-postgres logs-redis
-.PHONY: prune reset graph-viz
+.PHONY: prune reset graph-viz qa-p0 qa-p2 release-dry-run
 
 # =============================================================================
 # DRS Makefile — Deployment & Development
@@ -200,6 +200,19 @@ ci-lint: lint typecheck ## CI: Lint + type check
 ci-deploy: ## CI: Deploy (usage: make ci-deploy ENV=staging)
 	@echo "$(CYAN)CI deploying to $(ENV)...$(RESET)"
 	@bash scripts/deploy.sh
+
+
+qa-p0: ## Run P0 QA gate checks and generate docs/QA_P0_REPORT.md
+	@echo "$(CYAN)Running P0 QA gate checks...$(RESET)"
+	@bash scripts/qa_p0_gate_check.sh
+
+qa-p2: ## Run P2 API/QA hardening checks
+	@echo "$(CYAN)Running P2 QA checks...$(RESET)"
+	@bash scripts/qa_p2_e2e.sh
+
+release-dry-run: ## Run release dry-run and generate docs/RELEASE_DRY_RUN_REPORT.md
+	@echo "$(CYAN)Running release dry-run...$(RESET)"
+	@bash scripts/release_dry_run.sh
 
 
 # =============================================================================

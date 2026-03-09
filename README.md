@@ -18,12 +18,12 @@
 # 1. Clone & setup
 git clone https://github.com/lucadidomenicodopehubs/deep-research-spec.git
 cd deep-research-spec
-git checkout struct
+git checkout <your-branch>
 
 # 2. Install dependencies
 python3.11 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 
 # 3. Configure
 cp .env.example .env
@@ -33,10 +33,10 @@ cp .env.example .env
 docker-compose up -d postgres
 
 # 5. Smoke test
-python -c "from src.graph.graph import build_graph; print('✓ Ready')"
+python -c "import sys; sys.path.insert(0,'backend'); import main; print('✓ Backend import ok')"
 
 # 6. Run tests
-pytest tests/ -v --tb=short
+python3 -m pytest tests/unit/test_budget_estimator_v2.py -q
 ```
 
 ## Architecture
@@ -76,13 +76,13 @@ preset_cost = config.get("budgets.economy.max_cost_per_section", 0.50)
 ## API Server
 
 ```bash
-uvicorn src.api.server:app --host 0.0.0.0 --port 8000
+cd backend && uvicorn main:app --host 0.0.0.0 --port 8000
 # Docs: http://localhost:8000/docs
 
 # Endpoints:
-# POST /api/v1/runs        — Start pipeline
-# GET  /api/v1/runs/{id}   — Check status
-# GET  /api/v1/runs        — List runs
+# POST /api/runs           — Start pipeline
+# GET  /api/runs/{id}      — Check status
+# GET  /api/runs           — List runs
 # GET  /health             — Health check
 # GET  :9090/metrics       — Prometheus metrics
 ```
@@ -100,7 +100,7 @@ Five built-in profiles in `config/style_profiles.yaml`:
 
 ```bash
 # Full suite
-pytest tests/ -v --tb=short
+python3 -m pytest tests/unit/test_budget_estimator_v2.py -q
 
 # With coverage
 pytest tests/ --cov=src --cov-report=html

@@ -25,19 +25,20 @@ from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db
 from database.models import Run
+from api.dependencies import require_user
 from src.services.run_manager import run_manager
 from services.sse_broker import get_broker
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["runs"])
+router = APIRouter(prefix="/api", tags=["runs"], dependencies=[Depends(require_user)])
 
 # ---------------------------------------------------------------------------
 # Pydantic Schemas
@@ -250,9 +251,11 @@ async def get_run(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@router.get("/runs/{doc_id}/stream")
-async def stream_run_events(doc_id: str):
+def _build_sse_response(doc_id: str) -> StreamingResponse:
     """Stream real-time SSE events for a run.
+
+    Shared implementation used by both `/stream` and `/events` routes
+    to keep backward compatibility across clients.
 
     Server-Sent Events (SSE) stream that emits graph execution events:
     - NODE_STARTED
@@ -300,6 +303,18 @@ async def stream_run_events(doc_id: str):
     )
 
 
+@router.get("/runs/{doc_id}/stream")
+async def stream_run_events(doc_id: str):
+    """Legacy SSE endpoint for run events."""
+    return _build_sse_response(doc_id)
+
+
+@router.get("/runs/{doc_id}/events")
+async def stream_run_events_alias(doc_id: str):
+    """Frontend-compatible SSE endpoint alias for run events."""
+    return _build_sse_response(doc_id)
+
+
 @router.post("/runs/{doc_id}/approve-outline", status_code=200)
 async def approve_outline(
     doc_id: str,
@@ -318,25 +333,27 @@ async def approve_outline(
         Success message.
 
     Note:
-        Full HITL implementation requires LangGraph interrupt + resume.
-        For MVP, this emits an event and logs.
+        The endpoint forwards the approval payload to RunManager which resolves
+        broker waiters so planner/writer nodes can continue execution.
     """
     logger.info(
         "Outline approved for run %s (approved=%s, sections=%s)",
         doc_id, body.approved, len(body.sections) if body.sections else 0,
     )
 
-    # Emit event via broker
-    broker = get_broker()
-    await broker.emit(doc_id, "OUTLINE_APPROVED", {
-        "approved": body.approved,
-        "sections": body.sections,
-    })
+    try:
+        await run_manager.resume_run(
+            doc_id,
+            user_input={
+                "type": "outline_approval",
+                "approved": body.approved,
+                "sections": body.sections,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    # TODO: Resume graph with user input
-    # await run_manager.resume_run(doc_id, user_input=body.dict())
-
-    return {"status": "ok", "message": "Outline approved"}
+    return {"status": "ok", "message": "Outline approval received"}
 
 
 @router.post("/runs/{doc_id}/approve-section", status_code=200)
@@ -356,33 +373,35 @@ async def approve_section(
         Success message.
 
     Note:
-        Full HITL implementation requires LangGraph interrupt + resume.
-        For MVP, this emits an event.
+        The endpoint forwards the approval payload to RunManager which resolves
+        broker waiters so writer flow can continue execution.
     """
     logger.info(
         "Section %d approved for run %s (approved=%s)",
         body.section_idx, doc_id, body.approved,
     )
 
-    # Emit event via broker
-    broker = get_broker()
-    await broker.emit(doc_id, "SECTION_APPROVED", {
-        "section_idx": body.section_idx,
-        "approved": body.approved,
-        "content": body.content,
-    })
+    try:
+        await run_manager.resume_run(
+            doc_id,
+            user_input={
+                "type": "section_approval",
+                "section_idx": body.section_idx,
+                "approved": body.approved,
+                "content": body.content,
+            },
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    # TODO: Resume graph
-    # await run_manager.resume_run(doc_id, user_input=body.dict())
-
-    return {"status": "ok", "message": "Section approved"}
+    return {"status": "ok", "message": "Section approval received"}
 
 
 @router.delete("/runs/{doc_id}", status_code=204)
 async def cancel_run(
     doc_id: str,
     db: AsyncSession = Depends(get_db),
-):
+) -> Response:
     """Cancel an active run.
 
     Gracefully stops the graph execution and updates DB status.
@@ -402,7 +421,7 @@ async def cancel_run(
 
     try:
         await run_manager.cancel_run(doc_id)
-        return {"status": "ok"}
+        return Response(status_code=204)
 
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

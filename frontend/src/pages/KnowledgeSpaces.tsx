@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Folder, Trash2 } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '../lib/query';
+import { Plus, Folder, Trash2 } from '../lib/icons';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';

@@ -8,6 +8,8 @@ const CANVAS_HEIGHT = 3200
 
 interface PipelineEdgesProps {
   nodeStates: Record<string, NodeState>
+  visibleNodeIds: Set<string>
+  showLabels: boolean
 }
 
 function getNodeCenter(node: NodeDefinition) {
@@ -17,12 +19,17 @@ function getNodeCenter(node: NodeDefinition) {
   }
 }
 
-export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
+export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: PipelineEdgesProps) {
   const nodeMap = useMemo(() => {
     const map: Record<string, NodeDefinition> = {}
     PIPELINE_NODES.forEach(n => { map[n.id] = n })
     return map
   }, [])
+
+  const visibleEdges = useMemo(
+    () => PIPELINE_EDGES.filter((e) => visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)),
+    [visibleNodeIds],
+  )
 
   return (
     <svg
@@ -37,7 +44,7 @@ export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
       }}
     >
       <defs>
-        {PIPELINE_EDGES.map(edge => {
+        {visibleEdges.map(edge => {
           const fromNode = nodeMap[edge.from]
           if (!fromNode) return null
           const color = CLUSTER_COLORS[fromNode.cluster]
@@ -57,7 +64,7 @@ export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
         })}
       </defs>
 
-      {PIPELINE_EDGES.map(edge => {
+      {visibleEdges.map(edge => {
         const fromNode = nodeMap[edge.from]
         const toNode = nodeMap[edge.to]
         if (!fromNode || !toNode) return null
@@ -67,23 +74,19 @@ export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
         const color = CLUSTER_COLORS[fromNode.cluster]
         const fromStatus = nodeStates[edge.from]?.status
         const isActive = fromStatus === 'running' && edge.animated
-        const opacity = edge.type === 'dotted' ? 0.35 : 0.55
+        const opacity = edge.type === 'dotted' ? 0.28 : 0.48
 
-        // Calculate bezier control points for back-loop edges
         const dx = to.x - from.x
         const dy = to.y - from.y
         let pathD: string
 
         if (Math.abs(dy) < 10 && Math.abs(dx) > 100) {
-          // Horizontal-ish — slight curve
           const cy = from.y - 40
           pathD = `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${cy} ${to.x} ${to.y}`
         } else if (dy < 0) {
-          // Back-loop (going upward)
           const offset = 120
           pathD = `M ${from.x} ${from.y} C ${from.x + offset} ${from.y} ${to.x + offset} ${to.y} ${to.x} ${to.y}`
         } else {
-          // Normal downward flow
           const cy1 = from.y + dy * 0.4
           const cy2 = from.y + dy * 0.6
           pathD = `M ${from.x} ${from.y} C ${from.x} ${cy1} ${to.x} ${cy2} ${to.x} ${to.y}`
@@ -102,14 +105,13 @@ export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
               id={pathId}
               d={pathD}
               stroke={color}
-              strokeWidth={1.5}
+              strokeWidth={1.4}
               strokeDasharray={strokeDasharray}
               fill="none"
               opacity={opacity}
               markerEnd={`url(#arrow-${edge.id})`}
             />
 
-            {/* Particle animation when active */}
             {isActive && (
               <circle r="4" fill={color} opacity={0.9}>
                 <animateMotion dur="1.5s" repeatCount="indefinite">
@@ -118,15 +120,14 @@ export function PipelineEdges({ nodeStates }: PipelineEdgesProps) {
               </circle>
             )}
 
-            {/* Edge label for conditional branches */}
-            {edge.label && (
+            {showLabels && edge.label && (
               <text
                 x={(from.x + to.x) / 2}
                 y={(from.y + to.y) / 2 - 4}
                 fontSize={9}
                 fontFamily="monospace"
                 fill={color}
-                opacity={0.7}
+                opacity={0.72}
                 textAnchor="middle"
               >
                 {edge.label}

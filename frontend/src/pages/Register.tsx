@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Lock, Mail, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { Lock, Mail, User, AlertCircle, CheckCircle } from '../lib/icons';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();

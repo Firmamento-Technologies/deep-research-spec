@@ -1,10 +1,13 @@
 import type { RunState } from '../../store/useRunStore'
+import { useAppStore } from '../../store/useAppStore'
 
 interface PipelineHeaderProps {
   run: RunState | null
 }
 
 export function PipelineHeader({ run }: PipelineHeaderProps) {
+  const setState = useAppStore((s) => s.setState)
+
   if (!run) return null
 
   const budgetPct = run.maxBudget > 0
@@ -26,13 +29,13 @@ export function PipelineHeader({ run }: PipelineHeaderProps) {
         top: 0,
         left: 0,
         right: 0,
-        zIndex: 10,
-        background: 'rgba(10,11,15,0.85)',
+        zIndex: 30,
+        background: 'rgba(10,11,15,0.88)',
         borderBottom: '1px solid #2A2D3A',
-        padding: '6px 16px',
+        padding: '6px 12px',
         display: 'flex',
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
         fontSize: 12,
         fontFamily: 'monospace',
         color: '#F0F1F6',
@@ -60,50 +63,39 @@ export function PipelineHeader({ run }: PipelineHeaderProps) {
 
       <span style={{ color: budgetColor, letterSpacing: '0.5px' }}>{bar} {budgetPct}%</span>
 
-      {/* CSS Scores */}
       {run.cssScores && (
         <span style={{ color: '#8B8FA8', fontSize: 11 }}>
           CSS{' '}
           <span style={{ color: run.cssScores.content >= 0.65 ? '#22C55E' : '#EF4444' }}>
             C:{run.cssScores.content.toFixed(2)}
           </span>{' '}
-          <span style={{ color: run.cssScores.style >= 0.80 ? '#22C55E' : '#EF4444' }}>
+          <span style={{ color: run.cssScores.style >= 0.65 ? '#22C55E' : '#EF4444' }}>
             S:{run.cssScores.style.toFixed(2)}
+          </span>{' '}
+          <span style={{ color: run.cssScores.source >= 0.65 ? '#22C55E' : '#EF4444' }}>
+            Src:{run.cssScores.source.toFixed(2)}
           </span>
         </span>
       )}
 
-      {/* Hard stop banner */}
-      {run.hardStopFired && (
-        <span
+      <span style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+        <span style={{ color: '#9CA3AF', fontSize: 11 }}>Companion: ready</span>
+        <button
+          onClick={() => setState('CONVERSING')}
           style={{
-            background: '#F97316',
-            color: '#0A0B0F',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontWeight: 700,
+            background: '#202534',
+            color: '#D7DBF0',
+            border: '1px solid #3C435E',
+            borderRadius: 6,
+            padding: '3px 8px',
+            fontFamily: 'monospace',
             fontSize: 11,
           }}
+          title="Apri chat Companion senza interrompere il run"
         >
-          ⚠ HARD STOP
-        </span>
-      )}
-
-      {/* Oscillation badge */}
-      {run.oscillationDetected && (
-        <span
-          style={{
-            background: '#EAB30820',
-            border: '1px solid #EAB308',
-            color: '#EAB308',
-            padding: '2px 8px',
-            borderRadius: 4,
-            fontSize: 11,
-          }}
-        >
-          ⚠️ OSCILLAZIONE {run.oscillationType ? `[${run.oscillationType}]` : ''}
-        </span>
-      )}
+          Open Companion
+        </button>
+      </span>
     </div>
   )
 }

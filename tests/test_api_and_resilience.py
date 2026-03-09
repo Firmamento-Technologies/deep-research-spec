@@ -188,7 +188,7 @@ class TestAPIEndpoints(unittest.TestCase):
     def test_create_run(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
-        r = self.client.post("/api/v1/runs", json={
+        r = self.client.post("/api/runs", json={
             "topic": "Testing the Deep Research System",
             "target_words": 3000,
         })
@@ -204,23 +204,23 @@ class TestAPIEndpoints(unittest.TestCase):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
         # Create first
-        r1 = self.client.post("/api/v1/runs", json={"topic": "Get test topic"})
+        r1 = self.client.post("/api/runs", json={"topic": "Get test topic"})
         run_id = r1.json()["run_id"]
         # Get
-        r2 = self.client.get(f"/api/v1/runs/{run_id}")
+        r2 = self.client.get(f"/api/runs/{run_id}")
         self.assertEqual(r2.status_code, 200)
         self.assertEqual(r2.json()["run_id"], run_id)
 
     def test_get_run_not_found(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
-        r = self.client.get("/api/v1/runs/nonexistent-id")
+        r = self.client.get("/api/runs/nonexistent-id")
         self.assertEqual(r.status_code, 404)
 
     def test_list_runs(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
-        r = self.client.get("/api/v1/runs")
+        r = self.client.get("/api/runs")
         self.assertEqual(r.status_code, 200)
         self.assertIsInstance(r.json(), list)
 
@@ -228,15 +228,15 @@ class TestAPIEndpoints(unittest.TestCase):
     def test_cancel_run(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
-        r1 = self.client.post("/api/v1/runs", json={"topic": "Cancel test topic"})
+        r1 = self.client.post("/api/runs", json={"topic": "Cancel test topic"})
         run_id = r1.json()["run_id"]
-        r2 = self.client.delete(f"/api/v1/runs/{run_id}")
+        r2 = self.client.delete(f"/api/runs/{run_id}")
         self.assertEqual(r2.status_code, 204)
 
     def test_cancel_nonexistent(self):
         if not self.has_testclient:
             self.skipTest("TestClient not available")
-        r = self.client.delete("/api/v1/runs/fake-id")
+        r = self.client.delete("/api/runs/fake-id")
         self.assertEqual(r.status_code, 404)
 
     def test_openapi_docs(self):

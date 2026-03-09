@@ -5,8 +5,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core'
+  } from '@dnd-kit/core'
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -48,7 +47,7 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: any) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
       const oldIdx = sections.findIndex(s => s.id === active.id)

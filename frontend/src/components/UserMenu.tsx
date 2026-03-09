@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, LogOut, Settings, Shield, ChevronDown } from 'lucide-react';
+import { User, LogOut, Settings, Shield, ChevronDown } from '../lib/icons';
 
 export const UserMenu: React.FC = () => {
   const { user, logout } = useAuth();

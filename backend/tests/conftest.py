@@ -9,7 +9,9 @@ from sqlalchemy.orm import sessionmaker
 
 from database.models import Base
 from database.connection import get_db
+from api.dependencies import require_user
 from api.runs import router as runs_router
+from api.auth import router as auth_router
 from fastapi import FastAPI
 
 # ---------------------------------------------------------------------------
@@ -61,14 +63,34 @@ async def async_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, Non
     # Create test app
     app = FastAPI()
     app.include_router(runs_router)
+    app.include_router(auth_router)
     
     # Override DB dependency
     async def override_get_db():
         yield test_db
-    
+
+    async def override_require_user():
+        return {"id": "test-user", "role": "user"}
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_user] = override_require_user
     
     # Create async client
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+async def unauthenticated_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Create FastAPI test client without auth override."""
+    app = FastAPI()
+    app.include_router(runs_router)
+
+    async def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
 

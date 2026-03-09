@@ -218,8 +218,8 @@ class RunManager:
             )
             await db.commit()
 
-        # Cleanup
-        del active_runs[doc_id]
+        # Cleanup (idempotent: _run_graph_task may have already removed it)
+        active_runs.pop(doc_id, None)
         logger.info("Run %s cancelled and cleaned up", doc_id)
 
     async def resume_run(
@@ -243,16 +243,33 @@ class RunManager:
 
         logger.info("Resuming run %s with user input: %s", doc_id, user_input)
 
-        # TODO: Implement LangGraph resume with user input
-        # This requires:
-        # 1. Get latest checkpoint for thread_id=doc_id
-        # 2. Call graph.ainvoke() with user_input in config
-        # 3. Graph resumes from interrupt point
+        from services.sse_broker import get_broker
+        broker = get_broker()
 
-        # For MVP, we'll just log and emit an event
-        # Full implementation requires LangGraph interrupt() + get_state() API
+        approval_type = str(user_input.get("type", ""))
+        if approval_type == "outline_approval":
+            payload = {
+                "approved": bool(user_input.get("approved", True)),
+                "sections": user_input.get("sections"),
+            }
+            await broker.submit_outline_approval(doc_id, payload)
+            await broker.emit(doc_id, "OUTLINE_APPROVED", payload)
 
-        logger.warning("Resume functionality not yet implemented (MVP stub)")
+        elif approval_type == "section_approval":
+            section_idx = int(user_input.get("section_idx", 0))
+            payload = {
+                "section_idx": section_idx,
+                "approved": bool(user_input.get("approved", True)),
+                "content": user_input.get("content"),
+            }
+            await broker.submit_section_approval(doc_id, section_idx, payload)
+            await broker.emit(doc_id, "SECTION_APPROVED", payload)
+
+        else:
+            raise ValueError(f"Unsupported resume input type: {approval_type!r}")
+
+        await self._update_run_status(doc_id, "running")
+        await broker.emit(doc_id, "RUN_RESUMED", {"type": approval_type})
 
     async def get_run_status(self, doc_id: str) -> Dict[str, Any]:
         """Get current status of a run.
@@ -392,9 +409,9 @@ class RunManager:
             })
 
         finally:
-            # Cleanup active runs
-            if doc_id in active_runs:
-                del active_runs[doc_id]
+            # Cleanup active runs (idempotent; cancel path may race)
+            removed = active_runs.pop(doc_id, None)
+            if removed is not None:
                 logger.info("[%s] Cleaned up from active_runs", doc_id)
 
     async def _update_run_status(self, doc_id: str, status: str) -> None:

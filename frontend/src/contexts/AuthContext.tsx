@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../lib/api';
-import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: string;

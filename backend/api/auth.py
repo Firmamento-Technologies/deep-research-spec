@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime
@@ -31,6 +31,8 @@ class LoginRequest(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     email: str
     username: str
@@ -47,6 +49,10 @@ class TokenResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -179,45 +185,75 @@ async def logout(
 
 @router.post("/refresh", response_model=TokenResponse)
 async def refresh(
-    refresh_token: str,
+    request: RefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Refresh access token using refresh token."""
-    payload = AuthService.decode_token(refresh_token)
-    
+    """Refresh access token using a valid, non-revoked refresh token."""
+    payload = AuthService.decode_token(request.refresh_token)
+
     if payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token"
         )
-    
+
     user_id = payload.get("sub")
+    if not isinstance(user_id, str) or not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
+
+    session_result = await db.execute(
+        select(Session).where(
+            Session.user_id == user_id,
+            Session.refresh_token == request.refresh_token,
+        )
+    )
+    session = session_result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh session not found or revoked"
+        )
+
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
-    
+
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
         )
-    
-    # Create new tokens
+
+    # Create new tokens (rotate refresh token on every successful refresh)
     access_token = AuthService.create_access_token(user.id, user.email, user.role)
     new_refresh_token = AuthService.create_refresh_token(user.id)
-    
-    # Update session
+
+    # Atomic rotation: only succeeds if old refresh token is still current.
     new_payload = AuthService.decode_token(access_token)
-    await db.execute(
+    update_result = await db.execute(
         update(Session)
-        .where(Session.token_jti == payload["jti"])
+        .where(
+            Session.id == session.id,
+            Session.refresh_token == request.refresh_token,
+        )
         .values(
             token_jti=new_payload["jti"],
             refresh_token=new_refresh_token,
             expires_at=datetime.fromtimestamp(new_payload["exp"]),
         )
     )
+
+    if update_result.rowcount != 1:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token rotation failed"
+        )
+
     await db.commit()
-    
+
     return TokenResponse(
         access_token=access_token,
         refresh_token=new_refresh_token,

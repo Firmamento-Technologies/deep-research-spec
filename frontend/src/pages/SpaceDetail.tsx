@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, FileText, Trash2, Search } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '../lib/query';
+import { Upload, FileText, Trash2, Search } from '../lib/icons';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { api } from '../lib/api';
@@ -23,7 +23,7 @@ interface Space {
 }
 
 export const SpaceDetail: React.FC = () => {
-  const { id: spaceId } = useParams<{ id: string }>();
+  const { spaceId } = useParams() as { spaceId?: string };
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Map<string, number>>(new Map());
   const queryClient = useQueryClient();
@@ -59,7 +59,7 @@ export const SpaceDetail: React.FC = () => {
 
         return api.post(`/api/spaces/${spaceId}/sources`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (event) => {
+          onUploadProgress: (event: { loaded: number; total?: number }) => {
             if (event.total) {
               const progress = (event.loaded / event.total) * 100;
               setUploadProgress(prev => new Map(prev).set(file.name, progress));
