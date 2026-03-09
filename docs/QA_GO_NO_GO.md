@@ -52,6 +52,8 @@ Questa checklist definisce il gate minimo per dichiarare il software pronto al t
 
 Compilare ad ogni release candidate:
 
+- [ ] `make qa-p0` (genera `docs/QA_P0_REPORT.md` con evidenze)
+
 - [ ] `python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py -q`
 - [ ] `node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json`
 - [ ] `npm --prefix frontend run build`
