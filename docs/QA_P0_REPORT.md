@@ -1,6 +1,6 @@
 # QA P0 Gate Report
 
-Generated: 2026-03-09T14:48:38Z
+Generated: 2026-03-09T15:06:38Z
 
 ## Unit suite (budget + SSE + cancel race + HITL roundtrip)
 
@@ -12,7 +12,7 @@ python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_bro
 
 \`\`\`text
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.10s
+21 passed, 3 skipped in 0.11s
 \`\`\`
 
 ## Frontend TypeScript check
@@ -53,7 +53,7 @@ dist/assets/index-9qkDo7LE.js   609.39 kB │ gzip: 173.50 kB
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 6.56s
+✓ built in 6.77s
 \`\`\`
 
 ## Backend health smoke (requires running backend on :8000)

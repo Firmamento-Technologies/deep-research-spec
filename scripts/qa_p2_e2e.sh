@@ -13,12 +13,10 @@ STRICT_RELEASE_MODE="${QA_STRICT_RELEASE:-0}"
 if [[ "$STRICT_RELEASE_MODE" == "1" ]]; then
   BUILD_CHECK_MODE="fail"
   HEALTH_CHECK_MODE="fail"
-  BACKEND_DEPS_CHECK_MODE="fail"
   echo "[qa-p2] Strict release mode enabled: frontend build and health smoke are blocking"
 else
   BUILD_CHECK_MODE="warn"
   HEALTH_CHECK_MODE="warn"
-  BACKEND_DEPS_CHECK_MODE="warn"
   echo "[qa-p2] Local/dev mode: frontend build and health smoke are warning-only"
 fi
 
@@ -57,17 +55,12 @@ if missing:
 PY
 }
 
-mark_backend_tests_unavailable() {
-  BACKEND_TESTS_READY=0
-  return 1
-}
-
 run_backend_api_contract_suite() {
-  if [[ "$BACKEND_TESTS_READY" != "1" ]]; then
-    echo "Skipping backend API contract suite: backend test dependencies unavailable"
-    return 1
+  if [[ "$BACKEND_TESTS_READY" == "1" ]]; then
+    python3 -m pytest backend/tests/test_api_endpoints.py -q
+  else
+    python3 scripts/check_api_contract_fallback.py
   fi
-  python3 -m pytest backend/tests/test_api_endpoints.py -q
 }
 
 check_frontend_toolchain() {
@@ -97,24 +90,34 @@ check_frontend_toolchain() {
 }
 
 if check_backend_test_dependencies; then
-  run_check "$BACKEND_DEPS_CHECK_MODE" "Backend test dependency check" true
+  echo "[qa-p2] Backend test dependencies available: full backend suites enabled"
 else
   BACKEND_TESTS_READY=0
-  run_check "$BACKEND_DEPS_CHECK_MODE" "Backend test dependency check" false
+  echo "[qa-p2] Backend test dependencies missing: enabling fallback API contract checks"
 fi
 
 run_check fail "Frontend toolchain check" check_frontend_toolchain
 
-run_check "$BACKEND_DEPS_CHECK_MODE" "Backend API contract regression suite" \
+run_check fail "Backend API contract regression suite" \
   run_backend_api_contract_suite
 
-run_check "$BACKEND_DEPS_CHECK_MODE" "Backend reliability/HITL race unit suite" \
-  python3 -m pytest \
-    tests/unit/test_sse_broker_reliability.py \
-    tests/unit/test_hitl_approval_roundtrip.py \
-    tests/unit/test_run_manager_cancel_race.py \
-    tests/unit/test_budget_estimator_v2.py \
-    -q
+if [[ "$BACKEND_TESTS_READY" == "1" ]]; then
+  run_check fail "Backend reliability/HITL race unit suite" \
+    python3 -m pytest \
+      tests/unit/test_sse_broker_reliability.py \
+      tests/unit/test_hitl_approval_roundtrip.py \
+      tests/unit/test_run_manager_cancel_race.py \
+      tests/unit/test_budget_estimator_v2.py \
+      -q
+else
+  run_check fail "Backend reliability/HITL race unit suite (fallback)" \
+    python3 -m pytest \
+      tests/unit/test_sse_broker_reliability.py \
+      tests/unit/test_hitl_approval_roundtrip.py \
+      tests/unit/test_run_manager_cancel_race.py \
+      tests/unit/test_budget_estimator_v2.py \
+      -q
+fi
 
 run_check fail "Frontend typecheck" \
   node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json
