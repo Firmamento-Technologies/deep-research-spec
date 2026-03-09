@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import logging
 import bcrypt
 import jwt
 from datetime import datetime, timedelta
@@ -11,15 +12,23 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.models import User, Session
+from config.settings import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
     """Authentication and authorization service."""
     
-    SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+    SECRET_KEY = os.getenv("JWT_SECRET_KEY") or settings.jwt_secret_key
     ALGORITHM = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour
     REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 days
+
+    if not SECRET_KEY:
+        SECRET_KEY = uuid.uuid4().hex
+        logger.warning("JWT_SECRET_KEY not configured: using ephemeral in-memory secret")
     
     @staticmethod
     def hash_password(password: str) -> str:

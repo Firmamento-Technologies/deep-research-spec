@@ -1,9 +1,12 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 30000);
 
 type ApiConfig = {
   headers?: Record<string, string>;
   params?: Record<string, string | number | boolean | undefined>;
   responseType?: 'blob' | 'json';
+  timeoutMs?: number;
+  signal?: AbortSignal;
   onUploadProgress?: (event: { loaded: number; total?: number }) => void;
 };
 
@@ -52,29 +55,61 @@ function toErrorMessage(status: number, payload: unknown): string {
   return `Request failed with status ${status}`;
 }
 
-async function request(method: 'GET' | 'POST' | 'DELETE', url: string, data?: unknown, config: ApiConfig = {}) {
-  config.onUploadProgress?.({ loaded: 100, total: 100 });
-  const isForm = typeof FormData !== 'undefined' && data instanceof FormData;
+function mergeSignals(timeoutSignal: AbortSignal, externalSignal?: AbortSignal): AbortSignal {
+  if (!externalSignal) return timeoutSignal;
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([timeoutSignal, externalSignal]);
+  }
 
-  const response = await fetch(buildUrl(url, config.params), {
-    method,
-    headers:
-      method === 'POST' && !isForm
-        ? authHeaders({ 'Content-Type': 'application/json', ...(config.headers ?? {}) })
-        : authHeaders(config.headers),
-    body:
-      method === 'POST'
-        ? isForm
-          ? (data as BodyInit)
-          : data === undefined
-            ? undefined
-            : JSON.stringify(data)
-        : undefined,
-  });
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  timeoutSignal.addEventListener('abort', abort, { once: true });
+  externalSignal.addEventListener('abort', abort, { once: true });
+  return controller.signal;
+}
+
+async function request(method: 'GET' | 'POST' | 'DELETE', url: string, data?: unknown, config: ApiConfig = {}) {
+  if (config.onUploadProgress && typeof FormData !== 'undefined' && data instanceof FormData) {
+    config.onUploadProgress({ loaded: 0 });
+  }
+
+  const isForm = typeof FormData !== 'undefined' && data instanceof FormData;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = mergeSignals(timeoutSignal, config.signal);
+
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(url, config.params), {
+      method,
+      signal,
+      headers:
+        method === 'POST' && !isForm
+          ? authHeaders({ 'Content-Type': 'application/json', ...(config.headers ?? {}) })
+          : authHeaders(config.headers),
+      body:
+        method === 'POST'
+          ? isForm
+            ? (data as BodyInit)
+            : data === undefined
+              ? undefined
+              : JSON.stringify(data)
+          : undefined,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(408, `Request timeout after ${timeoutMs}ms`, null);
+    }
+    throw new ApiError(0, 'Network request failed', err);
+  }
 
   const payload = await parseResponse(response, config.responseType);
   if (!response.ok) {
     throw new ApiError(response.status, toErrorMessage(response.status, payload), payload);
+  }
+
+  if (config.onUploadProgress && typeof FormData !== 'undefined' && data instanceof FormData) {
+    config.onUploadProgress({ loaded: 100, total: 100 });
   }
 
   return { data: payload, status: response.status };

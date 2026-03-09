@@ -25,7 +25,7 @@ from typing import List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -387,7 +387,7 @@ async def approve_section(
 async def cancel_run(
     doc_id: str,
     db: AsyncSession = Depends(get_db),
-):
+) -> Response:
     """Cancel an active run.
 
     Gracefully stops the graph execution and updates DB status.
@@ -407,7 +407,7 @@ async def cancel_run(
 
     try:
         await run_manager.cancel_run(doc_id)
-        return {"status": "ok"}
+        return Response(status_code=204)
 
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

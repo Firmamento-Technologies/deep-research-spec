@@ -1,6 +1,5 @@
 """Application settings from environment variables."""
 
-import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -55,7 +54,7 @@ class Settings(BaseSettings):
     rlm_allow_tier_upgrade: bool = Field(default=False, alias="RLM_ALLOW_TIER_UPGRADE")
     
     # JWT Authentication
-    jwt_secret_key: str = Field(default="dev-secret-change-in-production", alias="JWT_SECRET_KEY")
+    jwt_secret_key: str = Field(default="", alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_token_expire_minutes: int = Field(default=30, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
     jwt_refresh_token_expire_days: int = Field(default=7, alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS")
@@ -76,9 +75,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# Debug output
-if os.getenv("DEBUG") == "true":
-    print(f"[Settings] .env file: {ENV_FILE}")
-    print(f"[Settings] .env exists: {ENV_FILE.exists()}")
-    print(f"[Settings] DATABASE_URL loaded: {settings.database_url[:50]}...")

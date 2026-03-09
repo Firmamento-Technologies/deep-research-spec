@@ -218,8 +218,8 @@ class RunManager:
             )
             await db.commit()
 
-        # Cleanup
-        del active_runs[doc_id]
+        # Cleanup (idempotent: _run_graph_task may have already removed it)
+        active_runs.pop(doc_id, None)
         logger.info("Run %s cancelled and cleaned up", doc_id)
 
     async def resume_run(
@@ -409,9 +409,9 @@ class RunManager:
             })
 
         finally:
-            # Cleanup active runs
-            if doc_id in active_runs:
-                del active_runs[doc_id]
+            # Cleanup active runs (idempotent; cancel path may race)
+            removed = active_runs.pop(doc_id, None)
+            if removed is not None:
                 logger.info("[%s] Cleaned up from active_runs", doc_id)
 
     async def _update_run_status(self, doc_id: str, status: str) -> None:
