@@ -47,6 +47,7 @@ Compilare ad ogni release candidate:
 
 - [ ] `make qa-p0` (genera `docs/QA_P0_REPORT.md` con evidenze)
 - [ ] `make qa-p2` (suite P2: contract API + HITL/race + frontend type/build + smoke)
+- [ ] `make release-dry-run` (report unico con timestamp + GO/NO-GO)
 - [ ] `python3 -m pytest backend/tests/test_api_endpoints.py -q`
 - [ ] Smoke API: `curl -sf http://localhost:8000/health`
 
@@ -54,5 +55,5 @@ Compilare ad ogni release candidate:
 
 ## Criterio finale
 
-- **GO QA**: sezioni 1, 2, 3, 4, 5, 6 e 7 complete.
+- **GO QA**: sezioni 1, 2, 3, 4, 5, 6 e 7 complete con evidenze archiviate (`docs/QA_P0_REPORT.md`, `docs/RELEASE_DRY_RUN_REPORT.md`).
 - **NO-GO QA**: fallimento di uno qualsiasi dei gate bloccanti o regressioni runtime.

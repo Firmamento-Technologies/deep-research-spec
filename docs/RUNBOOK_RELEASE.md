@@ -8,9 +8,11 @@ Questo documento definisce la procedura operativa minima per release candidate e
 2. Esegui gate QA:
    - `make qa-p0`
    - `make qa-p2`
-3. Verifica smoke locale/ambiente target:
+3. Esegui dry-run release con evidenze aggregate:
+   - `make release-dry-run`
+4. Verifica smoke locale/ambiente target:
    - `curl -sf http://localhost:8000/health`
-4. Conferma compatibilità SSE frontend/backend su `/api/runs/{doc_id}/events`.
+5. Conferma compatibilità SSE frontend/backend su `/api/runs/{doc_id}/events`.
 
 ## 2. Deploy standard
 
@@ -57,5 +59,6 @@ Questo documento definisce la procedura operativa minima per release candidate e
 Archivia sempre:
 - output `make qa-p0`
 - output `make qa-p2`
+- output `make release-dry-run` (`docs/RELEASE_DRY_RUN_REPORT.md`)
 - timestamp deploy/rollback
 - eventuali warning non bloccanti e piano di remediation
