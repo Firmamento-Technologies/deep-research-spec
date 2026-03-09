@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 
 # Get backend directory path
 BACKEND_DIR = Path(__file__).parent.parent
@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     rlm_log_dir: str = Field(default="./logs/rlm", alias="RLM_LOG_DIR")
     rlm_allow_tier_upgrade: bool = Field(default=False, alias="RLM_ALLOW_TIER_UPGRADE")
     
+    # Runtime environment
+    app_env: str = Field(default="dev", alias="APP_ENV")
+
     # JWT Authentication
     jwt_secret_key: str = Field(default="", alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
@@ -68,6 +71,13 @@ class Settings(BaseSettings):
     # Concurrency
     max_concurrent_runs: int = Field(default=5, alias="MAX_CONCURRENT_RUNS")
     
+
+    @model_validator(mode="after")
+    def _validate_security_policy(self):
+        if self.app_env.lower() in {"prod", "production"} and not self.jwt_secret_key:
+            raise ValueError("JWT_SECRET_KEY is required when APP_ENV=production")
+        return self
+
     class Config:
         env_file = str(ENV_FILE)
         env_file_encoding = "utf-8"

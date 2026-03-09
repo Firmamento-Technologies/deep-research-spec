@@ -94,3 +94,15 @@ async def test_section_approval_persisted_without_waiter():
     content = await broker.wait_for_section_approval("doc-1", 2, default_content="default")
 
     assert content == "edited"
+
+
+@pytest.mark.asyncio
+async def test_cross_worker_persisted_approval_visible_to_other_broker_instance():
+    shared = FakeRedis()
+    broker_a = SSEBroker(shared)
+    broker_b = SSEBroker(shared)
+
+    await broker_a.submit_outline_approval("doc-cross", {"approved": True, "sections": [{"title": "X"}]})
+    sections = await broker_b.wait_for_outline_approval("doc-cross", default_sections=[])
+
+    assert sections == [{"title": "X"}]

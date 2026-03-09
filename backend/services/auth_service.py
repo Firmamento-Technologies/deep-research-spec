@@ -27,8 +27,9 @@ class AuthService:
     REFRESH_TOKEN_EXPIRE_DAYS = 30  # 30 days
 
     if not SECRET_KEY:
+        # Dev/test convenience only; production is enforced in config validator.
         SECRET_KEY = uuid.uuid4().hex
-        logger.warning("JWT_SECRET_KEY not configured: using ephemeral in-memory secret")
+        logger.warning("JWT_SECRET_KEY not configured (non-production): using ephemeral in-memory secret")
     
     @staticmethod
     def hash_password(password: str) -> str:

@@ -16,7 +16,7 @@ function toKeyString(queryKey: QueryKey): string {
 }
 
 export class QueryClient {
-  private cache = new Map<string, { data: unknown; updatedAt: number }>();
+  private cache = new Map<string, { data: unknown; updatedAt: number; key: QueryKey }>();
   private subscribers = new Map<string, Set<() => void>>();
 
   constructor(_config?: unknown) {}
@@ -27,7 +27,7 @@ export class QueryClient {
 
   setQueryData<T>(queryKey: QueryKey, data: T): void {
     const key = toKeyString(queryKey);
-    this.cache.set(key, { data, updatedAt: Date.now() });
+    this.cache.set(key, { data, updatedAt: Date.now(), key: queryKey });
     this.notifyKey(key);
   }
 
@@ -48,9 +48,10 @@ export class QueryClient {
   }
 
   invalidateQueries(args?: { queryKey?: QueryKey }): void {
-    const prefix = args?.queryKey ? toKeyString(args.queryKey).slice(0, -1) : null;
-    for (const key of this.cache.keys()) {
-      if (!prefix || key.startsWith(prefix)) {
+    const target = args?.queryKey;
+    for (const [key, entry] of this.cache.entries()) {
+      const matches = !target || (target.length <= entry.key.length && target.every((v, i) => entry.key[i] === v));
+      if (matches) {
         this.cache.delete(key);
         this.notifyKey(key);
       }

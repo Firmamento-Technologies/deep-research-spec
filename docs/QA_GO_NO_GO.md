@@ -46,3 +46,14 @@ Questa checklist definisce il gate minimo per dichiarare il software pronto al t
 
 - **GO QA**: sezioni 1,2,3,4,5,6 complete.
 - **NO-GO QA**: fallimento di uno qualsiasi dei gate bloccanti o regressioni runtime.
+
+
+## 7) Evidenze esecuzione gate
+
+Compilare ad ogni release candidate:
+
+- [ ] `python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py -q`
+- [ ] `node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json`
+- [ ] `npm --prefix frontend run build`
+- [ ] Smoke API: `curl -sf http://localhost:8000/health`
+- [ ] HITL API smoke: `POST /api/runs/{doc_id}/approve-outline` + `POST /api/runs/{doc_id}/approve-section` su run attivo
