@@ -106,3 +106,19 @@ async def test_cross_worker_persisted_approval_visible_to_other_broker_instance(
     sections = await broker_b.wait_for_outline_approval("doc-cross", default_sections=[])
 
     assert sections == [{"title": "X"}]
+
+
+@pytest.mark.asyncio
+async def test_persisted_approval_consumed_once_after_restart_like_flow():
+    shared = FakeRedis()
+    broker_a = SSEBroker(shared)
+    broker_b = SSEBroker(shared)
+
+    await broker_a.submit_section_approval("doc-restart", 0, {"approved": True, "content": "v1"})
+
+    first = await broker_b.wait_for_section_approval("doc-restart", 0, default_content="default", timeout_s=0.1)
+    assert first == "v1"
+
+    # second read should not re-consume stale approval (key deleted on first consume)
+    second = await broker_b.wait_for_section_approval("doc-restart", 0, default_content="default", timeout_s=0.01)
+    assert second == "default"

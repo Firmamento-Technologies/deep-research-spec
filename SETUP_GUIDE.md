@@ -70,3 +70,21 @@ npm --prefix frontend run build
 - Se `npm ci` fallisce: verifica proxy/registry npm e autorizzazioni di rete.
 - Se il backend non parte: ricontrolla variabili `.env` e dipendenze Python installate.
 - Se Docker non è disponibile, puoi avviare backend/frontend senza stack completo (ma alcune feature non saranno operative).
+
+
+## Production secret policy (P1)
+
+For production-like deploys (`ENV=production` / `APP_ENV=production`):
+
+- `JWT_SECRET_KEY` **must** be set.
+- `scripts/verify_prod_env.sh` is executed by `scripts/deploy.sh` before migrations/deploy.
+- If secret validation fails, deployment aborts immediately (fail-fast).
+
+Example:
+
+```bash
+export ENV=production
+export APP_ENV=production
+export JWT_SECRET_KEY="<strong-random-secret>"
+bash scripts/deploy.sh
+```

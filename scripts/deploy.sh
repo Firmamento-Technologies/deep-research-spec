@@ -60,6 +60,10 @@ fi
 
 success "Pre-flight checks passed"
 
+# Validate secret/runtime policy
+log "Validating runtime secret policy..."
+bash scripts/verify_prod_env.sh || error "Runtime secret policy validation failed"
+
 # ── Backup database (production only) ───────────────────────────────────────
 
 if [ "$ENV" = "production" ]; then

@@ -1,6 +1,6 @@
 # QA P0 Gate Report
 
-Generated: 2026-03-09T00:25:17Z
+Generated: 2026-03-09T00:29:58Z
 
 ## Unit suite (budget + SSE + cancel race + HITL roundtrip)
 
@@ -12,7 +12,7 @@ python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_bro
 
 \`\`\`text
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.06s
+21 passed, 3 skipped in 0.07s
 \`\`\`
 
 ## Frontend TypeScript check
