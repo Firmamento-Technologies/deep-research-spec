@@ -56,10 +56,10 @@ action "Frontend TypeScript check" \
   "node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json"
 
 action "Frontend build" \
-  "npm --prefix frontend run build" warn
+  "npm --prefix frontend run build"
 
 action "Backend health smoke (requires running backend on :8000)" \
-  "curl -sf http://localhost:8000/health" warn
+  "curl -sf http://localhost:8000/health"
 
 {
   echo "## Summary"

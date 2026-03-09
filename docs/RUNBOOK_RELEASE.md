@@ -40,6 +40,7 @@ Questo documento definisce la procedura operativa minima per release candidate e
 - In release CI, nessun warning residuo sui check frontend build e `/health` (promossi a fail via `QA_STRICT_RELEASE=1`).
 - Health check verde.
 - SSE + HITL verificati su ambiente target.
+- Nessun pass di contesto/skip strutturale (deploy staging e health-check post deploy realmente eseguiti).
 
 ### NO-GO se:
 - Errori build frontend o regressioni API contrattuali.

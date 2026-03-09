@@ -52,6 +52,7 @@ Compilare ad ogni release candidate:
 - [ ] `make release-dry-run` (report unico con timestamp + GO/NO-GO)
 - [ ] `python3 -m pytest backend/tests/test_api_endpoints.py -q`
 - [ ] Smoke API: `curl -sf http://localhost:8000/health`
+- [ ] NO skip strutturali: deploy/health staging devono essere realmente eseguiti nel dry-run
 
 ---
 

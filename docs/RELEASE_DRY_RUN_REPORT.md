@@ -1,8 +1,8 @@
 # Release Dry-Run Report
 
-- Run ID: 20260309T150636Z
-- Generated (UTC): 2026-03-09T15:06:36Z
-- Scope: qa-p0 + qa-p2 + smoke + SSE/HITL verification + deploy-staging + health-check
+- Run ID: 20260309T162814Z
+- Generated (UTC): 2026-03-09T16:28:14Z
+- Scope: qa-p0 + qa-p2(strict) + smoke + SSE/HITL verification + deploy-staging + health-check
 
 ## Runbook step: QA P0
 
@@ -10,33 +10,35 @@
 make qa-p0
 ```
 
-- Status: PASS ✅
+- Status: FAIL ❌
 
 ```text
 make[1]: Entering directory '/workspace/deep-research-spec'
 [36mRunning P0 QA gate checks...[0m
 QA P0 report written to /workspace/deep-research-spec/docs/QA_P0_REPORT.md
+make[1]: *** [Makefile:207: qa-p0] Error 1
 make[1]: Leaving directory '/workspace/deep-research-spec'
 ```
 
-## Runbook step: QA P2
+## Runbook step: QA P2 (strict release mode)
 
 ```bash
-make qa-p2
+QA_STRICT_RELEASE=1 make qa-p2
 ```
 
-- Status: PASS ✅
+- Status: FAIL ❌
 
 ```text
 make[1]: Entering directory '/workspace/deep-research-spec'
 [36mRunning P2 QA checks...[0m
-[qa-p2] Local/dev mode: frontend build and health smoke are warning-only
+[qa-p2] Strict release mode enabled: frontend build and health smoke are blocking
 Missing backend test dependencies: pytest_asyncio, fastapi
 Install with: pip install -r backend/requirements.txt -r backend/requirements-test.txt
 [qa-p2] Backend test dependencies missing: enabling fallback API contract checks
 
 ==> Frontend toolchain check
-[PASS] Frontend toolchain check
+vite runtime missing: frontend/node_modules/vite/dist/node/cli.js
+[FAIL] Frontend toolchain check
 
 ==> Backend API contract regression suite
 Fallback API contract checks passed
@@ -44,7 +46,7 @@ Fallback API contract checks passed
 
 ==> Backend reliability/HITL race unit suite (fallback)
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.09s
+21 passed, 3 skipped in 0.08s
 [PASS] Backend reliability/HITL race unit suite (fallback)
 
 ==> Frontend typecheck
@@ -56,31 +58,38 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 > drs-frontend@0.1.0 build
 > vite build
 
-vite v5.4.21 building for production...
-transforming...
-✓ 850 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   0.60 kB │ gzip:   0.35 kB
-dist/assets/index-8GU1WCo6.css   25.60 kB │ gzip:   5.31 kB
-dist/assets/index-9qkDo7LE.js   609.39 kB │ gzip: 173.50 kB
+node:internal/modules/esm/resolve:274
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
 
-(!) Some chunks are larger than 500 kB after minification. Consider:
-- Using dynamic import() to code-split the application
-- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 6.35s
-[PASS] Frontend build
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/workspace/deep-research-spec/frontend/node_modules/vite/dist/node/cli.js' imported from /workspace/deep-research-spec/frontend/node_modules/vite/bin/vite.js
+    at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+    at moduleResolve (node:internal/modules/esm/resolve:859:10)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+    at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:664:36)
+    at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+    at ModuleLoader.import (node:internal/modules/esm/loader:663:21)
+    at defaultImportModuleDynamicallyForModule (node:internal/modules/esm/utils:222:31) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///workspace/deep-research-spec/frontend/node_modules/vite/dist/node/cli.js'
+}
+
+Node.js v22.21.1
+[FAIL] Frontend build
 
 ==> Backend /health smoke
-[WARN] Backend /health smoke
+[FAIL] Backend /health smoke
 
 ===============================
 P2 QA summary
-PASS: 5
-WARN: 1
-FAIL: 0
+PASS: 3
+WARN: 0
+FAIL: 3
 ===============================
+make[1]: *** [Makefile:211: qa-p2] Error 1
 make[1]: Leaving directory '/workspace/deep-research-spec'
 ```
 
@@ -90,7 +99,7 @@ make[1]: Leaving directory '/workspace/deep-research-spec'
 curl -sf http://localhost:8000/health
 ```
 
-- Status: WARN ⚠️
+- Status: FAIL ❌
 
 ```text
 ```
@@ -105,37 +114,37 @@ python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_bro
 
 ```text
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.10s
+21 passed, 3 skipped in 0.08s
 ```
 
-## Runbook step: deploy staging (docker unavailable in current env)
+## Runbook step: deploy staging
 
 ```bash
-echo 'Docker non disponibile: staging deploy non eseguibile in questo ambiente'
+echo 'Docker non disponibile: impossibile eseguire deploy staging reale' && exit 1
 ```
 
-- Status: PASS ✅
+- Status: FAIL ❌
 
 ```text
-Docker non disponibile: staging deploy non eseguibile in questo ambiente
+Docker non disponibile: impossibile eseguire deploy staging reale
 ```
 
-## Runbook step: health-check after staging deploy (docker unavailable in current env)
+## Runbook step: health-check after staging deploy
 
 ```bash
-echo 'Docker non disponibile: health-check post deploy staging non eseguibile'
+echo 'Docker non disponibile: impossibile eseguire health-check post deploy staging' && exit 1
 ```
 
-- Status: PASS ✅
+- Status: FAIL ❌
 
 ```text
-Docker non disponibile: health-check post deploy staging non eseguibile
+Docker non disponibile: impossibile eseguire health-check post deploy staging
 ```
 
 ## Summary
 
-- PASS: 5
-- WARN: 1
-- FAIL: 0
+- PASS: 1
+- WARN: 0
+- FAIL: 5
 
-- GO/NO-GO: **GO (dry-run criteria met)**
+- GO/NO-GO: **NO-GO (blocking failures detected)**

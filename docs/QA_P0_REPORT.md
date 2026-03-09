@@ -1,6 +1,6 @@
 # QA P0 Gate Report
 
-Generated: 2026-03-09T15:06:38Z
+Generated: 2026-03-09T16:28:16Z
 
 ## Unit suite (budget + SSE + cancel race + HITL roundtrip)
 
@@ -12,7 +12,7 @@ python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_bro
 
 \`\`\`text
 .....................                                                    [100%]
-21 passed, 3 skipped in 0.11s
+21 passed, 3 skipped in 0.08s
 \`\`\`
 
 ## Frontend TypeScript check
@@ -32,7 +32,7 @@ node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json
 npm --prefix frontend run build
 \`\`\`
 
-- Status: PASS ✅
+- Status: FAIL ❌
 
 \`\`\`text
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
@@ -40,20 +40,26 @@ npm warn Unknown env config "http-proxy". This will stop working in the next maj
 > drs-frontend@0.1.0 build
 > vite build
 
-vite v5.4.21 building for production...
-transforming...
-✓ 850 modules transformed.
-rendering chunks...
-computing gzip size...
-dist/index.html                   0.60 kB │ gzip:   0.35 kB
-dist/assets/index-8GU1WCo6.css   25.60 kB │ gzip:   5.31 kB
-dist/assets/index-9qkDo7LE.js   609.39 kB │ gzip: 173.50 kB
+node:internal/modules/esm/resolve:274
+    throw new ERR_MODULE_NOT_FOUND(
+          ^
 
-(!) Some chunks are larger than 500 kB after minification. Consider:
-- Using dynamic import() to code-split the application
-- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
-✓ built in 6.77s
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/workspace/deep-research-spec/frontend/node_modules/vite/dist/node/cli.js' imported from /workspace/deep-research-spec/frontend/node_modules/vite/bin/vite.js
+    at finalizeResolution (node:internal/modules/esm/resolve:274:11)
+    at moduleResolve (node:internal/modules/esm/resolve:859:10)
+    at defaultResolve (node:internal/modules/esm/resolve:983:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+    at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+    at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:664:36)
+    at TracingChannel.tracePromise (node:diagnostics_channel:350:14)
+    at ModuleLoader.import (node:internal/modules/esm/loader:663:21)
+    at defaultImportModuleDynamicallyForModule (node:internal/modules/esm/utils:222:31) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///workspace/deep-research-spec/frontend/node_modules/vite/dist/node/cli.js'
+}
+
+Node.js v22.21.1
 \`\`\`
 
 ## Backend health smoke (requires running backend on :8000)
@@ -62,13 +68,13 @@ dist/assets/index-9qkDo7LE.js   609.39 kB │ gzip: 173.50 kB
 curl -sf http://localhost:8000/health
 \`\`\`
 
-- Status: WARN ⚠️
+- Status: FAIL ❌
 
 \`\`\`text
 \`\`\`
 
 ## Summary
 
-- PASS: 3
-- WARN: 1
-- FAIL: 0
+- PASS: 2
+- WARN: 0
+- FAIL: 2

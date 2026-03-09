@@ -51,15 +51,15 @@ cat > "$REPORT_PATH" <<HDR
 
 - Run ID: ${RUN_ID}
 - Generated (UTC): $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-- Scope: qa-p0 + qa-p2 + smoke + SSE/HITL verification + deploy-staging + health-check
+- Scope: qa-p0 + qa-p2(strict) + smoke + SSE/HITL verification + deploy-staging + health-check
 
 HDR
 
 cd "$ROOT_DIR"
 
 log_step "Runbook step: QA P0" "make qa-p0"
-log_step "Runbook step: QA P2" "make qa-p2"
-log_step "Runbook step: backend smoke" "curl -sf http://localhost:8000/health" warn
+log_step "Runbook step: QA P2 (strict release mode)" "QA_STRICT_RELEASE=1 make qa-p2"
+log_step "Runbook step: backend smoke" "curl -sf http://localhost:8000/health"
 log_step "Runbook step: SSE/HITL verification (unit reliability)" \
   "python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py tests/unit/test_hitl_approval_roundtrip.py -q"
 
@@ -68,14 +68,16 @@ if [[ "${ENABLE_STAGING_DEPLOY:-0}" == "1" ]]; then
     log_step "Runbook step: deploy staging" "make deploy-staging"
     log_step "Runbook step: health-check after staging deploy" "make health-check"
   else
-    log_step "Runbook step: deploy staging (docker unavailable in current env)" \
-      "echo 'Docker non disponibile: staging deploy non eseguibile in questo ambiente'" warn
-    log_step "Runbook step: health-check after staging deploy (docker unavailable in current env)" \
-      "echo 'Docker non disponibile: health-check post deploy staging non eseguibile'" warn
+    log_step "Runbook step: deploy staging" \
+      "echo 'Docker non disponibile: impossibile eseguire deploy staging reale' && exit 1"
+    log_step "Runbook step: health-check after staging deploy" \
+      "echo 'Docker non disponibile: impossibile eseguire health-check post deploy staging' && exit 1"
   fi
 else
-  log_step "Runbook step: deploy staging (disabled)" \
-    "echo 'Set ENABLE_STAGING_DEPLOY=1 to execute make deploy-staging && make health-check' && exit 1" warn
+  log_step "Runbook step: deploy staging" \
+    "echo 'ENABLE_STAGING_DEPLOY must be 1 for a valid release dry-run' && exit 1"
+  log_step "Runbook step: health-check after staging deploy" \
+    "echo 'ENABLE_STAGING_DEPLOY must be 1 for a valid release dry-run' && exit 1"
 fi
 
 {
