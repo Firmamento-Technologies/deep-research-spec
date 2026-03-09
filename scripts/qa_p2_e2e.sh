@@ -45,11 +45,11 @@ check_backend_test_dependencies() {
   python3 - <<'PY'
 import importlib.util
 import sys
-required = ["httpx", "pytest"]
+required = ["httpx", "pytest", "pytest_asyncio"]
 missing = [name for name in required if importlib.util.find_spec(name) is None]
 if missing:
     print("Missing backend test dependencies:", ", ".join(missing))
-    print("Install with: pip install -r backend/requirements.txt pytest pytest-asyncio")
+    print("Install with: pip install -r backend/requirements.txt -r backend/requirements-test.txt")
     sys.exit(1)
 PY
 }
@@ -66,6 +66,16 @@ check_frontend_toolchain() {
 
   if [[ ! -x "frontend/node_modules/.bin/vite" ]]; then
     echo "vite binary is not executable at frontend/node_modules/.bin/vite"
+    return 1
+  fi
+
+  if [[ ! -f "frontend/node_modules/vite/dist/node/cli.js" ]]; then
+    echo "vite runtime missing: frontend/node_modules/vite/dist/node/cli.js"
+    return 1
+  fi
+
+  if [[ ! -f "frontend/node_modules/typescript/bin/tsc" ]]; then
+    echo "TypeScript compiler missing: frontend/node_modules/typescript/bin/tsc"
     return 1
   fi
 }

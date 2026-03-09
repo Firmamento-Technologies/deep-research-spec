@@ -5,15 +5,18 @@ Questo documento definisce la procedura operativa minima per release candidate e
 ## 1. Pre-release checklist
 
 1. Aggiorna branch e verifica working tree pulita.
-2. Esegui gate QA:
+2. Prepara ambiente QA:
+   - `python3 -m pip install -r backend/requirements.txt -r backend/requirements-test.txt`
+   - `npm --prefix frontend ci`
+3. Esegui gate QA:
    - `make qa-p0`
    - `make qa-p2`
    - In release CI: `QA_STRICT_RELEASE=1 make qa-p2`
-3. Esegui dry-run release con evidenze aggregate:
+4. Esegui dry-run release con evidenze aggregate:
    - `make release-dry-run`
-4. Verifica smoke locale/ambiente target:
+5. Verifica smoke locale/ambiente target:
    - `curl -sf http://localhost:8000/health`
-5. Conferma compatibilità SSE frontend/backend su `/api/runs/{doc_id}/events`.
+6. Conferma compatibilità SSE frontend/backend su `/api/runs/{doc_id}/events`.
 
 ## 2. Deploy standard
 

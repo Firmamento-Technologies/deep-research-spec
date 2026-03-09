@@ -53,14 +53,19 @@ jobs:
       - name: Install backend dependencies
         run: |
           cd backend
-          pip install -r requirements.txt
-          pip install pytest pytest-cov pytest-asyncio pytest-xdist
+          pip install -r requirements.txt -r requirements-test.txt
 
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
 
       - name: Ensure vite binary executable
         run: chmod +x frontend/node_modules/.bin/vite
+
+      - name: Verify frontend toolchain runtime
+        run: |
+          test -x frontend/node_modules/.bin/vite
+          test -f frontend/node_modules/vite/dist/node/cli.js
+          test -f frontend/node_modules/typescript/bin/tsc
 
       - name: Run strict QA P2 release gate
         env:

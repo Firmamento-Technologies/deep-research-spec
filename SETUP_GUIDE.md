@@ -88,3 +88,13 @@ export APP_ENV=production
 export JWT_SECRET_KEY="<strong-random-secret>"
 bash scripts/deploy.sh
 ```
+
+
+## QA dependencies (backend)
+
+Per eseguire in modo ripetibile i gate QA/CI (incluso `backend/tests/test_api_endpoints.py`):
+
+```bash
+cd backend
+pip install -r requirements.txt -r requirements-test.txt
+```

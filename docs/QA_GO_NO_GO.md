@@ -37,6 +37,7 @@ Questa checklist definisce il gate minimo per dichiarare il software pronto al t
 
 ## 6) Test automatici minimi richiesti
 
+- [ ] `python3 -m pip install -r backend/requirements.txt -r backend/requirements-test.txt`
 - [ ] `python3 -m pytest tests/unit/test_budget_estimator_v2.py -q`
 - [ ] `node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json`
 - [ ] `npm --prefix frontend run build`
