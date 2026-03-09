@@ -30,6 +30,38 @@ run_check() {
   fi
 }
 
+check_backend_test_dependencies() {
+  python3 - <<'PY'
+import importlib.util
+import sys
+required = ["httpx", "pytest"]
+missing = [name for name in required if importlib.util.find_spec(name) is None]
+if missing:
+    print("Missing backend test dependencies:", ", ".join(missing))
+    print("Install with: pip install -r backend/requirements.txt pytest pytest-asyncio")
+    sys.exit(1)
+PY
+}
+
+check_frontend_toolchain() {
+  if [[ ! -d "frontend/node_modules" ]]; then
+    echo "Missing frontend/node_modules. Run: npm --prefix frontend ci"
+    return 1
+  fi
+
+  if [[ -f "frontend/node_modules/.bin/vite" ]]; then
+    chmod +x frontend/node_modules/.bin/vite 2>/dev/null || true
+  fi
+
+  if [[ ! -x "frontend/node_modules/.bin/vite" ]]; then
+    echo "vite binary is not executable at frontend/node_modules/.bin/vite"
+    return 1
+  fi
+}
+
+run_check fail "Backend test dependency check" check_backend_test_dependencies
+run_check fail "Frontend toolchain check" check_frontend_toolchain
+
 run_check fail "Backend API contract regression suite" \
   python3 -m pytest backend/tests/test_api_endpoints.py -q
 
