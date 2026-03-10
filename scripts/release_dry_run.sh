@@ -4,6 +4,7 @@ set -u
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_PATH="${ROOT_DIR}/docs/RELEASE_DRY_RUN_REPORT.md"
 RUN_ID="$(date -u +"%Y%m%dT%H%M%SZ")"
+HEALTH_URL="${QA_HEALTH_URL:-http://localhost:8000/health}"
 
 PASS=0
 WARN=0
@@ -59,7 +60,7 @@ cd "$ROOT_DIR"
 
 log_step "Runbook step: QA P0" "make qa-p0"
 log_step "Runbook step: QA P2 (strict release mode)" "QA_STRICT_RELEASE=1 make qa-p2"
-log_step "Runbook step: backend smoke" "curl -sf http://localhost:8000/health"
+log_step "Runbook step: backend smoke" "curl -sf ${HEALTH_URL}"
 log_step "Runbook step: SSE/HITL verification (unit reliability)" \
   "python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py tests/unit/test_hitl_approval_roundtrip.py -q"
 

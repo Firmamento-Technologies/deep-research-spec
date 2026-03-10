@@ -3,6 +3,7 @@ set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REPORT_PATH="${ROOT_DIR}/docs/QA_P0_REPORT.md"
+HEALTH_URL="${QA_HEALTH_URL:-http://localhost:8000/health}"
 
 PASS=0
 WARN=0
@@ -20,9 +21,9 @@ action() {
 
   echo "## ${label}" >> "$REPORT_PATH"
   echo >> "$REPORT_PATH"
-  echo '\`\`\`bash' >> "$REPORT_PATH"
+  echo '```bash' >> "$REPORT_PATH"
   echo "$cmd" >> "$REPORT_PATH"
-  echo '\`\`\`' >> "$REPORT_PATH"
+  echo '```' >> "$REPORT_PATH"
   echo >> "$REPORT_PATH"
 
   local out_file
@@ -40,9 +41,9 @@ action() {
     fi
   fi
   echo >> "$REPORT_PATH"
-  echo '\`\`\`text' >> "$REPORT_PATH"
+  echo '```text' >> "$REPORT_PATH"
   sed -n '1,160p' "$out_file" >> "$REPORT_PATH"
-  echo '\`\`\`' >> "$REPORT_PATH"
+  echo '```' >> "$REPORT_PATH"
   echo >> "$REPORT_PATH"
   rm -f "$out_file"
 }
@@ -62,7 +63,7 @@ action "Frontend build" \
   "npm --prefix frontend run build"
 
 action "Backend health smoke (requires running backend on :8000)" \
-  "curl -sf http://localhost:8000/health"
+  "curl -sf ${HEALTH_URL}"
 
 {
   echo "## Summary"

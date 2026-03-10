@@ -3,6 +3,7 @@ set -u
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
+HEALTH_URL="${QA_HEALTH_URL:-http://localhost:8000/health}"
 
 PASS=0
 WARN=0
@@ -128,7 +129,7 @@ run_check "$BUILD_CHECK_MODE" "Frontend build" \
   npm --prefix frontend run build
 
 run_check "$HEALTH_CHECK_MODE" "Backend /health smoke" \
-  curl -sf http://localhost:8000/health
+  curl -sf "$HEALTH_URL"
 
 echo ""
 echo "==============================="
