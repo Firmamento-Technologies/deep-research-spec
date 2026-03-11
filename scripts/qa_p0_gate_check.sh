@@ -62,7 +62,7 @@ action "Frontend TypeScript check" \
   "node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json"
 
 action "Frontend build" \
-  "node frontend/node_modules/vite/bin/vite.js build"
+  "node frontend/node_modules/vite/bin/vite.js build frontend"
 
 action "Backend health smoke (requires running backend)" \
   "curl -sf ${HEALTH_URL}" "$P0_HEALTH_MODE"

@@ -4,7 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 HEALTH_URL="${QA_HEALTH_URL:-http://localhost:8000/health}"
-QA_BOOTSTRAP_FRONTEND_DEPS="${QA_BOOTSTRAP_FRONTEND_DEPS:-0}"
 
 PASS=0
 WARN=0
@@ -15,10 +14,12 @@ STRICT_RELEASE_MODE="${QA_STRICT_RELEASE:-0}"
 if [[ "$STRICT_RELEASE_MODE" == "1" ]]; then
   BUILD_CHECK_MODE="fail"
   HEALTH_CHECK_MODE="fail"
+  QA_BOOTSTRAP_FRONTEND_DEPS="${QA_BOOTSTRAP_FRONTEND_DEPS:-1}"
   echo "[qa-p2] Strict release mode enabled: frontend build and health smoke are blocking"
 else
   BUILD_CHECK_MODE="warn"
   HEALTH_CHECK_MODE="warn"
+  QA_BOOTSTRAP_FRONTEND_DEPS="${QA_BOOTSTRAP_FRONTEND_DEPS:-0}"
   echo "[qa-p2] Local/dev mode: frontend build and health smoke are warning-only"
 fi
 
@@ -123,7 +124,7 @@ run_check fail "Frontend typecheck" \
   node frontend/node_modules/typescript/bin/tsc --noEmit -p frontend/tsconfig.json
 
 run_check "$BUILD_CHECK_MODE" "Frontend build" \
-  node frontend/node_modules/vite/bin/vite.js build
+  node frontend/node_modules/vite/bin/vite.js build frontend
 
 run_check "$HEALTH_CHECK_MODE" "Backend /health smoke" \
   curl -sf "$HEALTH_URL"

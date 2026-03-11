@@ -58,8 +58,8 @@ HDR
 
 cd "$ROOT_DIR"
 
-log_step "Runbook step: QA P0" "QA_P0_HEALTH_MODE=strict make qa-p0"
-log_step "Runbook step: QA P2 (strict release mode)" "QA_STRICT_RELEASE=1 make qa-p2"
+log_step "Runbook step: QA P0" "QA_P0_HEALTH_MODE=strict QA_BOOTSTRAP_FRONTEND_DEPS=1 make qa-p0"
+log_step "Runbook step: QA P2 (strict release mode)" "QA_STRICT_RELEASE=1 QA_BOOTSTRAP_FRONTEND_DEPS=1 make qa-p2"
 log_step "Runbook step: backend smoke" "curl -sf ${HEALTH_URL}"
 log_step "Runbook step: SSE/HITL verification (unit reliability)" \
   "python3 -m pytest tests/unit/test_budget_estimator_v2.py tests/unit/test_sse_broker_reliability.py tests/unit/test_run_manager_cancel_race.py tests/unit/test_hitl_approval_roundtrip.py -q"

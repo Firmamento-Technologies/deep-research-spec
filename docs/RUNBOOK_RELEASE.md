@@ -18,6 +18,14 @@ Questo documento definisce la procedura operativa minima per release candidate e
    - `curl -sf http://localhost:8000/health`
 6. Conferma compatibilità SSE frontend/backend su `/api/runs/{doc_id}/events`.
 
+### Variabili utili per i gate
+
+- `QA_STRICT_RELEASE=1`: promuove check build/health a bloccanti in `qa-p2`.
+- `QA_HEALTH_URL=<url>`: override endpoint smoke health (default `http://localhost:8000/health`).
+- `QA_BOOTSTRAP_FRONTEND_DEPS=1`: abilita bootstrap automatico dipendenze frontend durante i gate (`ensure_frontend_runtime.sh`).
+- `QA_P0_HEALTH_MODE=warn|strict`: in `qa-p0` rende lo smoke health warning-only (`warn`, default) o bloccante (`strict`).
+
+
 ## 2. Deploy standard
 
 1. Deploy su staging:
