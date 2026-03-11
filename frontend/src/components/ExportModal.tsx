@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download } from '../lib/icons';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { api } from '../lib/api';

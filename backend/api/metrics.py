@@ -3,11 +3,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, cast, Date, text
 from database.connection import get_db
 from database.models import Run, Section
+from api.dependencies import require_viewer
 from typing import Optional, List
 from datetime import date, datetime, timedelta
 import json
 
-router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+router = APIRouter(
+    prefix="/api/analytics",
+    tags=["analytics"],
+    dependencies=[Depends(require_viewer)],
+)
 
 
 @router.get("")

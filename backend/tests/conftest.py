@@ -3,13 +3,59 @@
 import asyncio
 import pytest
 from typing import AsyncGenerator
-from httpx import AsyncClient
+try:
+    from httpx import AsyncClient
+except ModuleNotFoundError:
+    from fastapi.testclient import TestClient
+
+    class _StreamResponse:
+        def __init__(self, response):
+            self._response = response
+            self.status_code = response.status_code
+            self.headers = response.headers
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def aiter_lines(self):
+            for line in self._response.text.splitlines():
+                yield line
+
+    class AsyncClient:  # fallback for environments without httpx
+        def __init__(self, app, base_url="http://test"):
+            self._client = TestClient(app, base_url=base_url)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            self._client.close()
+            return False
+
+        async def get(self, url, **kwargs):
+            return self._client.get(url, **kwargs)
+
+        async def post(self, url, **kwargs):
+            return self._client.post(url, **kwargs)
+
+        async def delete(self, url, **kwargs):
+            return self._client.delete(url, **kwargs)
+
+        def stream(self, method, url, **kwargs):
+            response = self._client.request(method, url, **kwargs)
+            return _StreamResponse(response)
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from database.models import Base
 from database.connection import get_db
+from api.dependencies import require_user
 from api.runs import router as runs_router
+from api.auth import router as auth_router
 from fastapi import FastAPI
 
 # ---------------------------------------------------------------------------
@@ -61,14 +107,34 @@ async def async_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, Non
     # Create test app
     app = FastAPI()
     app.include_router(runs_router)
+    app.include_router(auth_router)
     
     # Override DB dependency
     async def override_get_db():
         yield test_db
-    
+
+    async def override_require_user():
+        return {"id": "test-user", "role": "user"}
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_user] = override_require_user
     
     # Create async client
+    async with AsyncClient(app=app, base_url="http://test") as client:
+        yield client
+
+
+@pytest.fixture
+async def unauthenticated_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """Create FastAPI test client without auth override."""
+    app = FastAPI()
+    app.include_router(runs_router)
+
+    async def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
     async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
 

@@ -1,9 +1,8 @@
 """Application settings from environment variables."""
 
-import os
 from pathlib import Path
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 
 # Get backend directory path
 BACKEND_DIR = Path(__file__).parent.parent
@@ -54,8 +53,11 @@ class Settings(BaseSettings):
     rlm_log_dir: str = Field(default="./logs/rlm", alias="RLM_LOG_DIR")
     rlm_allow_tier_upgrade: bool = Field(default=False, alias="RLM_ALLOW_TIER_UPGRADE")
     
+    # Runtime environment
+    app_env: str = Field(default="dev", alias="APP_ENV")
+
     # JWT Authentication
-    jwt_secret_key: str = Field(default="dev-secret-change-in-production", alias="JWT_SECRET_KEY")
+    jwt_secret_key: str = Field(default="", alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     jwt_access_token_expire_minutes: int = Field(default=30, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES")
     jwt_refresh_token_expire_days: int = Field(default=7, alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS")
@@ -69,6 +71,13 @@ class Settings(BaseSettings):
     # Concurrency
     max_concurrent_runs: int = Field(default=5, alias="MAX_CONCURRENT_RUNS")
     
+
+    @model_validator(mode="after")
+    def _validate_security_policy(self):
+        if self.app_env.lower() in {"prod", "production"} and not self.jwt_secret_key:
+            raise ValueError("JWT_SECRET_KEY is required when APP_ENV=production")
+        return self
+
     class Config:
         env_file = str(ENV_FILE)
         env_file_encoding = "utf-8"
@@ -76,9 +85,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
-# Debug output
-if os.getenv("DEBUG") == "true":
-    print(f"[Settings] .env file: {ENV_FILE}")
-    print(f"[Settings] .env exists: {ENV_FILE.exists()}")
-    print(f"[Settings] DATABASE_URL loaded: {settings.database_url[:50]}...")

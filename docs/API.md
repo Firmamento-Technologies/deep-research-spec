@@ -35,7 +35,7 @@ GET /health
 ### Start Pipeline Run
 
 ```http
-POST /api/v1/runs
+POST /api/runs
 Content-Type: application/json
 ```
 
@@ -65,7 +65,7 @@ Content-Type: application/json
 ### Get Run Status
 
 ```http
-GET /api/v1/runs/{run_id}
+GET /api/runs/{run_id}
 ```
 
 **Response:**
@@ -91,7 +91,7 @@ GET /api/v1/runs/{run_id}
 ### List Runs
 
 ```http
-GET /api/v1/runs
+GET /api/runs
 ```
 
 **Response:**
@@ -110,16 +110,10 @@ GET /api/v1/runs
 ### Cancel Run
 
 ```http
-DELETE /api/v1/runs/{run_id}
+DELETE /api/runs/{run_id}
 ```
 
-**Response (200):**
-```json
-{
-  "run_id": "abc-123-def",
-  "status": "cancelled"
-}
-```
+**Response (204 No Content)**
 
 ---
 

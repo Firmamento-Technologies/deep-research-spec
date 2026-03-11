@@ -47,11 +47,13 @@ import json
 import logging
 from collections import deque
 from datetime import datetime, timezone
-from typing import AsyncGenerator, Dict, Deque
+from typing import AsyncGenerator, Dict, Deque, Any, Optional
 
 import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
+
+APPROVAL_TTL_S = 3600
 
 # ---------------------------------------------------------------------------
 # SSEBroker class
@@ -69,7 +71,39 @@ class SSEBroker:
         self.redis = redis_client
         # Event buffer: {doc_id: deque([event, ...], maxlen=10)}
         self._event_buffers: Dict[str, Deque[dict]] = {}
+        # HITL approval waiters (in-process)
+        self._outline_approvals: Dict[str, asyncio.Future] = {}
+        self._section_approvals: Dict[str, Dict[int, asyncio.Future]] = {}
+        self._waiters_lock = asyncio.Lock()
         logger.info("SSEBroker initialized")
+
+    def _outline_approval_key(self, doc_id: str) -> str:
+        return f"run:{doc_id}:approval:outline"
+
+    def _section_approval_key(self, doc_id: str, section_idx: int) -> str:
+        return f"run:{doc_id}:approval:section:{section_idx}"
+
+    async def _store_pending_approval(self, key: str, payload: Dict[str, Any]) -> None:
+        try:
+            await self.redis.set(key, json.dumps(payload), ex=APPROVAL_TTL_S)
+        except Exception as exc:
+            logger.warning("Failed to persist pending approval %s: %s", key, exc)
+
+    async def _consume_pending_approval(self, key: str) -> Optional[Dict[str, Any]]:
+        try:
+            raw = await self.redis.get(key)
+            if not raw:
+                return None
+            await self.redis.delete(key)
+            if isinstance(raw, bytes):
+                raw = raw.decode("utf-8")
+            if isinstance(raw, str):
+                data = json.loads(raw)
+                if isinstance(data, dict):
+                    return data
+        except Exception as exc:
+            logger.warning("Failed to consume pending approval %s: %s", key, exc)
+        return None
 
     async def emit(
         self,
@@ -143,15 +177,14 @@ class SSEBroker:
 
             try:
                 async for message in pubsub.listen():
-                    # Yield heartbeat if available
-                    if not heartbeat_task.done():
+                    # Yield heartbeat when timer elapsed
+                    if heartbeat_task.done():
                         try:
                             heartbeat = heartbeat_task.result()
                             yield heartbeat
-                            # Recreate task for next heartbeat
+                        finally:
+                            # Recreate task for next heartbeat window
                             heartbeat_task = asyncio.create_task(self._heartbeat())
-                        except asyncio.InvalidStateError:
-                            pass  # Task not done yet
 
                     # Yield real event
                     if message["type"] == "message":
@@ -178,6 +211,120 @@ class SSEBroker:
             await pubsub.unsubscribe(channel)
             await pubsub.close()
             logger.info("[%s] SSE subscription closed", doc_id)
+
+
+    async def wait_for_outline_approval(
+        self,
+        doc_id: str,
+        default_sections: list,
+        timeout_s: float = 600.0,
+    ) -> list:
+        """Wait for outline approval from API and return approved sections.
+
+        Falls back to default sections on timeout.
+        """
+        persisted = await self._consume_pending_approval(self._outline_approval_key(doc_id))
+        if persisted is not None:
+            approved = bool(persisted.get("approved", True))
+            if not approved:
+                return default_sections
+            sections = persisted.get("sections")
+            return sections if sections else default_sections
+
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        async with self._waiters_lock:
+            prev = self._outline_approvals.get(doc_id)
+            if prev and not prev.done():
+                prev.cancel()
+            self._outline_approvals[doc_id] = future
+
+        try:
+            result = await asyncio.wait_for(future, timeout=timeout_s)
+            approved = bool(result.get("approved", True))
+            if not approved:
+                return default_sections
+            sections = result.get("sections")
+            return sections if sections else default_sections
+        except asyncio.TimeoutError:
+            logger.warning("[%s] Outline approval timeout after %.1fs, auto-approving", doc_id, timeout_s)
+            return default_sections
+        finally:
+            async with self._waiters_lock:
+                current = self._outline_approvals.get(doc_id)
+                if current is future:
+                    self._outline_approvals.pop(doc_id, None)
+
+    async def wait_for_section_approval(
+        self,
+        doc_id: str,
+        section_idx: int,
+        default_content: str,
+        timeout_s: float = 600.0,
+    ) -> str:
+        """Wait for section approval from API and return approved content."""
+        persisted = await self._consume_pending_approval(
+            self._section_approval_key(doc_id, section_idx)
+        )
+        if persisted is not None:
+            approved = bool(persisted.get("approved", True))
+            if not approved:
+                return default_content
+            edited = persisted.get("content")
+            return edited if isinstance(edited, str) and edited.strip() else default_content
+
+        loop = asyncio.get_running_loop()
+        future = loop.create_future()
+
+        async with self._waiters_lock:
+            per_doc = self._section_approvals.setdefault(doc_id, {})
+            prev = per_doc.get(section_idx)
+            if prev and not prev.done():
+                prev.cancel()
+            per_doc[section_idx] = future
+
+        try:
+            result = await asyncio.wait_for(future, timeout=timeout_s)
+            approved = bool(result.get("approved", True))
+            if not approved:
+                return default_content
+            edited = result.get("content")
+            return edited if isinstance(edited, str) and edited.strip() else default_content
+        except asyncio.TimeoutError:
+            logger.warning(
+                "[%s] Section %d approval timeout after %.1fs, auto-approving",
+                doc_id, section_idx, timeout_s,
+            )
+            return default_content
+        finally:
+            async with self._waiters_lock:
+                per_doc = self._section_approvals.get(doc_id)
+                if per_doc and per_doc.get(section_idx) is future:
+                    per_doc.pop(section_idx, None)
+                if per_doc == {}:
+                    self._section_approvals.pop(doc_id, None)
+
+    async def submit_outline_approval(self, doc_id: str, payload: Dict[str, Any]) -> None:
+        """Resolve a pending outline waiter if present; otherwise persist it."""
+        async with self._waiters_lock:
+            fut = self._outline_approvals.get(doc_id)
+            if fut and not fut.done():
+                fut.set_result(payload)
+                return
+
+        await self._store_pending_approval(self._outline_approval_key(doc_id), payload)
+
+    async def submit_section_approval(self, doc_id: str, section_idx: int, payload: Dict[str, Any]) -> None:
+        """Resolve a pending section waiter if present; otherwise persist it."""
+        async with self._waiters_lock:
+            fut = self._section_approvals.get(doc_id, {}).get(section_idx)
+            if fut and not fut.done():
+                fut.set_result(payload)
+                return
+
+        await self._store_pending_approval(self._section_approval_key(doc_id, section_idx), payload)
 
     async def _heartbeat(self) -> dict:
         """Generate heartbeat event after 30s delay.

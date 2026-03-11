@@ -1,63 +1,128 @@
-import axios from 'axios';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 30000);
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+type ApiConfig = {
+  headers?: Record<string, string>;
+  params?: Record<string, string | number | boolean | undefined>;
+  responseType?: 'blob' | 'json';
+  timeoutMs?: number;
+  signal?: AbortSignal;
+  onUploadProgress?: (event: { loaded: number; total?: number }) => void;
+};
 
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+export class ApiError extends Error {
+  status: number;
+  payload: unknown;
 
-// Request interceptor to add auth token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor to handle token refresh
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-
-    // If 401 and not already retried, try refreshing token
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) {
-          throw new Error('No refresh token');
-        }
-
-        // Refresh token
-        const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-          refresh_token: refreshToken,
-        });
-
-        const { access_token, refresh_token: newRefreshToken } = response.data;
-        localStorage.setItem('access_token', access_token);
-        localStorage.setItem('refresh_token', newRefreshToken);
-
-        // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
-        return api(originalRequest);
-      } catch (refreshError) {
-        // Refresh failed, clear tokens and redirect to login
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
+  constructor(status: number, message: string, payload: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.payload = payload;
   }
-);
+}
+
+function authHeaders(headers: Record<string, string> = {}) {
+  const token = localStorage.getItem('access_token');
+  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+}
+
+function buildUrl(url: string, params?: ApiConfig['params']) {
+  const full = `${API_BASE_URL}${url}`;
+  if (!params) return full;
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined) q.set(k, String(v));
+  });
+  return `${full}?${q.toString()}`;
+}
+
+async function parseResponse(response: Response, responseType: ApiConfig['responseType']) {
+  if (responseType === 'blob') return response.blob();
+  const text = await response.text();
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return text;
+  }
+}
+
+function toErrorMessage(status: number, payload: unknown): string {
+  if (payload && typeof payload === 'object' && 'detail' in payload) {
+    const detail = (payload as { detail?: unknown }).detail;
+    if (typeof detail === 'string') return detail;
+  }
+  return `Request failed with status ${status}`;
+}
+
+function mergeSignals(timeoutSignal: AbortSignal, externalSignal?: AbortSignal): AbortSignal {
+  if (!externalSignal) return timeoutSignal;
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([timeoutSignal, externalSignal]);
+  }
+
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  timeoutSignal.addEventListener('abort', abort, { once: true });
+  externalSignal.addEventListener('abort', abort, { once: true });
+  return controller.signal;
+}
+
+async function request(method: 'GET' | 'POST' | 'DELETE', url: string, data?: unknown, config: ApiConfig = {}) {
+  if (config.onUploadProgress && typeof FormData !== 'undefined' && data instanceof FormData) {
+    config.onUploadProgress({ loaded: 0 });
+  }
+
+  const isForm = typeof FormData !== 'undefined' && data instanceof FormData;
+  const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const signal = mergeSignals(timeoutSignal, config.signal);
+
+  let response: Response;
+  try {
+    response = await fetch(buildUrl(url, config.params), {
+      method,
+      signal,
+      headers:
+        method === 'POST' && !isForm
+          ? authHeaders({ 'Content-Type': 'application/json', ...(config.headers ?? {}) })
+          : authHeaders(config.headers),
+      body:
+        method === 'POST'
+          ? isForm
+            ? (data as BodyInit)
+            : data === undefined
+              ? undefined
+              : JSON.stringify(data)
+          : undefined,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(408, `Request timeout after ${timeoutMs}ms`, null);
+    }
+    throw new ApiError(0, 'Network request failed', err);
+  }
+
+  const payload = await parseResponse(response, config.responseType);
+  if (!response.ok) {
+    throw new ApiError(response.status, toErrorMessage(response.status, payload), payload);
+  }
+
+  if (config.onUploadProgress && typeof FormData !== 'undefined' && data instanceof FormData) {
+    config.onUploadProgress({ loaded: 100, total: 100 });
+  }
+
+  return { data: payload, status: response.status };
+}
+
+export const api = {
+  get(url: string, config: ApiConfig = {}) {
+    return request('GET', url, undefined, config);
+  },
+  post(url: string, data?: unknown, config: ApiConfig = {}) {
+    return request('POST', url, data, config);
+  },
+  delete(url: string, config: ApiConfig = {}) {
+    return request('DELETE', url, undefined, config);
+  },
+};

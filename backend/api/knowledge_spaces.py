@@ -33,13 +33,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db  # FIXED: was get_db_session
 from database.models import Space, Source, Chunk
+from api.dependencies import require_user
 from services.space_indexer import SpaceIndexer, IndexingError
 from services.db_inserter import get_chunk_count
 from services.semantic_search import search_chunks, SearchError
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/spaces", tags=["Knowledge Spaces"])
+router = APIRouter(
+    prefix="/api/spaces",
+    tags=["Knowledge Spaces"],
+    dependencies=[Depends(require_user)],
+)
 
 # Configuration
 UPLOAD_DIR = Path("/data/spaces")  # Or from env: os.getenv("SPACES_UPLOAD_DIR")

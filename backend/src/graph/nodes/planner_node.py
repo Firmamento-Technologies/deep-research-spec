@@ -12,7 +12,6 @@ Spec: §11 Planner node, §19 Budget tracking, §20 HITL
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -296,17 +295,28 @@ async def _wait_for_approval(
         logger.warning("No broker available, auto-approving outline")
         return sections
 
-    # Subscribe to approval event
-    # (In a real LangGraph interrupt, we'd use graph checkpointer + user input)
-    # For now, simulate with a simple wait loop polling Redis pub/sub
-
     logger.info("[%s] Waiting for outline approval...", doc_id)
 
-    # TODO: Replace with proper LangGraph interrupt + user input handling
-    # For MVP, we auto-approve after 1 second (stub)
-    await asyncio.sleep(1.0)
+    approved = await broker.wait_for_outline_approval(
+        doc_id=doc_id,
+        default_sections=[s.to_dict() for s in sections],
+        timeout_s=600.0,
+    )
 
-    logger.info("[%s] Outline auto-approved (HITL stub)", doc_id)
+    if approved and isinstance(approved[0], dict):
+        parsed = [
+            Section(
+                idx=int(item.get("idx", i + 1)),
+                title=str(item.get("title", f"Section {i+1}")),
+                scope=str(item.get("scope", "")),
+                target_words=int(item.get("target_words", 1000)),
+            )
+            for i, item in enumerate(approved)
+        ]
+        logger.info("[%s] Outline approved with %d sections", doc_id, len(parsed))
+        return parsed
+
+    logger.info("[%s] Outline approved with default sections", doc_id)
     return sections
 
 

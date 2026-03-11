@@ -20,7 +20,6 @@ Spec: §13 Writer node, §19 Budget tracking, §20 HITL
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import time
@@ -359,19 +358,17 @@ async def _wait_for_approval(
         logger.warning("No broker available, auto-approving section %d", section_idx)
         return content
 
-    # TODO: Replace with proper LangGraph interrupt + user input handling
-    # For MVP, auto-approve after 1 second (stub)
-    logger.info(
-        "[%s] Waiting for section %d approval...",
-        doc_id, section_idx,
-    )
-    await asyncio.sleep(1.0)
+    logger.info("[%s] Waiting for section %d approval...", doc_id, section_idx)
 
-    logger.info(
-        "[%s] Section %d auto-approved (HITL stub)",
-        doc_id, section_idx,
+    approved_content = await broker.wait_for_section_approval(
+        doc_id=doc_id,
+        section_idx=section_idx,
+        default_content=content,
+        timeout_s=600.0,
     )
-    return content
+
+    logger.info("[%s] Section %d approved (len=%d)", doc_id, section_idx, len(approved_content))
+    return approved_content
 
 
 # ---------------------------------------------------------------------------

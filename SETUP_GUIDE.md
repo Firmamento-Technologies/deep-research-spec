@@ -1,160 +1,100 @@
-# Deep Research System - Setup Completo
+# Deep Research System — Setup operativo (stato corrente)
 
-## 🚀 Quick Start (5 minuti)
+Guida aggiornata per avviare e testare il progetto in modo consistente.
 
-### 1. Clone e Checkout Branch
+## 1) Prerequisiti
+
+- Python 3.11+
+- Node.js 20+
+- Docker + Docker Compose
+
+## 2) Repository e branch
 
 ```bash
-cd C:\Users\Luca
-git clone https://github.com/lucadidomenicodopehubs/deep-research-spec
+git clone https://github.com/lucadidomenicodopehubs/deep-research-spec.git
 cd deep-research-spec
-git checkout fix/ui-issues-and-docker-config
-git pull origin fix/ui-issues-and-docker-config
+# checkout del branch su cui vuoi lavorare
 ```
 
-### 2. Avvia Infrastruttura con Docker
+## 3) Backend (canonico)
 
-```bash
-# Avvia PostgreSQL, Redis, MinIO
-docker-compose up -d postgres redis minio
-
-# Attendi 15 secondi per l'inizializzazione
-```
-
-### 3. Installa Dipendenze Python
+Il backend applicativo è sotto `backend/`.
 
 ```bash
 cd backend
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-pip install -r requirements_knowledge_spaces.txt
 ```
 
-### 4. Verifica Configurazione
+Avvio backend:
 
 ```bash
-# Il file .env è già presente nella root del progetto
-# Contiene la tua OPENROUTER_API_KEY
-
-# Verifica che PostgreSQL sia running
-docker exec -it drs-postgres psql -U drs -d drs -c "SELECT version();"
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 5. Avvia Backend
+Health check:
 
 ```bash
-cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 6. Testa
-
-```bash
-# Altro terminale
 curl http://localhost:8000/health
-
-# Oppure apri browser
-start http://localhost:8000/docs
 ```
 
----
+## 4) Frontend
 
-## 🔧 Troubleshooting
+```bash
+cd frontend
+npm ci
+npm run dev
+```
 
-### Errore: `ImportError: cannot import name 'get_db_session'`
+UI: `http://localhost:3001`
 
-**Causa**: Il codice usa `get_db_session()` ma `database/connection.py` esporta `get_db()`.
+## 5) Infrastruttura Docker (opzionale ma consigliata)
 
-**Fix**:
+```bash
+docker compose up -d postgres redis minio
+```
+
+## 6) Test minimi consigliati
+
+```bash
+# backend (dal root repo)
+python3 -m pytest tests/unit/test_budget_estimator_v2.py -q
+
+# frontend
+npm --prefix frontend run build
+```
+
+## Troubleshooting rapido
+
+- Se `npm ci` fallisce: verifica proxy/registry npm e autorizzazioni di rete.
+- Se il backend non parte: ricontrolla variabili `.env` e dipendenze Python installate.
+- Se Docker non è disponibile, puoi avviare backend/frontend senza stack completo (ma alcune feature non saranno operative).
+
+
+## Production secret policy (P1)
+
+For production-like deploys (`ENV=production` / `APP_ENV=production`):
+
+- `JWT_SECRET_KEY` **must** be set.
+- `scripts/verify_prod_env.sh` is executed by `scripts/deploy.sh` before migrations/deploy.
+- If secret validation fails, deployment aborts immediately (fail-fast).
+
+Example:
+
+```bash
+export ENV=production
+export APP_ENV=production
+export JWT_SECRET_KEY="<strong-random-secret>"
+bash scripts/deploy.sh
+```
+
+
+## QA dependencies (backend)
+
+Per eseguire in modo ripetibile i gate QA/CI (incluso `backend/tests/test_api_endpoints.py`):
+
 ```bash
 cd backend
-# Sostituisci tutte le occorrenze
-(Get-Content api/knowledge_spaces.py) -replace 'get_db_session', 'get_db' | Set-Content api/knowledge_spaces.py
+pip install -r requirements.txt -r requirements-test.txt
 ```
-
-### Errore: `asyncpg.exceptions.InvalidPasswordError`
-
-**Causa**: PostgreSQL non ha ancora processato la password.
-
-**Fix**:
-```bash
-# Ricrea container
-docker stop drs-postgres && docker rm drs-postgres
-docker-compose up -d postgres
-Start-Sleep -Seconds 15
-```
-
-### Errore: `ModuleNotFoundError: No module named 'langgraph'`
-
-**Fix**: Pull del branch aggiornato
-```bash
-git pull origin fix/ui-issues-and-docker-config
-cd backend
-pip install -r requirements.txt
-```
-
----
-
-## 📦 Servizi Docker
-
-| Servizio   | Porta | Credenziali             | URL                       |
-|------------|-------|-------------------------|---------------------------|
-| PostgreSQL | 5432  | `drs:drs_dev_password`  | localhost:5432            |
-| Redis      | 6379  | (nessuna)               | localhost:6379            |
-| MinIO      | 9000  | `drs_admin:drs_secret_key` | http://localhost:9000 |
-| MinIO UI   | 9001  | `drs_admin:drs_secret_key` | http://localhost:9001 |
-| Backend    | 8000  | (nessuna)               | http://localhost:8000     |
-| Prometheus | 9091  | (nessuna)               | http://localhost:9091     |
-| Grafana    | 3002  | `admin:admin`           | http://localhost:3002     |
-
----
-
-## 🔐 Variabili Ambiente (`.env`)
-
-Il file `.env` è già configurato con:
-- ✅ OPENROUTER_API_KEY (tua chiave)
-- ✅ DATABASE_URL corretto
-- ✅ Credenziali PostgreSQL/MinIO/Redis
-
-**⚠️ IMPORTANTE**: Il file `.env` è ora in `.gitignore` e **NON verrà committato**.
-
----
-
-## 🛠️ Comandi Utili
-
-```bash
-# Logs di tutti i servizi
-docker-compose logs -f
-
-# Logs solo PostgreSQL
-docker logs -f drs-postgres
-
-# Entra in PostgreSQL
-docker exec -it drs-postgres psql -U drs -d drs
-
-# Restart servizio singolo
-docker-compose restart postgres
-
-# Stop tutto
-docker-compose down
-
-# Stop e rimuovi volumi (reset completo)
-docker-compose down -v
-```
-
----
-
-## 📝 Prossimi Step
-
-1. ✅ Backend funzionante
-2. ⏳ Test endpoint API
-3. ⏳ Avvio Frontend
-4. ⏳ Test workflow completo
-
----
-
-## 🆘 Supporto
-
-Se hai problemi:
-1. Controlla i logs: `docker-compose logs -f`
-2. Verifica `.env`: `type .env`
-3. Testa connessione DB: `python test_asyncpg.py` (se esiste)
