@@ -24,13 +24,19 @@ The Researcher node (`src/graph/nodes/researcher.py`, 124 lines) is the most sig
 
 The model pricing architecture reveals a critical fragility. `src/llm/pricing.py` (32 lines) defines `MODEL_PRICING` as a flat dictionary keyed by `"provider/model"` strings. The `cost_usd()` function at line 28 performs a bare dictionary lookup: `p = MODEL_PRICING[model_id]` — no `.get()`, no fallback, no error handling. This will raise `KeyError` at runtime whenever OpenRouter returns a model string that doesn't exactly match the 17 entries in the dictionary. The `backend/src/llm/client.py` (line 474) handles this correctly with a try/except around `cost_usd()` that falls back to `0.0`, but `src/llm/pricing.py` itself provides no safety net, and any node in the `src/` pipeline that calls `cost_usd()` directly (rather than through the backend client) will crash.
 
-The routing table in `src/llm/routing.py` (547 lines) uses `openrouter/` prefixed model IDs for all agents except the writer, which uses `anthropic/` prefix for direct API access to enable prompt caching. The pricing table uses unprefixed `provider/model` IDs (e.g., `"anthropic/claude-opus-4-5"` not `"openrouter/anthropic/claude-opus-4-5"`). This inconsistency means that the routing layer must strip prefixes before pricing lookups, and the `_build_result()` method in `src/llm/client.py` must normalize the `model_used` string. If this normalization fails for any model, cost tracking silently breaks, and the budget controller makes decisions on incomplete data.
+Beyond the KeyError risk, the pricing table itself is dangerously inaccurate. It lists only 17 models while the routing table references many more. It omits Anthropic cache token costs entirely — `cache_creation_input` and `cache_read_input` tokens are ~90% cheaper than standard input tokens, and the writer node uses `cache_control: {"type": "ephemeral"}` blocks extensively (confirmed in `src/graph/nodes/writer.py` lines 216–232). It also ignores the 10–30% OpenRouter markup applied to all proxied models. The net result is cost estimates that are ±20% inaccurate, which means the budget controller's projections and threshold decisions operate on systematically wrong data.
+
+The routing table in `src/llm/routing.py` (547 lines) uses `openrouter/` prefixed model IDs for all agents except the writer, which uses `anthropic/` prefix for direct API access to enable prompt caching. The pricing table uses unprefixed `provider/model` IDs (e.g., `"anthropic/claude-opus-4-5"` not `"openrouter/anthropic/claude-opus-4-5"`). This inconsistency means that the routing layer must strip prefixes before pricing lookups, and the `_build_result()` method in `src/llm/client.py` must normalize the `model_used` string. If this normalization fails for any model, cost tracking silently breaks, and the budget controller makes decisions on incomplete data. There is also a subtle lateral fallback bug in the routing logic: when a preset lookup returns empty string (because `preset_lower` doesn't exist in the agent's route dict), the code passes that empty string to `_LATERAL_FALLBACKS.get("", [])`, which silently returns no fallbacks rather than escalating to vertical downgrade.
 
 The budget estimator v2 (`backend/src/services/budget_estimator_v2.py`, 374 lines) exists as a standalone module that fixes six documented bugs in the original estimator — including an 18× cost underestimate for `gpt-4.5` (at $150/M output tokens, style judge slot `judge_s1` using GPT-4.5 is by far the most expensive per-call component). This fix is correct and important, but the module lives in `backend/src/services/` and is **not integrated into either pipeline's actual execution path**. The `src/graph/nodes/budget_estimator.py` node in the main pipeline does not import or reference `budget_estimator_v2`. The `sys.path.insert(0, ...)` hack at line 29 of `budget_estimator_v2.py` confirms this module was designed to run standalone, not as part of the pipeline. The most critical cost calculation improvement in the codebase is dead code.
 
+### 1.3.1 Budget Enforcement Is Theater
+
+The budget management architecture has a deeper problem than inaccurate pricing: enforcement is fragmented across three disconnected lanes that never converge into a hard stop. The `src/budget/guard.py` `check_budget()` function checks `hard_stop_fired`, `spent >= max`, and estimated overage — but `src/graph/nodes/budget_controller.py` projects costs without ever raising exceptions or triggering hard stops. An `RLMBudgetController` exists at `src/budget/controller.py` but is **never instantiated or called** anywhere in the codebase — pure dead code. And the writer node's RLM cost reconciliation (lines 172–179 in `writer.py`) wraps the `result.usage_summary.total_cost` read in a try/except that silently logs a warning and skips the budget update on any `AttributeError`, `TypeError`, or `ValueError`. This means an RLM run where `usage_summary` is malformed will proceed with `budget['spent_dollars']` frozen at its pre-call value, and all downstream budget decisions (regime re-derivation, savings triggers, hard stop checks) will operate on stale data.
+
 ### 1.4 Scalability: Singleton Patterns and Concurrency Ceilings
 
-The `src/` pipeline relies heavily on module-level singletons. The LLM client is instantiated at module level: `llm_client = LLMClient()` in `src/llm/client.py`. The jury uses a module-level `ThreadPoolExecutor(max_workers=9)` in `src/graph/nodes/jury.py`. The SHINE adapter uses a thread-safe singleton with double-checked locking (`SHINEAdapterSingleton` in `src/graph/nodes/shine_adapter.py`). The researcher uses a module-level `_default_node = ResearcherNode()`. These singletons create a hard concurrency ceiling: multiple concurrent runs share the same thread pool, the same rate limiter state, and the same SHINE model instance. The `ThreadPoolExecutor(max_workers=9)` for the jury means that two concurrent runs with Premium preset (jury_size=3, 9 judges each) will contend for the same 9 worker threads, serializing what should be parallel evaluation.
+The `src/` pipeline relies heavily on module-level singletons. The LLM client is instantiated at module level: `llm_client = LLMClient()` in `src/llm/client.py`. The jury uses a module-level `ThreadPoolExecutor(max_workers=9)` in `src/graph/nodes/jury.py`. The SHINE adapter uses a thread-safe singleton with double-checked locking (`SHINEAdapterSingleton` in `src/graph/nodes/shine_adapter.py`). The researcher uses a module-level `_default_node = ResearcherNode()`. These singletons create a hard concurrency ceiling: multiple concurrent runs share the same thread pool, the same rate limiter state, and the same SHINE model instance. The `ThreadPoolExecutor(max_workers=9)` for the jury means that two concurrent runs with Premium preset (jury_size=3, 9 judges each) will contend for the same 9 worker threads, serializing what should be parallel evaluation. Additionally, the jury's `futures.as_completed()` call has no timeout — if a single judge hangs (e.g., OpenRouter drops the connection without closing it), the entire jury blocks indefinitely, and by extension the entire run stalls with no recovery path.
 
 The `backend/` `RunManager` tracks active runs in an in-memory dictionary (`active_runs: Dict[str, Dict[str, Any]] = {}`), which is adequate for a single-process deployment but incompatible with the spec's Kubernetes/KEDA scaling aspirations (§34). If two API servers handle concurrent runs, they have no shared visibility into active runs, no distributed locking, and no way to prevent duplicate run launches. The spec's Celery+Redis architecture (§34.2) is never implemented — the `backend/` pipeline uses plain `asyncio.create_task()` for background execution.
 
@@ -151,14 +157,21 @@ The `SourceConnector` ABC in `src/connectors/base.py` (295 lines) is well-design
 - `BraveConnector` (web search, redundancy for Tavily outages, 100–150 lines)
 - `SemanticScholarConnector` (academic search, 150–200 lines)
 
-#### C3: Fix `cost_usd()` KeyError in `src/llm/pricing.py`
-**Impact:** Medium-high. Any unrecognized model string crashes the pipeline.
-**Effort:** 0.5 person-days.
+#### C3: Fix `cost_usd()` KeyError and Pricing Accuracy in `src/llm/pricing.py`
+**Impact:** Medium-high. Any unrecognized model string crashes the pipeline; even recognized models have ±20% cost error.
+**Effort:** 1–2 person-days.
 **Risk:** Negligible.
 
-Change line 30 from `p = MODEL_PRICING[model_id]` to `p = MODEL_PRICING.get(model_id)` with a fallback that logs a warning and returns 0.0, matching the pattern already used in `backend/src/llm/client.py` line 474. Additionally, add a model-string normalization function that strips `openrouter/` prefixes before lookup, since the routing table uses prefixed IDs but the pricing table uses unprefixed ones.
+Change line 30 from `p = MODEL_PRICING[model_id]` to `p = MODEL_PRICING.get(model_id)` with a fallback that logs a warning and returns 0.0, matching the pattern already used in `backend/src/llm/client.py` line 474. Add a model-string normalization function that strips `openrouter/` prefixes before lookup. Add cache token pricing (Anthropic `cache_creation_input` at 1.25× base, `cache_read_input` at 0.1× base) since the writer uses prompt caching extensively. Add an OpenRouter markup multiplier (configurable, default 1.0 for direct API, 1.1–1.3 for OpenRouter). These changes bring cost estimates within ±5% of actual spend, making budget projections reliable.
 
-#### C4: Integrate Budget Estimator v2 Into the Pipeline
+#### C4: Unify Budget Enforcement Into a Single Authoritative Path
+**Impact:** High. Three disconnected budget tracking lanes means runs can overspend without triggering hard stops.
+**Effort:** 3–5 person-days.
+**Risk:** Medium — must preserve existing guard semantics while consolidating.
+
+Consolidate the three budget tracking lanes (`src/budget/guard.py` check_budget, `src/budget/controller.py` RLMBudgetController (dead code), and writer_node manual reconciliation) into a single `BudgetEnforcer` that is the sole authority for spend tracking and hard-stop decisions. The enforcer must: (a) accept cost updates from all sources (standard LLM calls, RLM calls, SHINE GPU time), (b) raise `BudgetExhaustedError` when `spent >= max_budget` rather than silently returning, (c) survive malformed `usage_summary` from RLM by using the pre-call token estimate as fallback rather than skipping the update entirely. Delete the dead `RLMBudgetController` and remove the try/except-swallow pattern in writer_node lines 172–179.
+
+#### C5: Integrate Budget Estimator v2 Into the Pipeline
 **Impact:** Medium-high. The 18× gpt-4.5 cost underestimate means budget guards are ineffective for Premium runs.
 **Effort:** 2 person-days.
 **Risk:** Low.
@@ -190,7 +203,14 @@ Add `_max_len_reducer` bounds (matching the pattern already used for `css_histor
 
 Add a check in `shine_adapter.py` that skips LoRA generation when `privacy_mode == "cloud"`, since cloud LLMs cannot apply LoRA weights. Currently the adapter checks for Economy preset, low word count, and iteration > 1, but not privacy mode — meaning cloud users silently burn GPU cycles for unusable LoRA weights.
 
-#### H4: CSS Formula Spec Conformance
+#### H4: Add Timeout to Jury Futures
+**Impact:** A single hanging judge blocks the entire run with no recovery.
+**Effort:** 0.5 person-days.
+**Risk:** Negligible.
+
+Add a `timeout` parameter to `futures.as_completed()` in `src/graph/nodes/jury.py`. On timeout, return the `_error_verdict()` fail-closed verdict for the timed-out judge and continue aggregation with available verdicts. Also fix the error verdict's `veto_category="technical_failure"` which is not a valid value in the `JudgeVerdict.veto_category` Literal type — it should use an existing category or `None`.
+
+#### H5: CSS Formula Spec Conformance
 **Impact:** Quality gate behavior differs from documented specification.
 **Effort:** 1 person-day.
 **Risk:** Medium — changes approval/rejection rates.
@@ -237,6 +257,29 @@ The spec §23 defines a comprehensive observability stack (OpenTelemetry tracing
 
 #### X2: Distributed RLM REPL (Docker/Modal/E2B sandboxes)
 **Rationale:** RLM supports remote sandboxed execution environments (Docker, Modal, Prime, Daytona, E2B), but these add infrastructure complexity for a feature (code execution in REPL) that DRS uses marginally. The security risk of executing LLM-generated code — even in a sandbox — for a research document generator is not justified by the quality improvement. If RLM is retained, keep it in `environment="local"` with the understanding that it processes only trusted internal prompts, never external source content.
+
+---
+
+---
+
+## Appendix — Quantitative Quality Assessment
+
+Based on deep analysis of 14,512 lines of Python across the `src/` pipeline (41 node files, LLM client, routing, pricing, resilience, budget, config, observability, security, connectors) and the `backend/` infrastructure (graph builder, run manager, LLM client, budget estimator v2, database models, API endpoints):
+
+| Component | Architectural Soundness | Execution Completeness | Production Readiness |
+|-----------|------------------------|----------------------|---------------------|
+| Graph topology (`src/graph/graph.py`) | 95% | 90% | High |
+| LLM client (`src/llm/client.py`) | 88% | 85% | Medium-High |
+| Model routing (`src/llm/routing.py`) | 92% | 88% | Medium-High |
+| Jury orchestration (`src/graph/nodes/jury.py`) | 88% | 80% | Medium |
+| Budget management (all modules) | 55% | 30% | **Not ready** |
+| RLM integration | 75% | 60% | **Not ready** |
+| SHINE integration | 72% | 40% | **Not ready** |
+| Observability | 72% | 50% | **Not ready** |
+| Research/connectors | 82% (ABC) | 20% (1 of 5 connectors) | **Not ready** |
+| Backend infrastructure | 85% | 75% | Medium |
+
+**Overall verdict: 75% architecturally sound, 55% complete in execution. Not production-ready without the Critical fixes (C1–C5) from the roadmap above.**
 
 ---
 
