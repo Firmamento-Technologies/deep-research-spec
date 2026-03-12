@@ -109,3 +109,7 @@ def check_budget(
         "BudgetGuard: OK for %s (spent=$%.4f / $%.2f, remaining=$%.4f)",
         agent, spent, max_dollars, max_dollars - spent,
     )
+
+
+# Alias used by panel_discussion and other callers
+check_budget_before_call = check_budget
