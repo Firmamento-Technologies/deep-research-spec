@@ -1,0 +1,134 @@
+import { useMemo } from 'react'
+import { PIPELINE_EDGES } from '../../constants/pipeline-edges'
+import { PIPELINE_NODES, CLUSTER_COLORS, NodeDefinition } from '../../constants/pipeline-layout'
+import type { NodeState } from '../../store/useRunStore'
+
+const CANVAS_WIDTH = 2400
+const CANVAS_HEIGHT = 3200
+
+interface PipelineEdgesProps {
+  nodeStates: Record<string, NodeState>
+  visibleNodeIds: Set<string>
+  showLabels: boolean
+}
+
+function getNodeCenter(node: NodeDefinition) {
+  return {
+    x: node.x + node.width / 2,
+    y: node.y + node.height / 2,
+  }
+}
+
+export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: PipelineEdgesProps) {
+  const nodeMap = useMemo(() => {
+    const map: Record<string, NodeDefinition> = {}
+    PIPELINE_NODES.forEach(n => { map[n.id] = n })
+    return map
+  }, [])
+
+  const visibleEdges = useMemo(
+    () => PIPELINE_EDGES.filter((e) => visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)),
+    [visibleNodeIds],
+  )
+
+  return (
+    <svg
+      style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+      className="absolute top-0 left-0 pointer-events-none overflow-visible"
+    >
+      <defs>
+        {visibleEdges.map(edge => {
+          const fromNode = nodeMap[edge.from]
+          if (!fromNode) return null
+          const color = CLUSTER_COLORS[fromNode.cluster]
+          return (
+            <marker
+              key={`arrow-${edge.id}`}
+              id={`arrow-${edge.id}`}
+              markerWidth="6"
+              markerHeight="6"
+              refX="5"
+              refY="3"
+              orient="auto"
+            >
+              <path d="M0,0 L0,6 L6,3 z" fill={color} opacity={0.6} />
+            </marker>
+          )
+        })}
+      </defs>
+
+      {visibleEdges.map(edge => {
+        const fromNode = nodeMap[edge.from]
+        const toNode = nodeMap[edge.to]
+        if (!fromNode || !toNode) return null
+
+        const from = getNodeCenter(fromNode)
+        const to = getNodeCenter(toNode)
+        const color = CLUSTER_COLORS[fromNode.cluster]
+        const fromStatus = nodeStates[edge.from]?.status
+        const isActive = fromStatus === 'running' && edge.animated
+        const opacity = edge.type === 'dotted' ? 0.28 : 0.48
+
+        const dx = to.x - from.x
+        const dy = to.y - from.y
+        let pathD: string
+
+        if (Math.abs(dy) < 10 && Math.abs(dx) > 100) {
+          const cy = from.y - 40
+          pathD = `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${cy} ${to.x} ${to.y}`
+        } else if (dy < 0) {
+          const offset = 120
+          pathD = `M ${from.x} ${from.y} C ${from.x + offset} ${from.y} ${to.x + offset} ${to.y} ${to.x} ${to.y}`
+        } else {
+          const cy1 = from.y + dy * 0.4
+          const cy2 = from.y + dy * 0.6
+          pathD = `M ${from.x} ${from.y} C ${from.x} ${cy1} ${to.x} ${cy2} ${to.x} ${to.y}`
+        }
+
+        const strokeDasharray =
+          edge.type === 'dashed' ? '6 4' :
+            edge.type === 'dotted' ? '2 4' :
+              undefined
+
+        const pathId = `path-${edge.id}`
+
+        return (
+          <g key={edge.id}>
+            <path
+              id={pathId}
+              d={pathD}
+              stroke={color}
+              strokeWidth={1.4}
+              strokeDasharray={strokeDasharray}
+              fill="none"
+              opacity={opacity}
+              markerEnd={`url(#arrow-${edge.id})`}
+            />
+
+            {isActive && (
+              <circle r="4" fill={color} opacity={0.9}>
+                <animateMotion dur="1.5s" repeatCount="indefinite">
+                  <mpath href={`#${pathId}`} />
+                </animateMotion>
+              </circle>
+            )}
+
+            {showLabels && edge.label && (
+              <text
+                x={(from.x + to.x) / 2}
+                y={(from.y + to.y) / 2 - 4}
+                fontSize={9}
+                fontFamily="monospace"
+                fill={color}
+                opacity={0.72}
+                textAnchor="middle"
+              >
+                {edge.label}
+              </text>
+            )}
+          </g>
+        )
+      })}
+    </svg>
+  )
+}

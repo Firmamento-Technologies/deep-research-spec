@@ -1,0 +1,82 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "drs-performance",
+    "title": "Performance Metrics",
+    "tags": ["drs", "performance"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "LLM Latency (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(drs_llm_latency_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(drs_llm_latency_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(drs_llm_latency_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxis": {"label": "Seconds"}
+      },
+      {
+        "id": 2,
+        "title": "Section Processing Time",
+        "type": "heatmap",
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(drs_section_duration_seconds_bucket[5m])",
+            "format": "heatmap",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Throughput (Sections/min)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(drs_sections_processed_total{status='success'}[5m]) * 60",
+            "legendFormat": "Success",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(drs_sections_processed_total{status='failed'}[5m]) * 60",
+            "legendFormat": "Failed",
+            "refId": "B"
+          }
+        ],
+        "yaxis": {"label": "Sections/min"}
+      },
+      {
+        "id": 4,
+        "title": "Run Duration Distribution",
+        "type": "heatmap",
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(drs_run_duration_seconds_bucket[5m])",
+            "format": "heatmap",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  }
+}

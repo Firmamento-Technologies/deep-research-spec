@@ -1,0 +1,154 @@
+{
+  "dashboard": {
+    "title": "DRS Pipeline Monitoring",
+    "tags": ["drs", "metrics"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Budget Overview",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "drs_budget_spent",
+            "legendFormat": "Spent ($)",
+            "refId": "A"
+          },
+          {
+            "expr": "drs_budget_max",
+            "legendFormat": "Max Budget ($)",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "currencyUSD", "label": "Budget"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Budget Usage %",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "(drs_budget_spent / drs_budget_max) * 100",
+            "legendFormat": "Usage %",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 70, "color": "yellow"},
+                {"value": 90, "color": "red"}
+              ]
+            },
+            "max": 100,
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Pipeline Duration",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(drs_pipeline_duration_seconds_sum[5m]) / rate(drs_pipeline_duration_seconds_count[5m])",
+            "legendFormat": "Avg Duration (5m)",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Sections Approved",
+        "type": "stat",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "drs_sections_approved_total",
+            "legendFormat": "Total Approved",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "yellow"},
+                {"value": 3, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "LLM Call Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "rate(drs_llm_calls_total[1m])",
+            "legendFormat": "{{agent}} - {{model}}",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Calls/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "CSS Scores by Section",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "drs_css_content",
+            "legendFormat": "Content CSS",
+            "refId": "A"
+          },
+          {
+            "expr": "drs_css_style",
+            "legendFormat": "Style CSS",
+            "refId": "B"
+          },
+          {
+            "expr": "drs_css_composite",
+            "legendFormat": "Composite CSS",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "CSS Score", "max": 1, "min": 0},
+          {"format": "short"}
+        ]
+      }
+    ],
+    "refresh": "5s",
+    "time": {"from": "now-15m", "to": "now"},
+    "timepicker": {}
+  }
+}

@@ -1,0 +1,119 @@
+name: Test RAG + SHINE Integration
+
+on:
+  pull_request:
+    paths:
+      - 'agents/shine_adapter.py'
+      - 'agents/memvid_connector.py'
+      - 'tests/test_rag_shine_*.py'
+      - 'scripts/build_memvid_kb.py'
+  push:
+    branches: [main, struct, develop]
+
+jobs:
+  test-rag:
+    name: Test RAG (Memvid + bge-m3)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-shine.txt
+          pip install pytest pytest-cov pytest-xdist
+      
+      - name: Build test knowledge base
+        run: |
+          mkdir -p tests/fixtures/specs
+          echo "# Test Spec\n\nThis is a test document for RAG." > tests/fixtures/specs/test.md
+          python scripts/build_memvid_kb.py --input tests/fixtures/specs/ --output test_kb.mp4
+      
+      - name: Run RAG tests
+        run: |
+          pytest tests/test_memvid_connector.py -v --cov=agents.memvid_connector --cov-report=xml
+          pytest tests/test_rag_fallback.py -v --cov-append --cov-report=xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: rag
+  
+  test-shine:
+    name: Test SHINE (GPU required)
+    runs-on: [self-hosted, gpu]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/struct')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install SHINE from GitHub
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-shine.txt
+          git clone https://github.com/Yewei-Liu/SHINE.git /tmp/shine
+          pip install -e /tmp/shine
+      
+      - name: Verify GPU availability
+        run: |
+          python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'GPU count: {torch.cuda.device_count()}')"
+      
+      - name: Test SHINE adapter
+        run: |
+          pytest tests/test_shine_adapter.py --gpu -v --cov=agents.shine_adapter --cov-report=xml
+        env:
+          CUDA_VISIBLE_DEVICES: 0
+      
+      - name: Test SHINE e2e integration
+        run: |
+          pytest tests/test_rag_shine_e2e.py --gpu -v --cov-append --cov-report=xml
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: shine
+  
+  test-fallback:
+    name: Test Fallback Paths (no GPU)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements-shine.txt
+          pip install pytest
+      
+      - name: Test SHINE fallback (CPU)
+        run: |
+          pytest tests/test_shine_fallback.py -v -k "cpu or fallback"
+        env:
+          CUDA_VISIBLE_DEVICES: ""

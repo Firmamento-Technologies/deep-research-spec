@@ -1,0 +1,53 @@
+# Deep Research System — Central Configuration
+# Environment variables: use ${VAR_NAME:-default_value} syntax
+
+system:
+  version: "1.0.0"
+  environment: "${DRS_ENV:-development}"
+
+llm:
+  default_temperature: 0.3
+  default_max_tokens: 8192
+  retry_attempts: 3
+  timeout_seconds: 120
+
+writer:
+  temperature: 0.3
+  max_tokens: 8192
+  word_count_tolerance: 0.15
+
+jury:
+  default_size: 1
+  timeout_per_judge: 60
+
+budgets:
+  economy:
+    max_cost_per_section: 0.50
+    jury_size: 1
+    quality_bar: 0.60
+  balanced:
+    max_cost_per_section: 2.00
+    jury_size: 2
+    quality_bar: 0.70
+  premium:
+    max_cost_per_section: 10.00
+    jury_size: 3
+    quality_bar: 0.85
+
+database:
+  url: "${DATABASE_URL:-postgresql://drs:drs_dev_password@localhost:5432/drs}"
+  pool_size: 10
+
+cache:
+  ttl_seconds: 300
+
+shine:
+  enabled: true
+  min_corpus_tokens: 4000
+  target_compression: 1200
+
+output:
+  dir: "output"
+  formats:
+    - "markdown"
+    - "docx"

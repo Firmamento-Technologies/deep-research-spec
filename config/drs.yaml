@@ -1,0 +1,19 @@
+# DRS Configuration for economy mode with auto-approval
+# This config disables human-in-the-loop to allow automated testing
+
+defaults:
+  quality_preset: economy
+  target_words: 1000
+  max_budget_dollars: 50.0
+  hitl_enabled: false  # Disable HITL to enable auto_approve_outline
+  output_formats:
+    - markdown
+
+convergence:
+  panel_max_rounds: 1
+  oscillation_soft_limit: 2
+  oscillation_hard_limit: 3
+  jury_weights:
+    reasoning: 0.35
+    factual: 0.45
+    style: 0.20

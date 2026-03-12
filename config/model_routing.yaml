@@ -1,0 +1,152 @@
+# =============================================================================
+# Deep Research System — Model Routing Override Configuration
+# =============================================================================
+#
+# This file overrides model assignments from src/llm/routing.py at runtime.
+# Changes take effect on the NEXT document run without code redeploy.
+#
+# HOT RELOAD (zero-downtime):
+#   from src.llm.routing import reload_routing_config
+#   reload_routing_config()   # thread-safe, reloads this file immediately
+#
+# FORMAT:
+#   <agent_name>:
+#     economy:  <provider-prefix>/<model>
+#     balanced: <provider-prefix>/<model>
+#     premium:  <provider-prefix>/<model>
+#
+# PROVIDER PREFIXES:
+#   openrouter/<provider>/<model>  → OpenRouter gateway (single API key)
+#   anthropic/<model>              → Direct Anthropic (§29.1 prompt caching)
+#
+# RULES:
+#   ✦ writer MUST use anthropic/ prefix (not openrouter/) to enable
+#     §29.1 prompt caching. Savings: ~$0.30-0.90 per 20-section document.
+#   ✦ Only agents listed here are overridden. All other agents use
+#     the built-in _DEFAULT_ROUTING table in src/llm/routing.py.
+#   ✦ Partial overrides are supported: you can list only "premium" and
+#     omit "economy"/"balanced" to override just one preset.
+# =============================================================================
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WRITER
+# ─────────────────────────────────────────────────────────────────────────────
+# Direct Anthropic path: enables §29.1 prompt caching for style rules + exemplar.
+# Do NOT change to openrouter/ — caching requires the direct API path.
+writer:
+  economy:  anthropic/claude-sonnet-4
+  balanced: anthropic/claude-opus-4-5
+  premium:  anthropic/claude-opus-4-5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JURY R — Reasoning / Reliability  (heterogeneous backbones)
+# Slot 1 = OpenAI   (strong formal reasoning, o-series)
+# Slot 2 = Google   (grounding + real-time search via Gemini)
+# Slot 3 = Anthropic (nuanced analysis, Claude)
+# ─────────────────────────────────────────────────────────────────────────────
+jury_r_1:
+  economy:  openrouter/openai/o3-mini
+  balanced: openrouter/openai/o3-mini
+  premium:  openrouter/openai/o3
+
+jury_r_2:
+  economy:  openrouter/openai/o3-mini
+  balanced: openrouter/google/gemini-2.5-pro
+  premium:  openrouter/google/gemini-2.5-pro
+
+jury_r_3:
+  economy:  openrouter/openai/o3-mini
+  balanced: openrouter/anthropic/claude-sonnet-4
+  premium:  openrouter/anthropic/claude-opus-4-5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JURY F — Factual verification  (heterogeneous backbones)
+# Slot 1 = Google   (Grounding API + search for fact-checking)
+# Slot 2 = OpenAI   (o-series reasoning for evidence evaluation)
+# Slot 3 = Anthropic (citation analysis)
+# ─────────────────────────────────────────────────────────────────────────────
+jury_f_1:
+  economy:  openrouter/google/gemini-2.5-flash
+  balanced: openrouter/google/gemini-2.5-pro
+  premium:  openrouter/google/gemini-2.5-pro
+
+jury_f_2:
+  economy:  openrouter/google/gemini-2.5-flash
+  balanced: openrouter/openai/o3-mini
+  premium:  openrouter/openai/o3
+
+jury_f_3:
+  economy:  openrouter/google/gemini-2.5-flash
+  balanced: openrouter/anthropic/claude-sonnet-4
+  premium:  openrouter/anthropic/claude-opus-4-5
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JURY S — Style quality  (heterogeneous backbones)
+# Slot 1 = Anthropic (strongest prose style evaluation)
+# Slot 2 = Google   (creative assessment)
+# Slot 3 = OpenAI   (structural coherence)
+# ─────────────────────────────────────────────────────────────────────────────
+jury_s_1:
+  economy:  openrouter/google/gemini-2.5-flash
+  balanced: openrouter/anthropic/claude-sonnet-4
+  premium:  openrouter/anthropic/claude-opus-4-5
+
+jury_s_2:
+  economy:  openrouter/google/gemini-2.5-flash
+  balanced: openrouter/google/gemini-2.5-pro
+  premium:  openrouter/google/gemini-2.5-pro
+
+jury_s_3:
+  economy:  openrouter/google/gemini-2.5-flash
+  balanced: openrouter/openai/o3-mini
+  premium:  openrouter/openai/o3
+
+
+# =============================================================================
+# OVERRIDE EXAMPLES
+# =============================================================================
+# Uncomment and edit the sections below to override specific agents.
+# Call reload_routing_config() after saving for immediate effect.
+#
+# Example 1: Downgrade writer to sonnet across all presets (cost reduction ~40%)
+# writer:
+#   economy:  anthropic/claude-sonnet-4
+#   balanced: anthropic/claude-sonnet-4
+#   premium:  anthropic/claude-sonnet-4
+#
+# Example 2: Force all jury slots to flash for rapid local testing
+# jury_r_1:
+#   economy:  openrouter/google/gemini-2.5-flash
+#   balanced: openrouter/google/gemini-2.5-flash
+#   premium:  openrouter/google/gemini-2.5-flash
+# jury_r_2:
+#   economy:  openrouter/google/gemini-2.5-flash
+#   balanced: openrouter/google/gemini-2.5-flash
+#   premium:  openrouter/google/gemini-2.5-flash
+# jury_r_3:
+#   economy:  openrouter/google/gemini-2.5-flash
+#   balanced: openrouter/google/gemini-2.5-flash
+#   premium:  openrouter/google/gemini-2.5-flash
+#
+# Example 3: Upgrade to newer model when available (e.g. after o4 release)
+# jury_r_1:
+#   premium: openrouter/openai/o4
+#
+# Example 4: Route all jury_f to a single trusted fact-checking model
+# jury_f_1:
+#   economy:  openrouter/google/gemini-2.5-pro
+#   balanced: openrouter/google/gemini-2.5-pro
+#   premium:  openrouter/google/gemini-2.5-pro
+# jury_f_2:
+#   economy:  openrouter/google/gemini-2.5-pro
+#   balanced: openrouter/google/gemini-2.5-pro
+#   premium:  openrouter/google/gemini-2.5-pro
+# jury_f_3:
+#   economy:  openrouter/google/gemini-2.5-pro
+#   balanced: openrouter/google/gemini-2.5-pro
+#   premium:  openrouter/google/gemini-2.5-pro
+# =============================================================================

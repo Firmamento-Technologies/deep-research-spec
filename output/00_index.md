@@ -56,6 +56,7 @@ Core architecture: a **Mixture-of-Writers** produces parallel drafts per section
 | 36 | KPIs & Success Metrics | Quantitative targets: quality, efficiency, reliability, convergence, MoW | [36_kpis.md](./36_kpis.md) |
 | 37 | Extensibility & Plugins | SourceConnector/Judge/OutputFormatter interfaces, Multi-Document Mode | [37_extensibility.md](./37_extensibility.md) |
 | 38 | AI Builder Rules | Imperative non-negotiable implementation rules for the coding agent | [38_ai_builder_rules.md](./38_ai_builder_rules.md) |
+| 39 | Spec Review & Self-Validation Loop | Pre-production validation gate: SpecReviewAgent, SpecFixerAgent, Loop Controller (max 3 iter) — blocks code generation until `critical_issues == 0` | [39_spec_review_loop.md](./39_spec_review_loop.md) |
 
 ---
 
@@ -63,13 +64,13 @@ Core architecture: a **Mixture-of-Writers** produces parallel drafts per section
 
 ### Path 1: Implement from Scratch
 ```
-§33 → §04 → §05 → §38 → §21 → §19 → §20 → §28 → §29 →
+§39 → §33 → §04 → §05 → §38 → §21 → §19 → §20 → §28 → §29 →
 §26 → §27 → §08 → §09 → §10 → §07 → §12 → §13 → §14 →
 §15 → §16 → §17 → §18 → §06 → §11 → §03 → §03B → §01 →
 §02 → §22 → §23 → §24 → §25 → §30 → §31 → §32 → §34 →
 §35 → §36 → §37
 ```
-Start with stack (§33) and architecture (§04) before any agent code. Read §38 before writing any agent module. §26 defines L1/L2/L3 enforcement consumed by §05 Style Linter — read §26 before §27.
+**Start with §39**: run the Spec Review Loop and resolve all CRITICAL issues before any implementation. Then stack (§33) and architecture (§04). Read §38 before writing any agent module. §26 defines L1/L2/L3 enforcement consumed by §05 Style Linter — read §26 before §27.
 
 ### Path 2: Integrate a Single Component
 Navigate directly to the section for the target component. Every agent spec in §05 lists `CONSUMES` and `PRODUCES` fields pointing to the exact `DocumentState` fields and their source sections.
@@ -101,6 +102,11 @@ Covers principles → jury design → economics → chain orchestration → succ
 §12  MUST be read before §05.12 (Reflector scope defines Span Editor activation)
 §03B MUST be read before §05.7  (Style Exemplar is Writer input)
 §31  REQUIRES §04 complete      (Pipeline Orchestrator wraps the full graph)
+```
+
+```
+§39  MUST run before Phase A    (blocks code generation until critical_issues == 0)
+§04  provides DocumentState fields consumed by §39.6 (SpecValidationState)
 ```
 
 <!-- SPEC_COMPLETE -->

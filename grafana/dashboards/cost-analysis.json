@@ -1,0 +1,102 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "drs-cost",
+    "title": "Cost Analysis",
+    "tags": ["drs", "cost"],
+    "timezone": "browser",
+    "schemaVersion": 16,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Cost per Run (7d average)",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "avg_over_time(drs_total_cost_dollars[7d])",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "unit": "currencyUSD"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Budget Utilization by Preset",
+        "type": "bargauge",
+        "gridPos": {"x": 8, "y": 0, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "drs_budget_utilization_ratio",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "orientation": "horizontal",
+          "thresholds": [
+            {"value": 0, "color": "green"},
+            {"value": 0.8, "color": "yellow"},
+            {"value": 0.95, "color": "red"}
+          ]
+        }
+      },
+      {
+        "id": 3,
+        "title": "Total Spend (30d)",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 0, "w": 8, "h": 4},
+        "targets": [
+          {
+            "expr": "increase(drs_total_cost_dollars[30d])",
+            "refId": "A"
+          }
+        ],
+        "options": {
+          "unit": "currencyUSD",
+          "graphMode": "area"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Cost Trends",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 4, "w": 24, "h": 8},
+        "targets": [
+          {
+            "expr": "rate(drs_total_cost_dollars[1h])",
+            "legendFormat": "Cost/hour",
+            "refId": "A"
+          }
+        ],
+        "yaxis": {"label": "USD/hour"}
+      },
+      {
+        "id": 5,
+        "title": "Cost by Agent",
+        "type": "piechart",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (agent) (drs_llm_calls_total)",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Cost by Model",
+        "type": "piechart",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "sum by (model) (drs_llm_calls_total)",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  }
+}
