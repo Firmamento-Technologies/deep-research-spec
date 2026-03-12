@@ -97,32 +97,17 @@ export function PipelineCanvas() {
   const nodeStates = activeRun?.nodes ?? {}
 
   return (
-    <div style={{ visibility: isVisible ? 'visible' : 'hidden', position: 'absolute', inset: 0 }} aria-label="Pipeline visualization" role="img">
+    <div style={{ visibility: isVisible ? 'visible' : 'hidden' }} className="absolute inset-0" aria-label="Pipeline visualization" role="img">
       <PipelineHeader run={activeRun} />
 
       <div
-        style={{
-          position: 'absolute',
-          top: 44,
-          left: 12,
-          zIndex: 22,
-          display: 'flex',
-          gap: 8,
-          alignItems: 'center',
-          background: 'rgba(10,11,15,0.8)',
-          border: '1px solid #2A2D3A',
-          borderRadius: 8,
-          padding: '6px 8px',
-          color: '#D7DAE8',
-          fontSize: 11,
-          fontFamily: 'monospace',
-        }}
+        className="absolute top-[44px] left-[12px] z-[22] flex gap-[8px] items-center bg-[rgba(10,11,15,0.8)] border border-drs-border rounded-card px-[8px] py-[6px] text-[#D7DAE8] text-[11px] font-mono"
       >
         <span>View:</span>
         <select
           value={graphMode}
           onChange={(e) => setGraphMode(e.target.value as GraphMode)}
-          style={{ background: '#151821', color: '#F0F1F6', border: '1px solid #34384A', borderRadius: 4 }}
+          className="bg-[#151821] text-drs-text border border-[#34384A] rounded-input"
         >
           <option value="core">Core flow</option>
           <option value="quality">Core + quality loop</option>
@@ -135,9 +120,7 @@ export function PipelineCanvas() {
             setPanX(-200)
             setPanY(-40)
           }}
-          style={{
-            background: '#202534', color: '#CDD2EA', border: '1px solid #3A4058', borderRadius: 4, padding: '2px 8px',
-          }}
+          className="bg-[#202534] text-[#CDD2EA] border border-[#3A4058] rounded-input px-[8px] py-[2px]"
         >
           Reset view
         </button>
@@ -155,26 +138,23 @@ export function PipelineCanvas() {
           style={{
             transform: `translate(${panX}px, ${panY}px) scale(${zoom})`,
             transformOrigin: '0 0',
-            position: 'absolute',
             width: CANVAS_WIDTH,
             height: CANVAS_HEIGHT,
           }}
+          className="absolute"
         >
           {PHASE_LANES.map((lane) => (
             <div
               key={lane.label}
               style={{
-                position: 'absolute',
                 left: 120,
                 top: lane.y,
                 width: 1800,
                 height: lane.h,
-                border: '1px solid rgba(92,101,132,0.25)',
-                background: 'rgba(30,34,45,0.22)',
-                borderRadius: 10,
               }}
+              className="absolute border border-[rgba(92,101,132,0.25)] bg-[rgba(30,34,45,0.22)] rounded-[10px]"
             >
-              <span style={{ fontSize: 10, color: '#AEB5CF', fontFamily: 'monospace', marginLeft: 8 }}>{lane.label}</span>
+              <span className="text-[10px] text-[#AEB5CF] font-mono ml-[8px]">{lane.label}</span>
             </div>
           ))}
 

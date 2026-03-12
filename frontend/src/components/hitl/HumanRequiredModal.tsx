@@ -24,83 +24,36 @@ export function HumanRequiredModal() {
 
   return (
     <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 50,
-        background: 'rgba(0,0,0,0.85)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backdropFilter: 'blur(4px)',
-      }}
+      className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-[4px]"
+      style={{ background: 'rgba(0,0,0,0.85)' }}
     // NOT dismissible — no onClick on overlay
     >
       <div
-        style={{
-          background: '#111318',
-          border: '1px solid #2A2D3A',
-          borderRadius: 12,
-          width: '90vw',
-          maxWidth: hitlType === 'section_approval' ? 1100 : 680,
-          maxHeight: '90vh',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.7)',
-        }}
+        className="bg-drs-s1 border border-drs-border rounded-[12px] w-[90vw] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)]"
+        style={{ maxWidth: hitlType === 'section_approval' ? 1100 : 680 }}
         onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
-        <div
-          style={{
-            padding: '14px 20px',
-            borderBottom: '1px solid #2A2D3A',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexShrink: 0,
-          }}
-        >
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: '50%',
-              background: '#F97316',
-              boxShadow: '0 0 8px #F97316',
-              display: 'inline-block',
-            }}
-          />
-          <span style={{ fontSize: 13, fontFamily: 'monospace', color: '#F0F1F6', fontWeight: 700 }}>
+        <div className="p-[14px_20px] border-b border-drs-border flex items-center gap-[10px] shrink-0">
+          <span className="w-[10px] h-[10px] rounded-full bg-drs-orange inline-block shadow-[0_0_8px_#F97316]" />
+          <span className="text-[13px] font-mono text-drs-text font-bold">
             {hitlType === 'outline_approval' && 'APPROVAZIONE OUTLINE'}
             {hitlType === 'section_approval' && 'REVISIONE SEZIONE'}
             {hitlType === 'escalation' && 'ESCALATION — AZIONE RICHIESTA'}
             {!hitlType && 'AZIONE RICHIESTA'}
           </span>
-          <span
-            style={{
-              marginLeft: 'auto',
-              fontSize: 10,
-              fontFamily: 'monospace',
-              color: '#F97316',
-              background: '#F9731620',
-              border: '1px solid #F9731660',
-              borderRadius: 3,
-              padding: '2px 8px',
-            }}
-          >
+          <span className="ml-auto text-[10px] font-mono text-drs-orange rounded-[3px] px-[8px] py-[2px]" style={{ background: '#F9731620', border: '1px solid #F9731660' }}>
             PIPELINE IN PAUSA
           </span>
         </div>
 
         {/* Modal body */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div className="flex-1 overflow-hidden">
           {hitlType === 'outline_approval' && <OutlineDragList docId={activeDocId} />}
           {hitlType === 'section_approval' && <SectionReviewSplit docId={activeDocId} />}
           {hitlType === 'escalation' && <EscalationBanner docId={activeDocId} />}
           {!hitlType && (
-            <div style={{ padding: 24, fontSize: 13, color: '#8B8FA8', fontFamily: 'monospace' }}>
+            <div className="p-[24px] text-[13px] text-drs-muted font-mono">
               Attendere i dati dalla pipeline…
             </div>
           )}

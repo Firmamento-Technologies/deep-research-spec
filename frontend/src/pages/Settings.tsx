@@ -128,68 +128,40 @@ export function Settings() {
 
   if (!data) {
     return (
-      <div style={{ flex: 1, background: '#0A0B0F', padding: 28, color: '#50536A', fontSize: 12, fontFamily: 'monospace' }}>
-        {error ? `Errore: ${error}` : 'Caricamento impostazioni…'}
+      <div className="flex-1 bg-drs-bg p-[28px] text-drs-faint text-[12px] font-mono">
+        {error ? `Errore: ${error}` : 'Caricamento impostazioni...'}
       </div>
     )
   }
 
   return (
-    <div style={{ flex: 1, background: '#0A0B0F', overflowY: 'auto', padding: '20px 28px' }}>
+    <div className="flex-1 bg-drs-bg overflow-y-auto px-[28px] py-[20px]">
       {/* Header with back button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+      <div className="flex items-center gap-[12px] mb-[24px]">
         <button
           onClick={() => navigate('/')}
-          style={{
-            background: 'transparent',
-            border: '1px solid #2A2D3A',
-            borderRadius: 6,
-            color: '#8B8FA8',
-            fontSize: 12,
-            fontFamily: 'monospace',
-            padding: '6px 12px',
-            cursor: 'pointer',
-          }}
+          className="bg-transparent border border-drs-border rounded-[6px] text-drs-muted text-[12px] font-mono px-[12px] py-[6px] cursor-pointer"
           title="Torna alla home"
         >
           ← Indietro
         </button>
-        <div style={{ fontSize: 18, color: '#F0F1F6', fontWeight: 700 }}>Impostazioni</div>
+        <div className="text-[18px] text-drs-text font-bold">Impostazioni</div>
       </div>
 
       {/* API Keys */}
       <Section title="API Keys">
         <Label>OpenRouter API Key</Label>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div className="flex gap-[8px] items-center">
           <input
             type={showApiKey ? 'text' : 'password'}
             value={data.api_keys.openrouter}
             onChange={e => updateField(['api_keys', 'openrouter'], e.target.value)}
             placeholder="sk-or-v1-..."
-            style={{
-              flex: 1,
-              background: '#111318',
-              border: '1px solid #2A2D3A',
-              borderRadius: 4,
-              color: '#F0F1F6',
-              fontSize: 12,
-              fontFamily: 'monospace',
-              padding: '7px 10px',
-              outline: 'none',
-            }}
+            className="flex-1 bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[7px] outline-none"
           />
           <button
             onClick={() => setShowApiKey(o => !o)}
-            style={{
-              background: 'transparent',
-              border: '1px solid #2A2D3A',
-              borderRadius: 4,
-              color: '#8B8FA8',
-              fontSize: 11,
-              fontFamily: 'monospace',
-              padding: '6px 12px',
-              cursor: 'pointer',
-            }}
+            className="bg-transparent border border-drs-border rounded-input text-drs-muted text-[11px] font-mono px-[12px] py-[6px] cursor-pointer"
           >
             {showApiKey ? 'Nascondi' : 'Mostra'}
           </button>
@@ -198,7 +170,7 @@ export function Settings() {
 
       {/* Model Assignments */}
       <Section title="Assegnazione Modelli">
-        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 8, alignItems: 'center' }}>
+        <div className="grid grid-cols-[200px_1fr] gap-[8px] items-center">
           {Object.entries(DEFAULT_NODE_MODELS).map(([nodeId, defaultModel]) => {
             const current = data.model_assignments[nodeId] ?? defaultModel
             return (
@@ -207,16 +179,7 @@ export function Settings() {
                 <select
                   value={current}
                   onChange={e => updateField(['model_assignments', nodeId], e.target.value)}
-                  style={{
-                    background: '#111318',
-                    border: '1px solid #2A2D3A',
-                    borderRadius: 4,
-                    color: '#F0F1F6',
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    padding: '6px 10px',
-                    outline: 'none',
-                  }}
+                  className="bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[6px] outline-none"
                 >
                   {AVAILABLE_MODELS.map(m => (
                     <option key={m.id} value={m.id}>
@@ -232,21 +195,12 @@ export function Settings() {
 
       {/* Default Config */}
       <Section title="Configurazione di Default">
-        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12, alignItems: 'center' }}>
+        <div className="grid grid-cols-[200px_1fr] gap-[12px] items-center">
           <Label>Preset predefinito</Label>
           <select
             value={data.default_config.preset}
             onChange={e => updateField(['default_config', 'preset'], e.target.value)}
-            style={{
-              background: '#111318',
-              border: '1px solid #2A2D3A',
-              borderRadius: 4,
-              color: '#F0F1F6',
-              fontSize: 12,
-              fontFamily: 'monospace',
-              padding: '6px 10px',
-              outline: 'none',
-            }}
+            className="bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[6px] outline-none"
           >
             <option value="Economy">Economy</option>
             <option value="Balanced">Balanced</option>
@@ -261,33 +215,14 @@ export function Settings() {
             min={1}
             max={1000}
             step={5}
-            style={{
-              background: '#111318',
-              border: '1px solid #2A2D3A',
-              borderRadius: 4,
-              color: '#F0F1F6',
-              fontSize: 12,
-              fontFamily: 'monospace',
-              padding: '6px 10px',
-              outline: 'none',
-              width: 120,
-            }}
+            className="bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[6px] outline-none w-[120px]"
           />
 
           <Label>Profilo stile</Label>
           <select
             value={data.default_config.style_profile}
             onChange={e => updateField(['default_config', 'style_profile'], e.target.value)}
-            style={{
-              background: '#111318',
-              border: '1px solid #2A2D3A',
-              borderRadius: 4,
-              color: '#F0F1F6',
-              fontSize: 12,
-              fontFamily: 'monospace',
-              padding: '6px 10px',
-              outline: 'none',
-            }}
+            className="bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[6px] outline-none"
           >
             <option value="academic">Academic</option>
             <option value="technical">Technical</option>
@@ -299,16 +234,16 @@ export function Settings() {
 
       {/* Connectors */}
       <Section title="Connettori">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="flex flex-col gap-[8px]">
           {['perplexity', 'tavily', 'brave', 'scraper'].map(conn => (
-            <label key={conn} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+            <label key={conn} className="flex items-center gap-[10px] cursor-pointer">
               <input
                 type="checkbox"
                 checked={data.connectors[conn as keyof typeof data.connectors]}
                 onChange={e => updateField(['connectors', conn], e.target.checked)}
-                style={{ cursor: 'pointer' }}
+                className="cursor-pointer"
               />
-              <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#F0F1F6' }}>
+              <span className="text-[12px] font-mono text-drs-text">
                 {conn.charAt(0).toUpperCase() + conn.slice(1)}
               </span>
             </label>
@@ -324,81 +259,45 @@ export function Settings() {
           value={data.webhooks.url}
           onChange={e => updateField(['webhooks', 'url'], e.target.value)}
           placeholder="https://your-server.com/webhook"
-          style={{
-            background: '#111318',
-            border: '1px solid #2A2D3A',
-            borderRadius: 4,
-            color: '#F0F1F6',
-            fontSize: 12,
-            fontFamily: 'monospace',
-            padding: '7px 10px',
-            outline: 'none',
-            width: '100%',
-            marginBottom: 12,
-          }}
+          className="bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[7px] outline-none w-full mb-[12px]"
         />
         <Label>Eventi da inviare</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
+        <div className="grid grid-cols-2 gap-[6px]">
           {WEBHOOK_EVENT_OPTIONS.map(evt => (
-            <label key={evt} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <label key={evt} className="flex items-center gap-[8px] cursor-pointer">
               <input
                 type="checkbox"
                 checked={data.webhooks.events.includes(evt)}
                 onChange={() => toggleWebhookEvent(evt)}
-                style={{ cursor: 'pointer' }}
+                className="cursor-pointer"
               />
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#8B8FA8' }}>{evt}</span>
+              <span className="text-[11px] font-mono text-drs-muted">{evt}</span>
             </label>
           ))}
         </div>
       </Section>
 
       {/* Save button */}
-      <div
-        style={{
-          marginTop: 24,
-          paddingTop: 20,
-          borderTop: '1px solid #2A2D3A',
-          display: 'flex',
-          gap: 12,
-          alignItems: 'center',
-        }}
-      >
-        {error && <span style={{ fontSize: 11, color: '#EF4444', fontFamily: 'monospace' }}>{error}</span>}
-        {saved && <span style={{ fontSize: 11, color: '#22C55E', fontFamily: 'monospace' }}>✓ Salvato</span>}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+      <div className="mt-[24px] pt-[20px] border-t border-drs-border flex gap-[12px] items-center">
+        {error && <span className="text-[11px] text-drs-red font-mono">{error}</span>}
+        {saved && <span className="text-[11px] text-drs-green font-mono">✓ Salvato</span>}
+        <div className="ml-auto flex gap-[8px]">
           <button
             onClick={() => window.location.reload()}
-            style={{
-              background: 'transparent',
-              border: '1px solid #2A2D3A',
-              borderRadius: 6,
-              color: '#8B8FA8',
-              fontSize: 12,
-              fontFamily: 'monospace',
-              padding: '8px 16px',
-              cursor: 'pointer',
-            }}
+            className="bg-transparent border border-drs-border rounded-[6px] text-drs-muted text-[12px] font-mono px-[16px] py-[8px] cursor-pointer"
           >
             Annulla
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
+            className="bg-drs-accent border-none rounded-[6px] text-drs-bg text-[12px] font-mono font-bold px-[20px] py-[8px]"
             style={{
-              background: '#7C8CFF',
-              border: 'none',
-              borderRadius: 6,
-              color: '#0A0B0F',
-              fontSize: 12,
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              padding: '8px 20px',
               cursor: saving ? 'not-allowed' : 'pointer',
               opacity: saving ? 0.5 : 1,
             }}
           >
-            {saving ? 'Salvataggio…' : 'Salva Impostazioni'}
+            {saving ? 'Salvataggio...' : 'Salva Impostazioni'}
           </button>
         </div>
       </div>

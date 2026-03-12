@@ -19,16 +19,8 @@ export function RlmCluster({ active }: RlmClusterProps) {
     <>
       {/* Cluster label */}
       <div
-        style={{
-          position: 'absolute',
-          left: 1700,
-          top: 1360,
-          fontSize: 9,
-          fontFamily: 'monospace',
-          color: RLM_COLOR,
-          opacity,
-          letterSpacing: 1,
-        }}
+        className="absolute text-[9px] font-mono text-drs-node-rlm tracking-[1px]"
+        style={{ left: 1700, top: 1360, opacity }}
       >
         RLM
       </div>
@@ -36,24 +28,17 @@ export function RlmCluster({ active }: RlmClusterProps) {
       {nodes.map(node => (
         <div
           key={node.id}
+          className="absolute w-[160px] h-[56px] rounded-card flex items-center justify-center transition-[opacity,border-color] duration-400"
           style={{
-            position: 'absolute',
             left: node.x,
             top: node.y,
-            width: 160,
-            height: 56,
             background: `${RLM_COLOR}10`,
             border: `1px dashed ${RLM_COLOR}${active ? 'AA' : '44'}`,
-            borderRadius: 8,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
             opacity,
-            transition: 'opacity 0.4s, border-color 0.4s',
             boxShadow: active ? `0 0 12px ${RLM_COLOR}40` : 'none',
           }}
         >
-          <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#F0F1F6' }}>
+          <span className="text-[10px] font-mono text-drs-text">
             {node.label}
           </span>
         </div>

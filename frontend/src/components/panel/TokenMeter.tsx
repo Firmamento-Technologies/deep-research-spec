@@ -14,20 +14,11 @@ function formatK(n: number): string {
 
 export function TokenMeter({ tokensIn, tokensOut, tokensOutEst, costUsd, isLive }: TokenMeterProps) {
   return (
-    <div
-      style={{
-        background: '#111318',
-        border: '1px solid #2A2D3A',
-        borderRadius: 6,
-        padding: '8px 12px',
-        fontSize: 11,
-        fontFamily: 'monospace',
-      }}
-    >
-      <div style={{ color: '#50536A', letterSpacing: 1, marginBottom: 6, fontSize: 10 }}>
+    <div className="bg-drs-s1 border border-drs-border rounded-[6px] px-[12px] py-[8px] text-[11px] font-mono">
+      <div className="text-drs-faint tracking-[1px] mb-[6px] text-[10px]">
         TOKEN &amp; COSTO
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div className="flex flex-col gap-[3px]">
         <Row
           label="Input"
           value={tokensIn != null ? `${formatK(tokensIn)} token` : '—'}
@@ -54,8 +45,8 @@ export function TokenMeter({ tokensIn, tokensOut, tokensOutEst, costUsd, isLive 
 
 function Row({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-      <span style={{ color: '#50536A' }}>{label}:</span>
+    <div className="flex justify-between gap-[8px]">
+      <span className="text-drs-faint">{label}:</span>
       <span style={{ color }}>{value}</span>
     </div>
   )
