@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginPage } from './pages/Login';
 import { RegisterPage } from './pages/Register';
+import { AppShell } from './components/layout/AppShell';
 
 // Code splitting — lazy-loaded pages
 const Dashboard = lazy(() => import('./pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -33,6 +34,15 @@ function LoadingFallback() {
   );
 }
 
+/** Layout wrapper: ProtectedRoute + AppShell with Outlet for child pages */
+function ProtectedLayout({ requiredRole }: { requiredRole?: 'admin' | 'user' | 'viewer' }) {
+  return (
+    <ProtectedRoute requiredRole={requiredRole}>
+      <AppShell />
+    </ProtectedRoute>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -45,65 +55,20 @@ function App() {
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
 
-                {/* Protected routes */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/spaces"
-                  element={
-                    <ProtectedRoute>
-                      <KnowledgeSpaces />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/spaces/:spaceId"
-                  element={
-                    <ProtectedRoute>
-                      <SpaceDetail />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/spaces/:spaceId/search"
-                  element={
-                    <ProtectedRoute>
-                      <SpaceSearch />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/analytics"
-                  element={
-                    <ProtectedRoute>
-                      <Analytics />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/settings"
-                  element={
-                    <ProtectedRoute>
-                      <Settings />
-                    </ProtectedRoute>
-                  }
-                />
+                {/* Protected routes — all wrapped in AppShell layout */}
+                <Route element={<ProtectedLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/spaces" element={<KnowledgeSpaces />} />
+                  <Route path="/spaces/:spaceId" element={<SpaceDetail />} />
+                  <Route path="/spaces/:spaceId/search" element={<SpaceSearch />} />
+                  <Route path="/analytics" element={<Analytics />} />
+                  <Route path="/settings" element={<Settings />} />
+                </Route>
 
                 {/* Admin-only routes */}
-                <Route
-                  path="/admin/users"
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <AdminUsers />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route element={<ProtectedLayout requiredRole="admin" />}>
+                  <Route path="/admin/users" element={<AdminUsers />} />
+                </Route>
 
                 {/* Redirects */}
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />

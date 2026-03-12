@@ -1,19 +1,16 @@
-import { Routes, Route } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 import { ChatThread } from '../chat/ChatThread'
 import { PipelineCanvas } from '../pipeline/PipelineCanvas'
-import { Settings } from '../../pages/Settings'
-import { Analytics } from '../../pages/Analytics'
 
 export function MainArea() {
+  const location = useLocation()
+  const isDashboard = location.pathname === '/dashboard' || location.pathname === '/'
+
   return (
     <main className="flex-1 overflow-hidden relative min-w-0">
-      <Routes>
-        <Route path="/" element={<HomeView />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/analytics" element={<Analytics />} />
-      </Routes>
+      {isDashboard ? <HomeView /> : <div className="h-full overflow-auto"><Outlet /></div>}
     </main>
   )
 }

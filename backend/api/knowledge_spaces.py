@@ -32,8 +32,8 @@ from sqlalchemy import select, func as sql_func, delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.connection import get_db  # FIXED: was get_db_session
-from database.models import Space, Source, Chunk
-from api.dependencies import require_user
+from database.models import Space, Source, Chunk, User
+from api.dependencies import require_user, get_current_user
 from services.space_indexer import SpaceIndexer, IndexingError
 from services.db_inserter import get_chunk_count
 from services.semantic_search import search_chunks, SearchError
@@ -124,13 +124,14 @@ class SearchResultResponse(BaseModel):
 async def create_space(
     request: CreateSpaceRequest,
     session: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Create a new Knowledge Space."""
     space = Space(
         id=str(uuid.uuid4()),
         name=request.name,
         description=request.description,
-        user_id=request.user_id,
+        user_id=current_user.id,
     )
     
     session.add(space)

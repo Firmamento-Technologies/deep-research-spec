@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '../lib/query';
 import { Upload, FileText, Trash2, Search } from '../lib/icons';
 import { Button } from '../components/ui/Button';
@@ -24,6 +24,7 @@ interface Space {
 
 export const SpaceDetail: React.FC = () => {
   const { spaceId } = useParams() as { spaceId?: string };
+  const navigate = useNavigate();
   const [isDragOver, setIsDragOver] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Map<string, number>>(new Map());
   const queryClient = useQueryClient();
@@ -127,7 +128,7 @@ export const SpaceDetail: React.FC = () => {
         )}
         <div className="mt-4 flex gap-4">
           <Button
-            onClick={() => (window.location.href = `/spaces/${spaceId}/search`)}
+            onClick={() => navigate(`/spaces/${spaceId}/search`)}
             className="flex items-center gap-2"
           >
             <Search className="w-4 h-4" />

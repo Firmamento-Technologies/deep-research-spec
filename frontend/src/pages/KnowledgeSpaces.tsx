@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '../lib/query';
 import { Plus, Folder, Trash2, Search } from '../lib/icons';
 import { Button } from '../components/ui/Button';
@@ -18,6 +19,8 @@ export const KnowledgeSpaces: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceDesc, setNewSpaceDesc] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   // Fetch spaces — queryFn must be stable to avoid infinite re-fetch
@@ -42,6 +45,10 @@ export const KnowledgeSpaces: React.FC = () => {
       setIsCreateModalOpen(false);
       setNewSpaceName('');
       setNewSpaceDesc('');
+      setCreateError(null);
+    },
+    onError: (err: any) => {
+      setCreateError(err?.message || 'Failed to create space. Please try again.');
     },
   });
 
@@ -57,6 +64,7 @@ export const KnowledgeSpaces: React.FC = () => {
 
   const handleCreateSpace = () => {
     if (!newSpaceName.trim()) return;
+    setCreateError(null);
     createMutation.mutate({
       name: newSpaceName,
       description: newSpaceDesc || undefined,
@@ -93,7 +101,7 @@ export const KnowledgeSpaces: React.FC = () => {
           </p>
         </div>
         <Button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => { setCreateError(null); setIsCreateModalOpen(true); }}
           className="flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -108,7 +116,7 @@ export const KnowledgeSpaces: React.FC = () => {
             <Card
               key={space.id}
               className="hover:border-drs-border-bright transition-colors cursor-pointer"
-              onClick={() => (window.location.href = `/spaces/${space.id}`)}
+              onClick={() => navigate(`/spaces/${space.id}`)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
@@ -128,7 +136,7 @@ export const KnowledgeSpaces: React.FC = () => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.location.href = `/spaces/${space.id}/search`;
+                      navigate(`/spaces/${space.id}/search`);
                     }}
                     className="p-2 text-drs-faint hover:text-drs-accent transition"
                     aria-label="Search space"
@@ -168,7 +176,7 @@ export const KnowledgeSpaces: React.FC = () => {
           <p className="text-drs-muted mb-6">
             Create your first space to start uploading documents
           </p>
-          <Button onClick={() => setIsCreateModalOpen(true)}>
+          <Button onClick={() => { setCreateError(null); setIsCreateModalOpen(true); }}>
             <Plus className="w-4 h-4 mr-2" />
             Create Space
           </Button>
@@ -207,6 +215,11 @@ export const KnowledgeSpaces: React.FC = () => {
               rows={3}
             />
           </div>
+          {createError && (
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              {createError}
+            </div>
+          )}
           <div className="flex gap-3 justify-end">
             <Button
               variant="ghost"

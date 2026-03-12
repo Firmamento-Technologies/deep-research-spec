@@ -37,7 +37,7 @@ def post_draft_analyzer_node(state: dict) -> dict:
     citations = _extract_citations(draft)
 
     # Use LLM to extract claims and find evidence gaps
-    claims, gaps = _analyse_draft(draft, sources)
+    claims, gaps = _analyse_draft(draft, sources, state.get("quality_preset", "balanced"))
 
     logger.info(
         "PostDraftAnalyzer: %d claims, %d evidence gaps, %d citations",
@@ -71,7 +71,7 @@ def _extract_citations(draft: str) -> list[dict]:
     return citations
 
 
-def _analyse_draft(draft: str, sources: list) -> tuple[list[dict], list[dict]]:
+def _analyse_draft(draft: str, sources: list, quality_preset: str = "balanced") -> tuple[list[dict], list[dict]]:
     """Use LLM to extract claims and identify evidence gaps."""
     try:
         source_summary = ""
@@ -82,7 +82,7 @@ def _analyse_draft(draft: str, sources: list) -> tuple[list[dict], list[dict]]:
             )
 
         response = llm_client.call(
-            model=route_model("post_draft_analyzer", state.get("quality_preset", "balanced")),
+            model=route_model("post_draft_analyzer", quality_preset),
             messages=[{
                 "role": "user",
                 "content": f"""\
@@ -106,7 +106,7 @@ EVIDENCE_GAPS:
             temperature=0.1,
             max_tokens=2048,
             agent="post_draft_analyzer",
-            preset=state.get("quality_preset", "balanced"),
+            preset=quality_preset,
         )
 
         return _parse_analysis(response["text"])
