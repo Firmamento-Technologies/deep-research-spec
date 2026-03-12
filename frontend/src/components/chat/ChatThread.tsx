@@ -19,7 +19,7 @@ export function ChatThread() {
   }, [messages.length, isTyping])
 
   return (
-    <div className="w-full h-full overflow-y-auto flex flex-col">
+    <div className="w-full h-full overflow-y-auto flex flex-col" role="log" aria-live="polite" aria-label="Chat conversation">
       {/* Content — centred column, max-width 720px */}
       <div className="flex-1 flex flex-col gap-3 max-w-[720px] mx-auto w-full px-4 pt-6 pb-4">
 

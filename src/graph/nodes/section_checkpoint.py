@@ -396,7 +396,7 @@ def _update_writer_memory(
     This shim calls it directly so SectionCheckpoint stays decoupled.
     """
     try:
-        from src.graph.nodes.writer_memory import update_writer_memory  # lazy import
+        from src.graph.internals.writer_memory import update_writer_memory  # lazy import
         return update_writer_memory(
             existing=state.get("writer_memory", {}),
             new_verdicts=new_verdicts,

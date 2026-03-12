@@ -279,7 +279,7 @@ class TestMoWActivation:
     """MoW activation conditions (§7.1)."""
 
     def test_activates_balanced(self):
-        from src.graph.nodes.mow_writers import should_activate_mow
+        from src.graph.internals.mow_writers import should_activate_mow
         state = {
             "budget": {"quality_preset": "balanced"},
             "outline": [{"target_words": 500}],
@@ -289,11 +289,11 @@ class TestMoWActivation:
         assert should_activate_mow(state) is True
 
     def test_skips_economy(self):
-        from src.graph.nodes.mow_writers import should_activate_mow
+        from src.graph.internals.mow_writers import should_activate_mow
         assert should_activate_mow({"budget": {"quality_preset": "economy"}}) is False
 
     def test_skips_short_section(self):
-        from src.graph.nodes.mow_writers import should_activate_mow
+        from src.graph.internals.mow_writers import should_activate_mow
         state = {
             "budget": {"quality_preset": "premium"},
             "outline": [{"target_words": 200}],
@@ -303,7 +303,7 @@ class TestMoWActivation:
         assert should_activate_mow(state) is False
 
     def test_skips_iteration_2(self):
-        from src.graph.nodes.mow_writers import should_activate_mow
+        from src.graph.internals.mow_writers import should_activate_mow
         state = {
             "budget": {"quality_preset": "premium"},
             "outline": [{"target_words": 500}],
@@ -313,7 +313,7 @@ class TestMoWActivation:
         assert should_activate_mow(state) is False
 
     def test_skips_human_pending(self):
-        from src.graph.nodes.mow_writers import should_activate_mow
+        from src.graph.internals.mow_writers import should_activate_mow
         state = {
             "budget": {"quality_preset": "premium"},
             "outline": [{"target_words": 500}],
@@ -328,12 +328,12 @@ class TestJuryMultiDraft:
     """JuryMultiDraft evaluation."""
 
     def test_insufficient_drafts(self):
-        from src.graph.nodes.jury_multidraft import jury_multidraft_node
+        from src.graph.internals.jury_multidraft import jury_multidraft_node
         r = jury_multidraft_node({"mow_drafts": []})
         assert r["mow_css_individual"] == []
 
     def test_handles_empty_drafts(self):
-        from src.graph.nodes.jury_multidraft import jury_multidraft_node
+        from src.graph.internals.jury_multidraft import jury_multidraft_node
         r = jury_multidraft_node({"mow_drafts": [{"draft": "", "word_count": 0}]})
         assert r["mow_best_draft_idx"] == 0
 
@@ -342,12 +342,12 @@ class TestFusor:
     """Fusor node."""
 
     def test_no_drafts(self):
-        from src.graph.nodes.fusor import fusor_node
+        from src.graph.internals.fusor import fusor_node
         r = fusor_node({"mow_drafts": []})
         assert r == {}
 
     def test_single_draft_passthrough(self):
-        from src.graph.nodes.fusor import fusor_node
+        from src.graph.internals.fusor import fusor_node
         r = fusor_node({
             "mow_drafts": [{"angle": "W-A", "label": "Coverage", "draft": "Hello world", "word_count": 2}],
             "mow_css_individual": [0.8],
@@ -362,7 +362,7 @@ class TestWriterMemory:
     """WriterMemory accumulator."""
 
     def test_recurring_error_detection(self):
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         r = writer_memory_node({
             "current_draft": "Some draft text",
             "jury_verdicts": [
@@ -376,7 +376,7 @@ class TestWriterMemory:
         assert mem["error_counts"]["citation_error"] == 2
 
     def test_glossary_extraction(self):
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         r = writer_memory_node({
             "current_draft": "Machine Learning is based on Neural Network architectures. CNN (Convolutional Neural Network) is popular.",
             "jury_verdicts": [],
@@ -386,7 +386,7 @@ class TestWriterMemory:
         assert "machine learning" in glossary or "neural network" in glossary
 
     def test_citation_under(self):
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         r = writer_memory_node({
             "current_draft": "No citations at all.",
             "jury_verdicts": [],
@@ -397,7 +397,7 @@ class TestWriterMemory:
         assert r["writer_memory"]["citation_tendency"] == "under"
 
     def test_citation_over(self):
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         r = writer_memory_node({
             "current_draft": "[s1] [s2] [s3] [s4] [s5]",
             "jury_verdicts": [],
@@ -408,7 +408,7 @@ class TestWriterMemory:
         assert r["writer_memory"]["citation_tendency"] == "over"
 
     def test_proactive_warnings_generated(self):
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         r = writer_memory_node({
             "current_draft": "Some text.",
             "jury_verdicts": [
@@ -424,7 +424,7 @@ class TestWriterMemory:
         assert any("TENDENCY" in w for w in warnings)  # under-citation
 
     def test_accumulation_across_sections(self):
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         # First section
         r1 = writer_memory_node({
             "current_draft": "Draft 1",

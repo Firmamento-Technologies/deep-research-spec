@@ -208,25 +208,15 @@ async def _handle_llm_compression(
     current_idx: int,
     tier:        str,
 ) -> dict:
-    """
-    LLM-based compression for structured_summary (d=3–5) and
-    thematic_extract (d≥6) tiers. These sections are already compressed;
-    token cost here is negligible.
+    """LLM-based compression for structured_summary (d=3-5) and
+    thematic_extract (d>=6) tiers via qwen/qwen3-7b.
 
-    TODO: Replace stub with qwen/qwen3-7b call via src/llm/client.py
-    when LLM client is implemented (currently missing — see §28).
+    Falls back to heuristic truncation if LLM call fails.
     """
     content = section.get("content", "")
     title   = outline[section_idx]["title"]
 
-    if tier == "structured_summary":
-        # §14.1 — max 120 words: take first 2 paragraphs
-        paragraphs   = [p.strip() for p in content.split("\n\n") if p.strip()]
-        summary_text = " ".join(paragraphs[:2])[:700]
-    else:
-        # thematic_extract — §14.1: title + 40 words + load-bearing claims
-        words        = content.split()[:40]
-        summary_text = f"[{title}] " + " ".join(words) + "..."
+    summary_text = await _llm_compress(content, title, tier)
 
     return {
         "section_idx":          section_idx,
@@ -239,6 +229,48 @@ async def _handle_llm_compression(
         "compressed_word_count": len(summary_text.split()),
         "adapter_available":    False,
     }
+
+
+async def _llm_compress(content: str, title: str, tier: str) -> str:
+    """Compress section content via LLM, with heuristic fallback."""
+    if tier == "structured_summary":
+        max_words = 120
+        prompt = (
+            f"Summarize the following section titled '{title}' in at most "
+            f"{max_words} words. Preserve key claims, data points, and "
+            f"conclusions.\n\n{content}"
+        )
+    else:
+        max_words = 40
+        prompt = (
+            f"Extract the core theme and load-bearing claims from '{title}' "
+            f"in at most {max_words} words.\n\n{content}"
+        )
+
+    try:
+        from src.llm.client import llm_client
+        result = llm_client.call(
+            model="qwen/qwen3-7b",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_words * 3,
+            temperature=0.1,
+        )
+        summary = result.get("content", "").strip()
+        if summary:
+            return summary
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(
+            "LLM compression failed for '%s', using heuristic: %s", title, e
+        )
+
+    # Heuristic fallback
+    if tier == "structured_summary":
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+        return " ".join(paragraphs[:2])[:700]
+    else:
+        words = content.split()[:max_words]
+        return f"[{title}] " + " ".join(words) + "..."
 
 
 def _resolve_tier(distance: int) -> str:

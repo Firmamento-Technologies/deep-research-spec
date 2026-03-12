@@ -544,3 +544,64 @@ def reload_routing_config() -> None:
         _routing_table = None
     _get_routing_table()
     logger.info("RLM Router: config reloaded from disk")
+
+
+# ---------------------------------------------------------------------------
+# Qwen 3.5 Frontier Routing — cost-optimized alternative (March 2026)
+#
+# Achieves 70-90% cost reduction by using Qwen 3.5 family as backbone
+# for economy/balanced presets, reserving closed-source models for premium.
+#
+# Reference: "Strategie concrete di ottimizzazione dei costi.md" §3.1
+# Pricing: Rivalry, OpenRouter (verified 2026-03-12)
+# ---------------------------------------------------------------------------
+QWEN35_FRONTIER_ROUTING: dict[str, dict[str, str]] = {
+    "writer": {
+        "economy":  "qwen/qwen3.5-9b-instruct",      # $0.10/$0.15 per M
+        "balanced": "qwen/qwen3.5-35b-a3b",           # $0.25/$2.00 per M
+        "premium":  "anthropic/claude-3.7-sonnet",     # $3.00/$15.00 per M
+    },
+    "researcher": {
+        "economy":  "qwen/qwen3.5-4b",
+        "balanced": "qwen/qwen3.5-9b-instruct",
+        "premium":  "perplexity/sonar-pro",
+    },
+    "jury_r": {
+        "economy":  "qwen/qwen3.5-2b",
+        "balanced": "qwen/qwen3.5-9b-instruct",
+        "premium":  "deepseek/deepseek-r1",
+    },
+    "jury_f": {
+        "economy":  "qwen/qwen3.5-flash",
+        "balanced": "google/gemini-3-flash",
+        "premium":  "anthropic/claude-3.7-sonnet",
+    },
+    "jury_s": {
+        "economy":  "qwen/qwen3.5-0.8b",
+        "balanced": "qwen/qwen3.5-2b",
+        "premium":  "meta/llama-3.3-70b-instruct",
+    },
+    "reflector": {
+        "economy":  "qwen/qwen3.5-4b",
+        "balanced": "qwen/qwen3.5-9b-instruct",
+        "premium":  "openai/o3-mini",
+    },
+    "context_compressor": {
+        "economy":  "qwen/qwen3.5-2b",
+        "balanced": "qwen/qwen3.5-4b",
+        "premium":  "qwen/qwen3.5-9b-instruct",
+    },
+}
+
+
+def route_model_frontier(purpose: str, preset: str) -> str:
+    """Route using Qwen 3.5 frontier table for cost-optimized deployments.
+
+    Falls back to standard route_model() if purpose is not in the frontier table.
+    """
+    table = QWEN35_FRONTIER_ROUTING.get(purpose, {})
+    model = table.get(preset.lower())
+    if model:
+        return model
+    # Fall back to standard routing
+    return route_model(purpose, preset)

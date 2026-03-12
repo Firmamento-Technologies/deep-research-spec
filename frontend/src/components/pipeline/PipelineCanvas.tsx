@@ -97,7 +97,7 @@ export function PipelineCanvas() {
   const nodeStates = activeRun?.nodes ?? {}
 
   return (
-    <div style={{ visibility: isVisible ? 'visible' : 'hidden', position: 'absolute', inset: 0 }}>
+    <div style={{ visibility: isVisible ? 'visible' : 'hidden', position: 'absolute', inset: 0 }} aria-label="Pipeline visualization" role="img">
       <PipelineHeader run={activeRun} />
 
       <div
