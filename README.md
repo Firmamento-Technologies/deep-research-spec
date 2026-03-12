@@ -14,29 +14,47 @@
 
 ## Quick Start
 
-```bash
-# 1. Clone & setup
-git clone https://github.com/lucadidomenicodopehubs/deep-research-spec.git
-cd deep-research-spec
-git checkout <your-branch>
+### One-command setup (recommended)
 
-# 2. Install dependencies
-python3.11 -m venv venv
-source venv/bin/activate
+```bash
+git clone https://github.com/Firmamento-Technologies/deep-research-spec.git
+cd deep-research-spec
+python setup_drs.py
+```
+
+This script works on **Windows, macOS, and Linux**. It:
+1. Creates a Python venv and installs all dependencies (backend + test tools)
+2. Copies `.env.example` to `.env`
+3. Starts Docker services (PostgreSQL, Redis, MinIO) if Docker is available
+4. Runs smoke tests and unit tests to verify the installation
+
+Options:
+- `python setup_drs.py --skip-docker` — skip Docker services (useful without Docker Desktop)
+- `python setup_drs.py --skip-venv` — use current Python environment instead of creating a venv
+- `python setup_drs.py --verify-only` — only run verification checks
+
+### Manual setup
+
+```bash
+# 1. Clone
+git clone https://github.com/Firmamento-Technologies/deep-research-spec.git
+cd deep-research-spec
+
+# 2. Create venv and install deps
+python -m venv venv
+source venv/bin/activate        # Linux/macOS
+# venv\Scripts\activate          # Windows
 pip install -r backend/requirements.txt
 
 # 3. Configure
 cp .env.example .env
-# Edit .env with API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+# Edit .env with API keys (OPENROUTER_API_KEY, ANTHROPIC_API_KEY, etc.)
 
-# 4. Start services
-docker-compose up -d postgres
+# 4. Start infrastructure
+docker compose up -d postgres redis minio
 
-# 5. Smoke test
-python -c "import sys; sys.path.insert(0,'backend'); import main; print('✓ Backend import ok')"
-
-# 6. Run tests
-python3 -m pytest tests/unit/test_budget_estimator_v2.py -q
+# 5. Run tests
+PYTHONPATH=. python -m pytest tests/unit/ -q
 ```
 
 ## Architecture
