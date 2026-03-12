@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { MODELS_BY_PROVIDER } from '../../constants/models'
 import { useAppStore } from '../../store/useAppStore'
+import { api } from '../../lib/api'
 
 interface AgentModelDropdownProps {
   nodeId: string
@@ -26,11 +27,7 @@ export function AgentModelDropdown({ nodeId, currentModel }: AgentModelDropdownP
     setSaving(true)
     setOpen(false)
     try {
-      await fetch(`/api/runs/${activeDocId}/config`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId, newModel: modelId }),
-      })
+      await api.patch(`/api/runs/${activeDocId}/config`, { nodeId, newModel: modelId })
     } finally {
       setSaving(false)
     }

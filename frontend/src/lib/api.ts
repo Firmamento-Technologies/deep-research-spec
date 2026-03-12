@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || '';
 const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 30000);
 
 type ApiConfig = {
@@ -68,7 +68,7 @@ function mergeSignals(timeoutSignal: AbortSignal, externalSignal?: AbortSignal):
   return controller.signal;
 }
 
-async function request(method: 'GET' | 'POST' | 'DELETE', url: string, data?: unknown, config: ApiConfig = {}) {
+async function request(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url: string, data?: unknown, config: ApiConfig = {}) {
   if (config.onUploadProgress && typeof FormData !== 'undefined' && data instanceof FormData) {
     config.onUploadProgress({ loaded: 0 });
   }
@@ -84,11 +84,11 @@ async function request(method: 'GET' | 'POST' | 'DELETE', url: string, data?: un
       method,
       signal,
       headers:
-        method === 'POST' && !isForm
+        (method === 'POST' || method === 'PUT' || method === 'PATCH') && !isForm
           ? authHeaders({ 'Content-Type': 'application/json', ...(config.headers ?? {}) })
           : authHeaders(config.headers),
       body:
-        method === 'POST'
+        (method === 'POST' || method === 'PUT' || method === 'PATCH')
           ? isForm
             ? (data as BodyInit)
             : data === undefined
@@ -121,6 +121,12 @@ export const api = {
   },
   post(url: string, data?: unknown, config: ApiConfig = {}) {
     return request('POST', url, data, config);
+  },
+  put(url: string, data?: unknown, config: ApiConfig = {}) {
+    return request('PUT', url, data, config);
+  },
+  patch(url: string, data?: unknown, config: ApiConfig = {}) {
+    return request('PATCH', url, data, config);
   },
   delete(url: string, config: ApiConfig = {}) {
     return request('DELETE', url, undefined, config);

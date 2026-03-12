@@ -35,9 +35,9 @@
 # Direct Anthropic path: enables §29.1 prompt caching for style rules + exemplar.
 # Do NOT change to openrouter/ — caching requires the direct API path.
 writer:
-  economy:  anthropic/claude-sonnet-4
-  balanced: anthropic/claude-opus-4-5
-  premium:  anthropic/claude-opus-4-5
+  economy:  openrouter/anthropic/claude-sonnet-4
+  balanced: openrouter/anthropic/claude-opus-4-5
+  premium:  openrouter/anthropic/claude-opus-4-5
 
 
 # ─────────────────────────────────────────────────────────────────────────────

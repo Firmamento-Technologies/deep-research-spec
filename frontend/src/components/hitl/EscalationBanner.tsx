@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
+import { api } from '../../lib/api'
 
 interface EscalationBannerProps {
   docId: string
@@ -21,12 +22,10 @@ export function EscalationBanner({ docId }: EscalationBannerProps) {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch(`/api/runs/${docId}/resolve-escalation`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...(resolution ? { resolution } : {}) }),
+      await api.post(`/api/runs/${docId}/resolve-escalation`, {
+        action,
+        ...(resolution ? { resolution } : {}),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       setState('PROCESSING')
     } catch (e) {
       setError((e as Error).message)

@@ -98,19 +98,28 @@ export function useQuery<T>({
   refetchInterval = false,
 }: UseQueryOptions<T>) {
   const queryClient = useQueryClient();
+  // Stabilize queryKey: use a string version so array identity changes don't cause re-renders
+  const keyStr = toKeyString(queryKey);
+  const queryKeyRef = useRef(queryKey);
+  queryKeyRef.current = queryKey;
+  // Stabilize queryFn: use a ref so inline arrow functions don't cause infinite re-renders
+  const queryFnRef = useRef(queryFn);
+  queryFnRef.current = queryFn;
+
   const [data, setData] = useState<T | undefined>(() => queryClient.getQueryData<T>(queryKey));
   const [error, setError] = useState<unknown>(null);
   const [isLoading, setLoading] = useState<boolean>(enabled && data === undefined);
   const timerRef = useRef<number | null>(null);
 
   const run = useCallback(async () => {
+    const qk = queryKeyRef.current;
     if (!enabled) {
       setLoading(false);
       return;
     }
 
-    const cached = queryClient.getQueryData<T>(queryKey);
-    const updatedAt = queryClient.getQueryUpdatedAt(queryKey) ?? 0;
+    const cached = queryClient.getQueryData<T>(qk);
+    const updatedAt = queryClient.getQueryUpdatedAt(qk) ?? 0;
     if (cached !== undefined && Date.now() - updatedAt <= staleTime) {
       setData(cached);
       setLoading(false);
@@ -121,25 +130,31 @@ export function useQuery<T>({
     setError(null);
 
     let attempt = 0;
-    while (true) {
-      try {
-        const result = await queryFn();
-        queryClient.setQueryData(queryKey, result);
-        setData(result);
-        return;
-      } catch (err) {
-        attempt += 1;
-        if (attempt > retry) {
-          setError(err);
+    try {
+      while (true) {
+        try {
+          const result = await queryFnRef.current();
+          queryClient.setQueryData(qk, result);
+          setData(result);
           return;
+        } catch (err) {
+          attempt += 1;
+          if (attempt > retry) {
+            setError(err);
+            return;
+          }
+          // Brief delay between retries
+          await new Promise(r => setTimeout(r, Math.min(1000 * attempt, 5000)));
         }
-      } finally {
-        setLoading(false);
       }
+    } finally {
+      setLoading(false);
     }
-  }, [enabled, queryClient, queryKey, queryFn, retry, staleTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, queryClient, keyStr, retry, staleTime]);
 
   useEffect(() => {
+    const qk = queryKeyRef.current;
     const clearTimer = () => {
       if (timerRef.current) {
         window.clearTimeout(timerRef.current);
@@ -147,8 +162,8 @@ export function useQuery<T>({
       }
     };
 
-    const unsub = queryClient.subscribe(queryKey, () => {
-      const fresh = queryClient.getQueryData<T>(queryKey);
+    const unsub = queryClient.subscribe(qk, () => {
+      const fresh = queryClient.getQueryData<T>(qk);
       setData(fresh);
       if (fresh === undefined && enabled) {
         void run();
@@ -161,17 +176,18 @@ export function useQuery<T>({
       clearTimer();
       timerRef.current = window.setTimeout(async () => {
         await run();
-        scheduleRefetch(queryClient.getQueryData<T>(queryKey));
+        scheduleRefetch(queryClient.getQueryData<T>(qk));
       }, interval);
     };
 
-    void run().then(() => scheduleRefetch(queryClient.getQueryData<T>(queryKey)));
+    void run().then(() => scheduleRefetch(queryClient.getQueryData<T>(qk)));
 
     return () => {
       clearTimer();
       unsub();
     };
-  }, [enabled, queryClient, queryKey, refetchInterval, run]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, queryClient, keyStr, refetchInterval, run]);
 
   return {
     data,

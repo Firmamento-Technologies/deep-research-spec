@@ -66,7 +66,7 @@ def _determine_reason(state: dict) -> str:
         osc_type = state.get("oscillation_type", "unknown")
         return f"oscillation_{osc_type}"
 
-    ro = state.get("reflector_output", {})
+    ro = state.get("reflector_output") or {}
     if ro.get("dominant_scope") == "FULL":
         return "structural_rewrite_needed"
 

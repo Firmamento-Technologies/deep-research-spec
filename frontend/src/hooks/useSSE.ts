@@ -124,7 +124,9 @@ export function useSSE(docId: string | null): UseSSEResult {
   // Real EventSource connection with exponential-backoff reconnect
   const connect = useCallback(() => {
     if (!docId) return
-    const es = new EventSource(`/api/runs/${docId}/events`)
+    const token = localStorage.getItem('access_token')
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
+    const es = new EventSource(`/api/runs/${docId}/events${tokenParam}`)
     esRef.current = es
 
     es.onopen = () => {

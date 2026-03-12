@@ -134,7 +134,11 @@ def writer_node(state: dict) -> dict:
             logger.warning(
                 "Writer/RLM: budget exhausted before RLM call — forcing approval"
             )
-            return {"force_approve": True}
+            existing_draft = state.get("current_draft", "")
+            return {
+                "force_approve": True,
+                "current_draft": existing_draft if existing_draft else f"(Section content unavailable — budget exhausted for: {section_scope})",
+            }
 
         from src.llm.rlm_adapter import get_rlm_client  # lazy import
 
@@ -243,7 +247,11 @@ def writer_node(state: dict) -> dict:
         logger.warning(
             "Writer: budget exhausted before llm_client.call — forcing approval"
         )
-        return {"force_approve": True}
+        existing_draft = state.get("current_draft", "")
+        return {
+            "force_approve": True,
+            "current_draft": existing_draft if existing_draft else f"(Section content unavailable — budget exhausted for: {section_scope})",
+        }
 
     # ── LLM call (PATH 1 + PATH 3) ─────────────────────────────────────
     messages = [{"role": "user", "content": user_prompt}]

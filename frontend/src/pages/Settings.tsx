@@ -1,6 +1,7 @@
 import { useState, useEffect, Fragment, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AVAILABLE_MODELS } from '../constants/models'
+import { api } from '../lib/api'
 
 // ------------------------------------------------------------------ //
 // Types
@@ -77,9 +78,8 @@ export function Settings() {
   const [showApiKey, setShowApiKey] = useState(false)
 
   useEffect(() => {
-    fetch('/api/settings')
-      .then(r => r.json())
-      .then(json => setData(json))
+    api.get('/api/settings')
+      .then(res => setData(res.data))
       .catch(e => setError(`Errore caricamento: ${e.message}`))
   }, [])
 
@@ -89,12 +89,7 @@ export function Settings() {
     setSaved(false)
     setError(null)
     try {
-      const res = await fetch('/api/settings', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await api.put('/api/settings', data)
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (e) {

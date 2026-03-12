@@ -101,6 +101,7 @@ def _build_initial_state(
 
     return {
         # Core fields
+        "doc_id": thread_id,
         "topic": topic,
         "target_words": target_words,
         "style_profile": style_profile,

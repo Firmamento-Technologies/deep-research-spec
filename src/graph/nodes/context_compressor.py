@@ -64,15 +64,23 @@ async def run(state: dict) -> dict:
     if state.get("rlm_mode", False):
         return state  # no-op: rlm.completion() handles recursive context internally
 
-    from src.shine.hypernetwork import SHINEHypernetwork
-    from src.shine.adapter_registry import AdapterRegistry
-    from src.shine.chunker import TextChunker
+    _shine_available = True
+    try:
+        from src.shine.hypernetwork import SHINEHypernetwork
+        from src.shine.adapter_registry import AdapterRegistry
+        from src.shine.chunker import TextChunker
+    except ImportError:
+        logger.warning("[context_compressor] SHINE/torch not installed — disabling SHINE encoding")
+        _shine_available = False
+        SHINEHypernetwork = None
+        AdapterRegistry = None
+        TextChunker = None
 
     current_idx:       int  = state["current_section_idx"]
     approved_sections: list = state.get("approved_sections", [])
     outline:           list = state["outline"]
-    doc_id:            str  = state["run_id"]
-    shine_enabled:     bool = state.get("shine_enabled", True)
+    doc_id:            str  = state.get("doc_id", "default")
+    shine_enabled:     bool = state.get("shine_enabled", True) and _shine_available
 
     # §14.4 — never invoke on section 0
     if current_idx == 0 or not approved_sections:

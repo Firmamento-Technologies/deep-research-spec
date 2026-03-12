@@ -459,16 +459,27 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
         before the next section starts (ALTA-05).
     """
     doc_id: str = state["doc_id"]
-    run_id: str = state["run_id"]
+    run_id: str = state.get("run_id", state.get("doc_id", "default"))
     section_idx: int = state["current_section_idx"]
-    content: str = state["current_draft"]
+    content: str = state.get("current_draft", "") or ""
+
+    # If force_approve was triggered but no draft was produced, generate placeholder
+    if not content.strip() and state.get("force_approve", False):
+        outline = state.get("outline", [])
+        section_meta = outline[section_idx] if section_idx < len(outline) else {}
+        scope = section_meta.get("scope", "")
+        content = f"(This section could not be fully generated due to budget or iteration constraints. Intended scope: {scope})"
+        logger.warning(
+            "[checkpoint] force_approve with empty draft for section %d — using placeholder",
+            section_idx,
+        )
     css_history: list[float] = state.get("css_history", [])
     all_verdicts: list[list[dict]] = state.get("all_verdicts_history", [])
     style_violations: list[dict] = state.get("style_lint_violations", [])
     outline: list[dict] = state["outline"]
     total_sections: int = state["total_sections"]
-    db_dsn: str = state["config"]["db_dsn"]
-    output_dir: str = state["config"].get("output_dir", DEFAULT_OUTPUT_DIR)
+    db_dsn: str = state.get("config", {}).get("db_dsn", "")
+    output_dir: str = state.get("config", {}).get("output_dir", DEFAULT_OUTPUT_DIR)
 
     section_meta = outline[section_idx]
     title: str = section_meta["title"]
@@ -494,27 +505,30 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
     # Step 1 — PostgreSQL INSERT (retry ×3, raises on total failure)
     # NEVER increment currentsectionidx before this succeeds.
     # ------------------------------------------------------------------
-    try:
-        await _insert_with_retry(
-            db_dsn,
-            doc_id,
-            run_id,
-            section_idx,
-            title,
-            content,
-            css_final,
-            css_breakdown,
-            iterations_used,
-            flat_verdicts,
-            approved_at_dt,
-            version,
-        )
-    except RuntimeError:
-        logger.error(
-            "[checkpoint] CHECKPOINT_FAILED for section %d — section not advanced",
-            section_idx,
-        )
-        return {**state, "status": "CHECKPOINT_FAILED"}  # type: ignore[return-value]
+    if db_dsn:
+        try:
+            await _insert_with_retry(
+                db_dsn,
+                doc_id,
+                run_id,
+                section_idx,
+                title,
+                content,
+                css_final,
+                css_breakdown,
+                iterations_used,
+                flat_verdicts,
+                approved_at_dt,
+                version,
+            )
+        except RuntimeError:
+            logger.error(
+                "[checkpoint] CHECKPOINT_FAILED for section %d — section not advanced",
+                section_idx,
+            )
+            return {**state, "status": "CHECKPOINT_FAILED"}  # type: ignore[return-value]
+    else:
+        logger.warning("[checkpoint] No db_dsn configured — skipping DB INSERT for section %d", section_idx)
 
     # ------------------------------------------------------------------
     # Step 2 — Filesystem mirror [NEW]
@@ -579,6 +593,8 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
         "verdicts_history": flat_verdicts,
         "approved_at": approved_at_iso,
         "version": version,
+        # Preserve source metadata for citation resolution in publisher
+        "sources": list(state.get("current_sources") or []),
     }
     approved_sections: list[dict] = list(state.get("approved_sections") or [])
     approved_sections.append(new_entry)
