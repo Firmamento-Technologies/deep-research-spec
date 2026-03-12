@@ -30,18 +30,14 @@ export class ErrorBoundary extends Component<Props, State> {
         return this.props.fallback;
       }
       return (
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <div className="p-8 text-center">
           <h2>Something went wrong</h2>
-          <p style={{ color: '#666', marginTop: '0.5rem' }}>
+          <p className="text-drs-muted mt-2">
             {this.state.error?.message || 'An unexpected error occurred.'}
           </p>
           <button
             onClick={() => this.setState({ hasError: false, error: null })}
-            style={{
-              marginTop: '1rem',
-              padding: '0.5rem 1rem',
-              cursor: 'pointer',
-            }}
+            className="mt-4 px-4 py-2 cursor-pointer"
           >
             Try again
           </button>

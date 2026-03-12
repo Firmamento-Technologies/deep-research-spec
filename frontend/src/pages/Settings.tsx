@@ -310,24 +310,8 @@ export function Settings() {
 // ------------------------------------------------------------------ //
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div
-      style={{
-        background: '#111318',
-        border: '1px solid #2A2D3A',
-        borderRadius: 8,
-        padding: '16px 20px',
-        marginBottom: 16,
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontFamily: 'monospace',
-          color: '#50536A',
-          letterSpacing: 1,
-          marginBottom: 14,
-        }}
-      >
+    <div className="bg-drs-s1 border border-drs-border rounded-card px-[20px] py-[16px] mb-[16px]">
+      <div className="text-[11px] font-mono text-drs-faint tracking-[1px] mb-[14px]">
         {title.toUpperCase()}
       </div>
       {children}
@@ -337,7 +321,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 function Label({ children }: { children: ReactNode }) {
   return (
-    <span style={{ fontSize: 12, fontFamily: 'monospace', color: '#8B8FA8' }}>
+    <span className="text-[12px] font-mono text-drs-muted">
       {children}
     </span>
   )

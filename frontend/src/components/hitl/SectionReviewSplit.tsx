@@ -65,18 +65,11 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
   const highlightedDraft = applyViolationHighlights(draft, violations)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+    <div className="flex flex-col h-full">
+      <div className="flex-1 flex overflow-hidden">
         {/* LEFT — Draft */}
-        <div
-          style={{
-            flex: 1,
-            borderRight: '1px solid #2A2D3A',
-            overflowY: 'auto',
-            padding: '16px 20px',
-          }}
-        >
-          <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', letterSpacing: 1, marginBottom: 10 }}>
+        <div className="flex-1 border-r border-drs-border overflow-y-auto p-[16px_20px]">
+          <div className="text-[10px] font-mono text-drs-faint tracking-[1px] mb-[10px]">
             DRAFT
           </div>
 
@@ -84,48 +77,25 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
             <textarea
               value={manualText}
               onChange={e => setManualText(e.target.value)}
-              style={{
-                width: '100%',
-                minHeight: 400,
-                background: '#0A0B0F',
-                border: '1px solid #2A2D3A',
-                borderRadius: 6,
-                color: '#F0F1F6',
-                fontSize: 12,
-                fontFamily: 'monospace',
-                padding: 12,
-                resize: 'vertical',
-                outline: 'none',
-                lineHeight: 1.7,
-              }}
+              className="w-full min-h-[400px] bg-drs-bg border border-drs-border rounded-[6px] text-drs-text text-[12px] font-mono p-[12px] resize-y outline-none leading-[1.7]"
             />
           ) : (
             <div
-              style={{ fontSize: 13, lineHeight: 1.8, color: '#F0F1F6' }}
+              className="text-[13px] leading-[1.8] text-drs-text"
               dangerouslySetInnerHTML={{ __html: highlightedDraft }}
             />
           )}
         </div>
 
         {/* RIGHT — Feedback + Sources */}
-        <div
-          style={{
-            width: 340,
-            flexShrink: 0,
-            overflowY: 'auto',
-            padding: '16px 16px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 16,
-          }}
-        >
+        <div className="w-[340px] shrink-0 overflow-y-auto p-[16px] flex flex-col gap-[16px]">
           {/* Feedback */}
           <div>
-            <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', letterSpacing: 1, marginBottom: 8 }}>
+            <div className="text-[10px] font-mono text-drs-faint tracking-[1px] mb-[8px]">
               FEEDBACK REFLECTOR
             </div>
             {feedback.length === 0 && (
-              <div style={{ fontSize: 11, color: '#50536A', fontFamily: 'monospace' }}>Nessun feedback.</div>
+              <div className="text-[11px] text-drs-faint font-mono">Nessun feedback.</div>
             )}
             {feedback.map((item, i) => (
               <FeedbackCard key={i} item={item} />
@@ -138,20 +108,11 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
       </div>
 
       {/* Footer */}
-      <div
-        style={{
-          padding: '12px 20px',
-          borderTop: '1px solid #2A2D3A',
-          display: 'flex',
-          gap: 10,
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-      >
+      <div className="p-[12px_20px] border-t border-drs-border flex gap-[10px] items-center shrink-0">
         {error && (
-          <span style={{ fontSize: 11, color: '#EF4444', fontFamily: 'monospace' }}>{error}</span>
+          <span className="text-[11px] text-drs-red font-mono">{error}</span>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div className="ml-auto flex gap-[8px]">
           <ActionBtn variant="ghost" disabled={submitting}
             onClick={() => manualEdit ? post('edit', manualText) : setManualEdit(true)}>
             {manualEdit ? 'Invia Modifica' : 'Modifica Manuale'}
@@ -181,48 +142,35 @@ function FeedbackCard({ item }: { item: FeedbackItem }) {
 
   return (
     <div
-      style={{
-        background: '#111318',
-        border: `1px solid ${color}30`,
-        borderRadius: 6,
-        padding: '8px 10px',
-        marginBottom: 6,
-      }}
+      className="bg-drs-s1 rounded-[6px] p-[8px_10px] mb-[6px]"
+      style={{ border: `1px solid ${color}30` }}
     >
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 3 }}>
+      <div className="flex gap-[6px] items-center mb-[3px]">
         <span
+          className="text-[9px] font-mono rounded-[3px] p-[1px_5px]"
           style={{
-            fontSize: 9, fontFamily: 'monospace', color,
-            background: `${color}20`, border: `1px solid ${color}60`,
-            borderRadius: 3, padding: '1px 5px',
+            color,
+            background: `${color}20`,
+            border: `1px solid ${color}60`,
           }}
         >
           {item.severity}
         </span>
-        <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#F0F1F6' }}>
+        <span className="text-[11px] font-mono text-drs-text">
           {item.category}
         </span>
       </div>
-      <div style={{ fontSize: 11, color: '#8B8FA8', lineHeight: 1.5 }}>{item.text}</div>
+      <div className="text-[11px] text-drs-muted leading-[1.5]">{item.text}</div>
       {item.fixSuggested && (
         <button
           onClick={() => setExpanded(o => !o)}
-          style={{
-            marginTop: 4, background: 'transparent', border: 'none',
-            color: '#7C8CFF', fontSize: 10, cursor: 'pointer', padding: 0,
-          }}
+          className="mt-[4px] bg-transparent border-none text-drs-accent text-[10px] cursor-pointer p-0"
         >
           {expanded ? '▾' : '▸'} Fix suggerito
         </button>
       )}
       {expanded && item.fixSuggested && (
-        <div
-          style={{
-            marginTop: 4, fontSize: 10, color: '#8B8FA8', fontFamily: 'monospace',
-            background: '#0A0B0F', borderRadius: 4, padding: '6px 8px',
-            whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          }}
-        >
+        <div className="mt-[4px] text-[10px] text-drs-muted font-mono bg-drs-bg rounded-input p-[6px_8px] whitespace-pre-wrap break-words">
           {item.fixSuggested}
         </div>
       )}
@@ -264,16 +212,13 @@ function ActionBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      style={{
-        padding: '8px 16px', borderRadius: 6,
-        fontSize: 12, fontFamily: 'monospace',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        border: variant === 'primary' ? 'none' : '1px solid #2A2D3A',
-        background: variant === 'primary' ? '#7C8CFF' : 'transparent',
-        color: variant === 'primary' ? '#0A0B0F' : '#8B8FA8',
-        fontWeight: variant === 'primary' ? 700 : 400,
-      }}
+      className={`p-[8px_16px] rounded-[6px] text-[12px] font-mono ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+      } ${
+        variant === 'primary'
+          ? 'border-none bg-drs-accent text-drs-bg font-bold'
+          : 'border border-drs-border bg-transparent text-drs-muted font-normal'
+      }`}
     >
       {children}
     </button>

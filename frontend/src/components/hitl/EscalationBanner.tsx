@@ -36,77 +36,31 @@ export function EscalationBanner({ docId }: EscalationBannerProps) {
   }
 
   return (
-    <div
-      style={{
-        padding: 24,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 20,
-      }}
-    >
+    <div className="p-[24px] flex flex-col gap-[20px]">
       {/* Red banner */}
-      <div
-        style={{
-          background: '#EF444415',
-          border: '1px solid #EF4444',
-          borderRadius: 8,
-          padding: '14px 18px',
-        }}
-      >
-        <div
-          style={{
-            fontSize: 13,
-            fontFamily: 'monospace',
-            color: '#EF4444',
-            fontWeight: 700,
-            marginBottom: 8,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}
-        >
-          <span
-            style={{
-              width: 10, height: 10, borderRadius: '50%',
-              background: '#EF4444',
-              boxShadow: '0 0 8px #EF4444',
-              display: 'inline-block',
-              flexShrink: 0,
-            }}
-          />
+      <div className="rounded-card p-[14px_18px]" style={{ background: '#EF444415', border: '1px solid #EF4444' }}>
+        <div className="text-[13px] font-mono text-drs-red font-bold mb-[8px] flex items-center gap-[8px]">
+          <span className="w-[10px] h-[10px] rounded-full bg-drs-red inline-block shrink-0 shadow-[0_0_8px_#EF4444]" />
           {escalationType}
         </div>
-        <div style={{ fontSize: 13, color: '#F0F1F6', lineHeight: 1.7 }}>
+        <div className="text-[13px] text-drs-text leading-[1.7]">
           {description}
         </div>
       </div>
 
       {/* Context detail */}
       {payload.detail && (
-        <div
-          style={{
-            background: '#111318',
-            border: '1px solid #2A2D3A',
-            borderRadius: 6,
-            padding: '12px 14px',
-            fontSize: 12,
-            fontFamily: 'monospace',
-            color: '#8B8FA8',
-            lineHeight: 1.6,
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-          }}
-        >
+        <div className="bg-drs-s1 border border-drs-border rounded-[6px] p-[12px_14px] text-[12px] font-mono text-drs-muted leading-[1.6] whitespace-pre-wrap break-words">
           {payload.detail}
         </div>
       )}
 
       {error && (
-        <div style={{ fontSize: 11, color: '#EF4444', fontFamily: 'monospace' }}>{error}</div>
+        <div className="text-[11px] text-drs-red font-mono">{error}</div>
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <div className="flex gap-[12px] flex-wrap">
         <EscalationBtn
           label="Risolvi Automatico"
           description="Lascia che la pipeline risolva il conflitto automaticamente."
@@ -146,25 +100,20 @@ function EscalationBtn({
     <button
       onClick={onClick}
       disabled={disabled}
+      className={`flex-1 min-w-[160px] p-[14px_16px] rounded-card text-left transition-[background,border-color] duration-150 ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+      }`}
       style={{
-        flex: 1,
-        minWidth: 160,
-        padding: '14px 16px',
         background: `${color}10`,
         border: `1px solid ${color}60`,
-        borderRadius: 8,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        textAlign: 'left',
-        transition: 'background 0.15s, border-color 0.15s',
       }}
       onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = `${color}20` }}
       onMouseLeave={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = `${color}10` }}
     >
-      <div style={{ fontSize: 12, fontFamily: 'monospace', color, fontWeight: 700, marginBottom: 4 }}>
+      <div className="text-[12px] font-mono font-bold mb-[4px]" style={{ color }}>
         {label}
       </div>
-      <div style={{ fontSize: 11, color: '#8B8FA8', lineHeight: 1.4 }}>
+      <div className="text-[11px] text-drs-muted leading-[1.4]">
         {description}
       </div>
     </button>
