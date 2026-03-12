@@ -16,8 +16,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      <div className="min-h-screen flex items-center justify-center bg-drs-bg">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-drs-accent" />
       </div>
     );
   }
@@ -34,10 +34,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
     if (userLevel < requiredLevel) {
       return (
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="min-h-screen flex items-center justify-center bg-drs-bg">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
-            <p className="text-gray-600">You don't have permission to access this page.</p>
+            <h1 className="text-2xl font-bold text-drs-text mb-2">Access Denied</h1>
+            <p className="text-drs-muted">You don't have permission to access this page.</p>
           </div>
         </div>
       );

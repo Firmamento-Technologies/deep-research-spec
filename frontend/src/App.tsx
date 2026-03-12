@@ -27,8 +27,8 @@ const queryClient = new QueryClient({
 
 function LoadingFallback() {
   return (
-    <div className="flex justify-center items-center h-screen">
-      <div>Loading...</div>
+    <div className="flex justify-center items-center h-screen bg-drs-bg">
+      <div className="text-drs-muted font-mono text-sm">Loading...</div>
     </div>
   );
 }

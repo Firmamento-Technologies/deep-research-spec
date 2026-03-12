@@ -1,5 +1,6 @@
 import { useState, useEffect, type FC } from 'react';
 import { Card } from '../components/ui/Card';
+import { api } from '../lib/api';
 
 interface User {
   id: string;
@@ -16,11 +17,8 @@ export const AdminUsers: FC = () => {
   useEffect(() => {
     async function fetchUsers() {
       try {
-        const res = await fetch('/api/admin/users');
-        if (res.ok) {
-          const data = await res.json();
-          setUsers(data.users || []);
-        }
+        const res = await api.get('/api/admin/users');
+        setUsers(res.data?.users || []);
       } catch {
         // API not available
       } finally {
@@ -32,16 +30,10 @@ export const AdminUsers: FC = () => {
 
   const toggleActive = async (userId: string, active: boolean) => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: !active }),
-      });
-      if (res.ok) {
-        setUsers(prev =>
-          prev.map(u => u.id === userId ? { ...u, active: !active } : u)
-        );
-      }
+      await api.patch(`/api/admin/users/${userId}`, { active: !active });
+      setUsers(prev =>
+        prev.map(u => u.id === userId ? { ...u, active: !active } : u)
+      );
     } catch {
       // Handle error
     }
@@ -49,18 +41,18 @@ export const AdminUsers: FC = () => {
 
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">User Management</h1>
+      <h1 className="text-3xl font-bold text-drs-text">User Management</h1>
 
       <Card>
         {loading ? (
-          <p className="text-sm text-gray-500">Loading users...</p>
+          <p className="text-sm text-drs-faint">Loading users...</p>
         ) : users.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-gray-400">No users found.</p>
+          <p className="text-sm text-drs-muted">No users found.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left text-gray-500 dark:text-gray-400">
+                <tr className="border-b border-drs-border text-left text-drs-muted">
                   <th className="pb-2">Email</th>
                   <th className="pb-2">Role</th>
                   <th className="pb-2">Status</th>
@@ -70,30 +62,30 @@ export const AdminUsers: FC = () => {
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} className="border-b border-gray-100 dark:border-gray-700">
-                    <td className="py-2 text-gray-900 dark:text-white">{user.email}</td>
+                  <tr key={user.id} className="border-b border-drs-border">
+                    <td className="py-2 text-drs-text">{user.email}</td>
                     <td className="py-2">
-                      <span className={`inline-block rounded px-2 py-0.5 text-xs ${
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                        'bg-gray-100 text-gray-800'
+                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                        user.role === 'admin' ? 'bg-drs-accent/20 text-drs-accent' :
+                        'bg-drs-s3 text-drs-muted'
                       }`}>
                         {user.role}
                       </span>
                     </td>
                     <td className="py-2">
-                      <span className={`inline-block rounded px-2 py-0.5 text-xs ${
-                        user.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
+                        user.active ? 'bg-drs-green/20 text-drs-green' : 'bg-drs-red/20 text-drs-red'
                       }`}>
                         {user.active ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="py-2 text-gray-500 dark:text-gray-400">
+                    <td className="py-2 text-drs-faint">
                       {new Date(user.created_at).toLocaleDateString()}
                     </td>
                     <td className="py-2">
                       <button
                         onClick={() => toggleActive(user.id, user.active)}
-                        className="text-sm text-blue-600 hover:text-blue-700"
+                        className="text-sm text-drs-accent hover:brightness-110"
                       >
                         {user.active ? 'Deactivate' : 'Activate'}
                       </button>

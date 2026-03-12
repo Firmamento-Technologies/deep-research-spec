@@ -45,7 +45,6 @@ export const SpaceDetail: React.FC = () => {
       return res.data;
     },
     refetchInterval: (data) => {
-      // Poll if any source is processing
       return data?.some(s => s.status === 'processing') ? 5000 : false;
     },
   });
@@ -103,9 +102,9 @@ export const SpaceDetail: React.FC = () => {
 
   const getStatusBadge = (status: Source['status']) => {
     const styles = {
-      processing: 'bg-yellow-100 text-yellow-800',
-      ready: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
+      processing: 'bg-drs-yellow/20 text-drs-yellow',
+      ready: 'bg-drs-green/20 text-drs-green',
+      failed: 'bg-drs-red/20 text-drs-red',
     };
     return (
       <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
@@ -118,11 +117,11 @@ export const SpaceDetail: React.FC = () => {
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        <h1 className="text-3xl font-bold text-drs-text">
           {space?.name || 'Loading...'}
         </h1>
         {space?.description && (
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <p className="mt-2 text-drs-muted">
             {space.description}
           </p>
         )}
@@ -147,14 +146,14 @@ export const SpaceDetail: React.FC = () => {
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
           className={`border-2 border-dashed rounded-lg p-12 text-center transition ${
-            isDragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+            isDragOver ? 'border-drs-accent bg-drs-accent/10' : 'border-drs-border'
           }`}
         >
-          <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <Upload className="w-12 h-12 text-drs-faint mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-drs-text mb-2">
             Upload Documents
           </h3>
-          <p className="text-gray-600 mb-4">
+          <p className="text-drs-muted mb-4">
             Drag and drop files here, or click to browse
           </p>
           <input
@@ -170,7 +169,7 @@ export const SpaceDetail: React.FC = () => {
               Select Files
             </Button>
           </label>
-          <p className="text-xs text-gray-500 mt-4">
+          <p className="text-xs text-drs-faint mt-4">
             Supported: PDF, DOCX, TXT, MD, HTML (max 50MB)
           </p>
         </div>
@@ -180,13 +179,13 @@ export const SpaceDetail: React.FC = () => {
           <div className="mt-4 space-y-2">
             {Array.from(uploadProgress.entries()).map(([filename, progress]) => (
               <div key={filename}>
-                <div className="flex justify-between text-sm mb-1">
+                <div className="flex justify-between text-sm mb-1 text-drs-text">
                   <span>{filename}</span>
                   <span>{Math.round(progress)}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-drs-s3 rounded-full h-2">
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    className="bg-drs-accent h-2 rounded-full transition-all"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -198,7 +197,7 @@ export const SpaceDetail: React.FC = () => {
 
       {/* Sources List */}
       <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+        <h2 className="text-xl font-semibold text-drs-text mb-4">
           Sources ({sources?.length || 0})
         </h2>
         {sources && sources.length > 0 ? (
@@ -206,17 +205,17 @@ export const SpaceDetail: React.FC = () => {
             {sources.map((source) => (
               <Card key={source.id} className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <FileText className="w-8 h-8 text-gray-400" />
+                  <FileText className="w-8 h-8 text-drs-faint" />
                   <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">
+                    <h3 className="font-medium text-drs-text">
                       {source.filename}
                     </h3>
                     <div className="flex items-center gap-2 mt-1">
                       {getStatusBadge(source.status)}
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-drs-muted">
                         {source.chunk_count} chunks
                       </span>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-drs-faint">
                         {new Date(source.created_at).toLocaleDateString()}
                       </span>
                     </div>
@@ -224,7 +223,7 @@ export const SpaceDetail: React.FC = () => {
                 </div>
                 <button
                   onClick={() => deleteMutation.mutate(source.id)}
-                  className="p-2 text-gray-400 hover:text-red-600 transition"
+                  className="p-2 text-drs-faint hover:text-drs-red transition"
                   aria-label="Delete source"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -233,7 +232,7 @@ export const SpaceDetail: React.FC = () => {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">
+          <p className="text-drs-muted text-center py-8">
             No sources uploaded yet. Upload documents to get started.
           </p>
         )}

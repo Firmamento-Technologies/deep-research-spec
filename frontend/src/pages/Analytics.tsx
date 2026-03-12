@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
+import { api } from '../lib/api'
 import {
   LineChart, Line,
   BarChart, Bar,
@@ -49,13 +50,11 @@ export function Analytics() {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({ from, to })
-      if (presets.length) params.set('preset', presets.join(','))
-      if (keyword) params.set('keyword', keyword)
-      const res = await fetch(`/api/analytics?${params}`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      setData(json)
+      const params: Record<string, string> = { from, to }
+      if (presets.length) params.preset = presets.join(',')
+      if (keyword) params.keyword = keyword
+      const res = await api.get('/api/analytics', { params })
+      setData(res.data)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -79,14 +78,21 @@ export function Analytics() {
         onKeyword={setKeyword} onRefresh={fetchData}
       />
 
-      {error && (
-        <div className="bg-[#EF444415] border border-drs-red rounded-[6px] px-[12px] py-[8px] text-[12px] text-drs-red font-mono">
-          Errore: {error}
-        </div>
-      )}
-
       {loading && !data && (
         <div className="text-drs-faint text-[12px] font-mono">Caricamento dati...</div>
+      )}
+
+      {error && !data && (
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <div className="text-drs-faint text-[48px]">&#128202;</div>
+          <div className="text-drs-text text-[16px] font-bold">Nessun dato disponibile</div>
+          <div className="text-drs-muted text-[13px] font-mono text-center max-w-md">
+            Non ci sono ancora dati analytics. I dati appariranno qui dopo aver completato le prime ricerche nel sistema.
+          </div>
+          <div className="bg-drs-s1 border border-drs-border rounded-card px-4 py-3 mt-2">
+            <div className="text-drs-faint text-[11px] font-mono">{error}</div>
+          </div>
+        </div>
       )}
 
       {data && (

@@ -6,7 +6,7 @@ export const Card: FC<PropsWithChildren<CardProps>> = ({ children, className = '
   return (
     <div
       {...props}
-      className={`rounded-lg border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 ${className}`}
+      className={`rounded-card border border-drs-border bg-drs-s1 p-4 ${className}`}
     >
       {children}
     </div>

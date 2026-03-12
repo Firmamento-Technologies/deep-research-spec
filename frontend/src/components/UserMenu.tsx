@@ -29,9 +29,9 @@ export const UserMenu: React.FC = () => {
 
   // Role badge color
   const roleColors = {
-    admin: 'bg-purple-100 text-purple-800',
-    user: 'bg-blue-100 text-blue-800',
-    viewer: 'bg-gray-100 text-gray-800',
+    admin: 'bg-drs-accent/20 text-drs-accent',
+    user: 'bg-drs-accent/15 text-drs-accent',
+    viewer: 'bg-drs-s3 text-drs-muted',
   };
 
   return (
@@ -39,35 +39,35 @@ export const UserMenu: React.FC = () => {
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+        className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-drs-s2 transition-colors"
       >
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium">
+        <div className="w-8 h-8 rounded-full bg-drs-accent flex items-center justify-center text-white font-medium">
           {user.username.charAt(0).toUpperCase()}
         </div>
-        
+
         {/* User info */}
         <div className="text-left hidden sm:block">
-          <div className="text-sm font-medium text-gray-900">{user.username}</div>
-          <div className="text-xs text-gray-500">{user.email}</div>
+          <div className="text-sm font-medium text-drs-text">{user.username}</div>
+          <div className="text-xs text-drs-faint">{user.email}</div>
         </div>
-        
-        <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+
+        <ChevronDown className={`h-4 w-4 text-drs-faint transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown menu */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+        <div className="absolute right-0 mt-2 w-64 bg-drs-s2 rounded-lg shadow-lg border border-drs-border py-2 z-50">
           {/* User info (mobile) */}
-          <div className="px-4 py-3 border-b border-gray-200 sm:hidden">
-            <div className="text-sm font-medium text-gray-900">{user.username}</div>
-            <div className="text-xs text-gray-500 mt-1">{user.email}</div>
+          <div className="px-4 py-3 border-b border-drs-border sm:hidden">
+            <div className="text-sm font-medium text-drs-text">{user.username}</div>
+            <div className="text-xs text-drs-faint mt-1">{user.email}</div>
           </div>
 
           {/* Role badge */}
-          <div className="px-4 py-2 border-b border-gray-200">
+          <div className="px-4 py-2 border-b border-drs-border">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-500">Role</span>
+              <span className="text-xs text-drs-faint">Role</span>
               <span className={`px-2 py-1 text-xs font-medium rounded-full ${roleColors[user.role]}`}>
                 {user.role === 'admin' && <Shield className="inline h-3 w-3 mr-1" />}
                 {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
@@ -82,7 +82,7 @@ export const UserMenu: React.FC = () => {
                 navigate('/profile');
                 setIsOpen(false);
               }}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="w-full flex items-center px-4 py-2 text-sm text-drs-muted hover:bg-drs-s3 hover:text-drs-text"
             >
               <User className="h-4 w-4 mr-3" />
               Profile
@@ -93,7 +93,7 @@ export const UserMenu: React.FC = () => {
                 navigate('/settings');
                 setIsOpen(false);
               }}
-              className="w-full flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              className="w-full flex items-center px-4 py-2 text-sm text-drs-muted hover:bg-drs-s3 hover:text-drs-text"
             >
               <Settings className="h-4 w-4 mr-3" />
               Settings
@@ -101,10 +101,10 @@ export const UserMenu: React.FC = () => {
           </div>
 
           {/* Logout */}
-          <div className="border-t border-gray-200 py-1">
+          <div className="border-t border-drs-border py-1">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              className="w-full flex items-center px-4 py-2 text-sm text-drs-red hover:bg-drs-red/10"
             >
               <LogOut className="h-4 w-4 mr-3" />
               Sign out
