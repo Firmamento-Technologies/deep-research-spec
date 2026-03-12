@@ -38,20 +38,10 @@ export function PipelineMinimap({ nodeStates, visibleNodeIds, viewport, onMinima
 
   return (
     <div
-      style={{
-        position: 'absolute',
-        bottom: 16,
-        right: 16,
-        width: MAP_W,
-        height: MAP_H,
-        background: '#111318',
-        border: '1px solid #2A2D3A',
-        borderRadius: 6,
-        overflow: 'hidden',
-        zIndex: 20,
-      }}
+      style={{ width: MAP_W, height: MAP_H }}
+      className="absolute bottom-[16px] right-[16px] bg-drs-s1 border border-drs-border rounded-[6px] overflow-hidden z-20"
     >
-      <svg width={MAP_W} height={MAP_H} style={{ cursor: 'pointer' }} onClick={handleClick}>
+      <svg width={MAP_W} height={MAP_H} className="cursor-pointer" onClick={handleClick}>
         {PIPELINE_NODES.filter((node) => visibleNodeIds.has(node.id)).map(node => {
           const status = nodeStates[node.id]?.status ?? 'waiting'
           const color = CLUSTER_COLORS[node.cluster]

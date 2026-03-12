@@ -13,22 +13,14 @@ interface SectionItemProps {
 
 function StatusIcon({ status }: { status: SectionStatus }) {
   if (status === 'completed') return <span title="Completata">✅</span>
-  if (status === 'failed')    return <span title="Fallita" style={{ color: '#EF4444' }}>❌</span>
-  if (status === 'waiting')   return <span title="In attesa" style={{ color: '#50536A', fontSize: 14 }}>⏳</span>
+  if (status === 'failed')    return <span title="Fallita" className="text-drs-red">❌</span>
+  if (status === 'waiting')   return <span title="In attesa" className="text-drs-faint text-[14px]">⏳</span>
   // running — animated green dot
   return (
     <span
       title="In esecuzione"
-      style={{
-        display: 'inline-block',
-        width: 8,
-        height: 8,
-        borderRadius: '50%',
-        background: '#22C55E',
-        boxShadow: '0 0 6px #22C55E',
-        animation: 'pulse-dot 1s ease-in-out infinite',
-        verticalAlign: 'middle',
-      }}
+      className="inline-block w-[8px] h-[8px] rounded-full bg-drs-green align-middle shadow-[0_0_6px_#22C55E]"
+      style={{ animation: 'pulse-dot 1s ease-in-out infinite' }}
     />
   )
 }
@@ -65,11 +57,8 @@ export function SectionItem({ idx, title, status, docId, collapsed }: SectionIte
       <div
         title={`§${idx + 1} ${title}`}
         onClick={handleClick}
+        className="w-[8px] h-[8px] rounded-full mx-auto my-[6px]"
         style={{
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
-          margin: '6px auto',
           background:
             status === 'completed' ? '#4F6EF7' :
             status === 'running'   ? '#22C55E' :
@@ -86,44 +75,27 @@ export function SectionItem({ idx, title, status, docId, collapsed }: SectionIte
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleClick}
+      className="flex items-center gap-[8px] p-[4px_8px] rounded-input relative transition-[background] duration-150"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '4px 8px',
-        borderRadius: 4,
         cursor: status === 'completed' ? 'pointer' : 'default',
         background: hovered ? '#1A1D2740' : 'transparent',
-        position: 'relative',
-        transition: 'background 0.15s',
       }}
     >
-      <div style={{ flexShrink: 0, width: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="shrink-0 w-[16px] flex items-center justify-center">
         <StatusIcon status={status} />
       </div>
 
       <span
-        style={{
-          flex: 1,
-          fontSize: 12,
-          color: status === 'completed' ? '#F0F1F6' : '#8B8FA8',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}
+        className={`flex-1 text-[12px] overflow-hidden text-ellipsis whitespace-nowrap ${
+          status === 'completed' ? 'text-drs-text' : 'text-drs-muted'
+        }`}
       >
         §{idx + 1} {title}
       </span>
 
       {/* Hover micro-menu */}
       {hovered && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 4,
-            flexShrink: 0,
-          }}
-        >
+        <div className="flex gap-[4px] shrink-0">
           <MicroBtn title="Esporta DOCX" onClick={e => handleExport(e, 'docx')}>⬇ DOCX</MicroBtn>
           <MicroBtn title="Copia" onClick={handleCopy}>Copia</MicroBtn>
           <MicroBtn title="Log agenti" onClick={handleLog}>Log</MicroBtn>
@@ -146,17 +118,7 @@ function MicroBtn({
     <button
       title={title}
       onClick={onClick}
-      style={{
-        background: '#1A1D27',
-        border: '1px solid #2A2D3A',
-        borderRadius: 3,
-        color: '#8B8FA8',
-        fontSize: 9,
-        fontFamily: 'monospace',
-        padding: '2px 5px',
-        cursor: 'pointer',
-        lineHeight: 1,
-      }}
+      className="bg-drs-s2 border border-drs-border rounded-[3px] text-drs-muted text-[9px] font-mono p-[2px_5px] cursor-pointer leading-none"
     >
       {children}
     </button>

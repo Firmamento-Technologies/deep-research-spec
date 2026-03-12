@@ -107,9 +107,9 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className="flex flex-col h-full">
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+      <div className="flex-1 overflow-y-auto p-[16px_20px]">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={sections.map(s => s.id)} strategy={verticalListSortingStrategy}>
             {sections.map((section, idx) => (
@@ -126,38 +126,18 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
 
         <button
           onClick={addSection}
-          style={{
-            marginTop: 8,
-            background: 'transparent',
-            border: '1px dashed #2A2D3A',
-            borderRadius: 6,
-            color: '#8B8FA8',
-            fontSize: 12,
-            fontFamily: 'monospace',
-            padding: '8px 16px',
-            cursor: 'pointer',
-            width: '100%',
-          }}
+          className="mt-[8px] bg-transparent border border-dashed border-drs-border rounded-[6px] text-drs-muted text-[12px] font-mono p-[8px_16px] cursor-pointer w-full"
         >
           + Aggiungi Sezione
         </button>
       </div>
 
       {/* Footer */}
-      <div
-        style={{
-          padding: '12px 20px',
-          borderTop: '1px solid #2A2D3A',
-          display: 'flex',
-          gap: 10,
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-      >
+      <div className="p-[12px_20px] border-t border-drs-border flex gap-[10px] items-center shrink-0">
         {error && (
-          <span style={{ fontSize: 11, color: '#EF4444', fontFamily: 'monospace', flex: 1 }}>{error}</span>
+          <span className="text-[11px] text-drs-red font-mono flex-1">{error}</span>
         )}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div className="ml-auto flex gap-[8px]">
           <ActionBtn onClick={handleRegenerate} disabled={submitting} variant="ghost">
             Rigenera
           </ActionBtn>
@@ -189,17 +169,12 @@ function SortableRow({
   return (
     <div
       ref={setNodeRef}
+      className="flex items-center gap-[8px] p-[8px_10px] mb-[6px] rounded-[6px]"
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 10px',
-        marginBottom: 6,
         background: isDragging ? '#1A1D27' : '#111318',
         border: `1px solid ${isDragging ? '#7C8CFF60' : '#2A2D3A'}`,
-        borderRadius: 6,
         opacity: isDragging ? 0.85 : 1,
         boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.4)' : 'none',
       }}
@@ -208,13 +183,13 @@ function SortableRow({
       <span
         {...attributes}
         {...listeners}
-        style={{ cursor: 'grab', color: '#50536A', fontSize: 14, flexShrink: 0, lineHeight: 1 }}
+        className="cursor-grab text-drs-faint text-[14px] shrink-0 leading-none"
       >
         ☰
       </span>
 
       {/* Index */}
-      <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#50536A', flexShrink: 0, width: 20 }}>
+      <span className="text-[11px] font-mono text-drs-faint shrink-0 w-[20px]">
         §{idx + 1}
       </span>
 
@@ -222,17 +197,7 @@ function SortableRow({
       <input
         value={section.title}
         onChange={e => onUpdate(section.id, 'title', e.target.value)}
-        style={{
-          flex: 2,
-          background: 'transparent',
-          border: 'none',
-          borderBottom: '1px solid #2A2D3A',
-          color: '#F0F1F6',
-          fontSize: 12,
-          fontFamily: 'monospace',
-          padding: '2px 4px',
-          outline: 'none',
-        }}
+        className="flex-[2] bg-transparent border-0 border-b border-drs-border text-drs-text text-[12px] font-mono p-[2px_4px] outline-none"
         placeholder="Titolo sezione"
       />
 
@@ -240,17 +205,7 @@ function SortableRow({
       <input
         value={section.scope}
         onChange={e => onUpdate(section.id, 'scope', e.target.value)}
-        style={{
-          flex: 3,
-          background: 'transparent',
-          border: 'none',
-          borderBottom: '1px solid #2A2D3A',
-          color: '#8B8FA8',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          padding: '2px 4px',
-          outline: 'none',
-        }}
+        className="flex-[3] bg-transparent border-0 border-b border-drs-border text-drs-muted text-[11px] font-mono p-[2px_4px] outline-none"
         placeholder="Scope"
       />
 
@@ -262,34 +217,14 @@ function SortableRow({
         max={10000}
         step={100}
         onChange={e => onUpdate(section.id, 'targetWords', parseInt(e.target.value) || 500)}
-        style={{
-          width: 72,
-          background: 'transparent',
-          border: '1px solid #2A2D3A',
-          borderRadius: 4,
-          color: '#8B8FA8',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          padding: '2px 6px',
-          outline: 'none',
-          textAlign: 'right',
-          flexShrink: 0,
-        }}
+        className="w-[72px] bg-transparent border border-drs-border rounded-input text-drs-muted text-[11px] font-mono p-[2px_6px] outline-none text-right shrink-0"
       />
-      <span style={{ fontSize: 9, color: '#50536A', flexShrink: 0 }}>w</span>
+      <span className="text-[9px] text-drs-faint shrink-0">w</span>
 
       {/* Delete */}
       <button
         onClick={() => onRemove(section.id)}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: '#50536A',
-          cursor: 'pointer',
-          fontSize: 14,
-          flexShrink: 0,
-          lineHeight: 1,
-        }}
+        className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] shrink-0 leading-none"
         title="Rimuovi sezione"
       >
         ×
@@ -313,18 +248,13 @@ function ActionBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      style={{
-        padding: '8px 18px',
-        borderRadius: 6,
-        fontSize: 12,
-        fontFamily: 'monospace',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1,
-        border: variant === 'primary' ? 'none' : '1px solid #2A2D3A',
-        background: variant === 'primary' ? '#7C8CFF' : 'transparent',
-        color: variant === 'primary' ? '#0A0B0F' : '#8B8FA8',
-        fontWeight: variant === 'primary' ? 700 : 400,
-      }}
+      className={`p-[8px_18px] rounded-[6px] text-[12px] font-mono ${
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
+      } ${
+        variant === 'primary'
+          ? 'border-none bg-drs-accent text-drs-bg font-bold'
+          : 'border border-drs-border bg-transparent text-drs-muted font-normal'
+      }`}
     >
       {children}
     </button>

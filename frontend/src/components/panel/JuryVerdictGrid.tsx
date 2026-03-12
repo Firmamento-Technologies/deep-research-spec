@@ -28,22 +28,15 @@ export function JuryVerdictGrid({ verdicts }: JuryVerdictGridProps) {
   const expandedVerdict = expanded ? map[expanded] : null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', letterSpacing: 1 }}>
+    <div className="flex flex-col gap-[8px]">
+      <div className="text-[10px] font-mono text-drs-faint tracking-[1px]">
         JURY VERDICTS
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div className="flex flex-col gap-[4px]">
         {ROWS.map((row, ri) => (
-          <div key={ri} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <span
-              style={{
-                fontSize: 9,
-                fontFamily: 'monospace',
-                color: '#50536A',
-                width: 10,
-              }}
-            >
+          <div key={ri} className="flex gap-[4px] items-center">
+            <span className="text-[9px] font-mono text-drs-faint w-[10px]">
               {ROW_LABELS[ri]}
             </span>
             {row.map(judgeId => {
@@ -76,23 +69,17 @@ export function JuryVerdictGrid({ verdicts }: JuryVerdictGridProps) {
                 <button
                   key={judgeId}
                   onClick={() => setExpanded(expanded === judgeId ? null : judgeId)}
+                  className="flex-1 flex flex-col items-center gap-[1px] rounded-input cursor-pointer"
                   style={{
-                    flex: 1,
                     padding: '4px 2px',
                     background: bg,
                     border: `1px solid ${border}`,
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 1,
                   }}
                 >
-                  <span style={{ fontSize: 9, fontFamily: 'monospace', color: textColor, fontWeight: 700 }}>
+                  <span className="text-[9px] font-mono font-bold" style={{ color: textColor }}>
                     {judgeId.toUpperCase()}
                   </span>
-                  <span style={{ fontSize: 8, color: textColor }}>
+                  <span className="text-[8px]" style={{ color: textColor }}>
                     {v == null ? '—' : isVeto ? '🔴 VETO' : isPass ? '✓' : '×'}
                   </span>
                 </button>
@@ -104,29 +91,18 @@ export function JuryVerdictGrid({ verdicts }: JuryVerdictGridProps) {
 
       {/* Expanded reasoning */}
       {expandedVerdict && (
-        <div
-          style={{
-            background: '#0A0B0F',
-            border: '1px solid #2A2D3A',
-            borderRadius: 6,
-            padding: '8px 10px',
-            fontSize: 11,
-            fontFamily: 'monospace',
-            color: '#F0F1F6',
-            lineHeight: 1.6,
-          }}
-        >
+        <div className="bg-drs-bg border border-drs-border rounded-[6px] px-[10px] py-[8px] text-[11px] font-mono text-drs-text leading-[1.6]">
           {expandedVerdict.vetoCategory && (
-            <div style={{ color: '#EF4444', marginBottom: 4, fontSize: 10 }}>
+            <div className="text-drs-red mb-[4px] text-[10px]">
               VETO: {expandedVerdict.vetoCategory}
             </div>
           )}
           {expandedVerdict.confidence && (
-            <div style={{ color: '#8B8FA8', marginBottom: 4, fontSize: 10 }}>
+            <div className="text-drs-muted mb-[4px] text-[10px]">
               Confidence: {expandedVerdict.confidence}
             </div>
           )}
-          <div style={{ color: '#8B8FA8', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+          <div className="text-drs-muted whitespace-pre-wrap break-words">
             {expandedVerdict.reasoning ?? 'Nessun dettaglio disponibile.'}
           </div>
         </div>

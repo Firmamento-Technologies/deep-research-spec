@@ -13,17 +13,7 @@ export function DocumentPreview() {
 
   if (!activeRun) {
     return (
-      <div
-        style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 13,
-          fontFamily: 'monospace',
-          color: '#50536A',
-        }}
-      >
+      <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-drs-faint">
         Nessun documento selezionato.
       </div>
     )
@@ -33,31 +23,14 @@ export function DocumentPreview() {
   const approved = sections.filter(s => s.status === 'approved')
 
   return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        background: '#0A0B0F',
-      }}
-    >
+    <div className="flex-1 flex flex-col overflow-hidden bg-drs-bg">
       {/* Document header */}
-      <div
-        style={{
-          padding: '12px 20px',
-          borderBottom: '1px solid #2A2D3A',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-        }}
-      >
+      <div className="p-[12px_20px] border-b border-drs-border flex items-center justify-between shrink-0">
         <div>
-          <div style={{ fontSize: 14, color: '#F0F1F6', fontWeight: 600 }}>
+          <div className="text-[14px] text-drs-text font-semibold">
             {activeRun.topic}
           </div>
-          <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#50536A', marginTop: 2 }}>
+          <div className="text-[11px] font-mono text-drs-faint mt-[2px]">
             {approved.length}/{sections.length} sezioni approvate
             {activeRun.cssScores && (
               <> • CSS
@@ -74,9 +47,9 @@ export function DocumentPreview() {
       </div>
 
       {/* Sections accordion */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+      <div className="flex-1 overflow-y-auto p-[12px_20px]">
         {sections.length === 0 && (
-          <div style={{ fontSize: 12, color: '#50536A', fontFamily: 'monospace', textAlign: 'center', marginTop: 48 }}>
+          <div className="text-[12px] text-drs-faint font-mono text-center mt-[48px]">
             Nessuna sezione ancora approvata.
           </div>
         )}
@@ -112,55 +85,23 @@ function SectionAccordion({ section, docId, isExpanded, onToggle }: SectionAccor
         '#50536A'
 
   return (
-    <div
-      style={{
-        border: '1px solid #2A2D3A',
-        borderRadius: 8,
-        marginBottom: 8,
-        overflow: 'hidden',
-      }}
-    >
+    <div className="border border-drs-border rounded-card mb-[8px] overflow-hidden">
       {/* Accordion header */}
       <button
         onClick={onToggle}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          width: '100%',
-          padding: '10px 14px',
-          background: isExpanded ? '#1A1D27' : '#111318',
-          border: 'none',
-          cursor: 'pointer',
-          textAlign: 'left',
-          transition: 'background 0.15s',
-        }}
+        className={`flex items-center gap-[10px] w-full p-[10px_14px] border-none cursor-pointer text-left transition-[background] duration-150 ${
+          isExpanded ? 'bg-drs-s2' : 'bg-drs-s1'
+        }`}
       >
-        <span style={{ fontSize: 11, color: '#50536A', fontFamily: 'monospace', flexShrink: 0 }}>
+        <span className="text-[11px] text-drs-faint font-mono shrink-0">
           {isExpanded ? '▾' : '▸'}
         </span>
 
-        <span
-          style={{
-            fontSize: 10,
-            fontFamily: 'monospace',
-            color: '#50536A',
-            flexShrink: 0,
-          }}
-        >
+        <span className="text-[10px] font-mono text-drs-faint shrink-0">
           §{section.idx + 1}
         </span>
 
-        <span
-          style={{
-            flex: 1,
-            fontSize: 13,
-            color: '#F0F1F6',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <span className="flex-1 text-[13px] text-drs-text overflow-hidden text-ellipsis whitespace-nowrap">
           {section.title}
         </span>
 
@@ -171,20 +112,15 @@ function SectionAccordion({ section, docId, isExpanded, onToggle }: SectionAccor
 
         {/* Word count */}
         {(section.wordsCount ?? section.wordCount) > 0 && (
-          <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', flexShrink: 0 }}>
+          <span className="text-[10px] font-mono text-drs-faint shrink-0">
             {(section.wordsCount ?? section.wordCount).toLocaleString()}w
           </span>
         )}
 
         {/* Status dot */}
         <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            background: statusColor,
-            flexShrink: 0,
-          }}
+          className="w-[8px] h-[8px] rounded-full shrink-0"
+          style={{ background: statusColor }}
         />
 
         {/* Export button */}
@@ -197,46 +133,23 @@ function SectionAccordion({ section, docId, isExpanded, onToggle }: SectionAccor
 
       {/* Accordion body — Markdown content */}
       {isExpanded && (
-        <div
-          style={{
-            padding: '16px 20px',
-            background: '#0A0B0F',
-            borderTop: '1px solid #2A2D3A',
-          }}
-        >
+        <div className="p-[16px_20px] bg-drs-bg border-t border-drs-border">
           {section.content ? (
             <div
-              style={{
-                fontSize: 13,
-                lineHeight: 1.8,
-                color: '#F0F1F6',
-                maxWidth: 720,
-              }}
-              className="prose-drs"
+              className="text-[13px] leading-[1.8] text-drs-text max-w-[720px] prose-drs"
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {section.content}
               </ReactMarkdown>
             </div>
           ) : (
-            <div style={{ fontSize: 12, color: '#50536A', fontFamily: 'monospace' }}>
+            <div className="text-[12px] text-drs-faint font-mono">
               Contenuto non disponibile.
             </div>
           )}
 
           {/* Section metrics */}
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              marginTop: 16,
-              paddingTop: 12,
-              borderTop: '1px solid #2A2D3A',
-              fontSize: 11,
-              fontFamily: 'monospace',
-              color: '#50536A',
-            }}
-          >
+          <div className="flex gap-[16px] mt-[16px] pt-[12px] border-t border-drs-border text-[11px] font-mono text-drs-faint">
             {section.cssContent != null && <Metric label="CSS Content" value={section.cssContent.toFixed(2)} color={section.cssContent >= 0.65 ? '#22C55E' : '#EF4444'} />}
             {section.cssStyle != null && <Metric label="CSS Style" value={section.cssStyle.toFixed(2)} color={section.cssStyle >= 0.80 ? '#22C55E' : '#EF4444'} />}
             {section.cssSource != null && <Metric label="CSS Source" value={section.cssSource.toFixed(2)} color="#8B8FA8" />}
@@ -252,15 +165,12 @@ function CSSBadge({ value }: { value: number }) {
   const color = value >= 0.78 ? '#22C55E' : value >= 0.65 ? '#EAB308' : '#EF4444'
   return (
     <span
+      className="text-[10px] font-mono rounded-input shrink-0"
       style={{
-        fontSize: 10,
-        fontFamily: 'monospace',
         color,
         background: `${color}18`,
         border: `1px solid ${color}60`,
-        borderRadius: 4,
         padding: '1px 5px',
-        flexShrink: 0,
       }}
     >
       {value.toFixed(2)}
@@ -271,7 +181,7 @@ function CSSBadge({ value }: { value: number }) {
 function Metric({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <span>
-      <span style={{ color: '#50536A' }}>{label}: </span>
+      <span className="text-drs-faint">{label}: </span>
       <span style={{ color }}>{value}</span>
     </span>
   )

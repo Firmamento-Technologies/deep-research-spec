@@ -18,17 +18,12 @@ function ReliabilityBadge({ score }: { score: number }) {
         '#EF4444'
   return (
     <span
+      className="inline-block rounded-input text-[10px] font-mono min-w-[36px] text-center"
       style={{
-        display: 'inline-block',
         background: `${color}20`,
         border: `1px solid ${color}80`,
-        borderRadius: 4,
         padding: '1px 5px',
-        fontSize: 10,
-        fontFamily: 'monospace',
         color,
-        minWidth: 36,
-        textAlign: 'center',
       }}
     >
       {score.toFixed(2)}
@@ -41,15 +36,15 @@ export function SourceList({ sources }: SourceListProps) {
 
   if (!sources.length) {
     return (
-      <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#50536A' }}>
+      <div className="text-[11px] font-mono text-drs-faint">
         Nessuna fonte disponibile.
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', letterSpacing: 1 }}>
+    <div className="flex flex-col gap-[6px]">
+      <div className="text-[10px] font-mono text-drs-faint tracking-[1px]">
         FONTI
       </div>
       {sources.map((src, i) => {
@@ -61,53 +56,22 @@ export function SourceList({ sources }: SourceListProps) {
         return (
           <div
             key={i}
-            style={{
-              background: '#111318',
-              border: '1px solid #2A2D3A',
-              borderRadius: 6,
-              padding: '7px 10px',
-            }}
+            className="bg-drs-s1 border border-drs-border rounded-[6px] p-[7px_10px]"
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <div className="flex items-start gap-[6px]">
               <ReliabilityBadge score={src.reliabilityScore} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    color: '#7C8CFF',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
+              <div className="flex-1 min-w-0">
+                <div className="text-[11px] font-mono text-drs-accent overflow-hidden text-ellipsis whitespace-nowrap">
                   {domain}
                 </div>
                 <div
-                  style={{
-                    fontSize: 11,
-                    color: '#F0F1F6',
-                    marginTop: 2,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: isOpen ? 'normal' : 'nowrap',
-                    cursor: 'pointer',
-                  }}
+                  className={`text-[11px] text-drs-text mt-[2px] overflow-hidden text-ellipsis cursor-pointer ${isOpen ? 'whitespace-normal' : 'whitespace-nowrap'}`}
                   onClick={() => setExpanded(isOpen ? null : i)}
                 >
                   {src.title}
                 </div>
                 {isOpen && (
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: '#8B8FA8',
-                      marginTop: 4,
-                      lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}
-                  >
+                  <div className="text-[10px] text-drs-muted mt-[4px] leading-[1.5] whitespace-pre-wrap break-words">
                     {src.snippet}
                   </div>
                 )}

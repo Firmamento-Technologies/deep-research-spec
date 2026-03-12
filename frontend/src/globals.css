@@ -7,6 +7,37 @@
    STEP 2: @keyframes + base resets
 ------------------------------------------------------- */
 
+/* ── Design Tokens (CSS Custom Properties) ───────────── */
+:root {
+  --drs-bg-primary: #0A0B0F;
+  --drs-bg-surface: #12141A;
+  --drs-bg-elevated: #1A1D27;
+  --drs-bg-hover: #2A2D3A;
+
+  --drs-text-primary: #F0F1F6;
+  --drs-text-secondary: #8B8FA3;
+  --drs-text-muted: #5A5E72;
+
+  --drs-accent: #6C63FF;
+  --drs-accent-hover: #7B73FF;
+  --drs-accent-muted: rgba(108, 99, 255, 0.15);
+
+  --drs-border: #2A2D3A;
+  --drs-border-hover: #3D4155;
+
+  --drs-success: #34D399;
+  --drs-warning: #FBBF24;
+  --drs-error: #F87171;
+
+  --drs-scrollbar-track: transparent;
+  --drs-scrollbar-thumb: #2A2D3A;
+  --drs-scrollbar-thumb-hover: #3D4155;
+
+  --drs-radius-sm: 4px;
+  --drs-radius-md: 8px;
+  --drs-radius-lg: 12px;
+}
+
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -16,8 +47,8 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    background-color: #0A0B0F;
-    color: #F0F1F6;
+    background-color: var(--drs-bg-primary);
+    color: var(--drs-text-primary);
   }
 
   ::-webkit-scrollbar {

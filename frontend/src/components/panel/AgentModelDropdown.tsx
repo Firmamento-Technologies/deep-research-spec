@@ -39,76 +39,34 @@ export function AgentModelDropdown({ nodeId, currentModel }: AgentModelDropdownP
   const shortName = currentModel?.split('/')[1] ?? currentModel ?? '—'
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <div ref={ref} className="relative inline-block">
       <button
         onClick={() => setOpen(o => !o)}
-        style={{
-          background: '#1A1D27',
-          border: '1px solid #2A2D3A',
-          borderRadius: 4,
-          color: '#8B8FA8',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          padding: '2px 8px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
+        className="bg-drs-s2 border border-drs-border rounded-input text-drs-muted text-[11px] font-mono px-[8px] py-[2px] cursor-pointer flex items-center gap-[4px]"
       >
         {saving ? 'Salvataggio…' : shortName}
-        <span style={{ fontSize: 9 }}>▾</span>
+        <span className="text-[9px]">▾</span>
       </button>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            zIndex: 50,
-            background: '#111318',
-            border: '1px solid #2A2D3A',
-            borderRadius: 6,
-            minWidth: 220,
-            maxHeight: 320,
-            overflowY: 'auto',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-          }}
-        >
+        <div className="absolute top-full left-0 z-50 bg-drs-s1 border border-drs-border rounded-[6px] min-w-[220px] max-h-[320px] overflow-y-auto shadow-[0_8px_24px_rgba(0,0,0,0.6)]">
           {Object.entries(MODELS_BY_PROVIDER).map(([provider, models]) => (
             <div key={provider}>
-              <div
-                style={{
-                  fontSize: 9,
-                  fontFamily: 'monospace',
-                  color: '#50536A',
-                  padding: '6px 10px 2px',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
-                }}
-              >
+              <div className="text-[9px] font-mono text-drs-faint p-[6px_10px_2px] tracking-[1px] uppercase">
                 {provider}
               </div>
               {models.map(m => (
                 <button
                   key={m.id}
                   onClick={() => handleSelect(m.id)}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '5px 10px',
-                    background: m.id === currentModel ? '#1A1D27' : 'transparent',
-                    border: 'none',
-                    color: m.id === currentModel ? '#7C8CFF' : '#F0F1F6',
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                    cursor: 'pointer',
-                  }}
+                  className={`block w-full text-left p-[5px_10px] border-none text-[11px] font-mono cursor-pointer ${
+                    m.id === currentModel
+                      ? 'bg-drs-s2 text-drs-accent'
+                      : 'bg-transparent text-drs-text'
+                  }`}
                 >
                   {m.name}
-                  <span style={{ color: '#50536A', marginLeft: 6, fontSize: 9 }}>
+                  <span className="text-drs-faint ml-[6px] text-[9px]">
                     ${m.costIn}/{m.costOut}
                   </span>
                 </button>

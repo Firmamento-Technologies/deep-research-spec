@@ -33,15 +33,8 @@ export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: Pipeli
 
   return (
     <svg
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: CANVAS_WIDTH,
-        height: CANVAS_HEIGHT,
-        pointerEvents: 'none',
-        overflow: 'visible',
-      }}
+      style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+      className="absolute top-0 left-0 pointer-events-none overflow-visible"
     >
       <defs>
         {visibleEdges.map(edge => {

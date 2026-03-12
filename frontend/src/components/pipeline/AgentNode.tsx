@@ -25,13 +25,10 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
   const isInactive = isSatellite && status === 'waiting'
 
   const baseStyle: React.CSSProperties = {
-    position: 'absolute',
     left: x,
     top: y,
     width,
     height,
-    cursor: 'pointer',
-    userSelect: 'none',
   }
 
   // JURY JUDGE — circle shape
@@ -40,17 +37,14 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
       <div
         data-node={id}
         onClick={onClick}
+        className="absolute cursor-pointer select-none flex items-center justify-center rounded-full"
         style={{
           ...baseStyle,
           width: 32,
           height: 32,
-          borderRadius: '50%',
           background: `${clusterColor}22`,
           border: `2px solid ${isSelected ? '#F0F1F6' : isRunning ? clusterColor : `${clusterColor}88`
             }`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           opacity: isInactive ? 0.3 : 1,
           boxShadow: isRunning
             ? `0 0 10px ${clusterColor}, 0 0 20px ${clusterColor}40`
@@ -61,7 +55,7 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
           ['--node-color' as string]: clusterColor,
         }}
       >
-        <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#F0F1F6', lineHeight: 1 }}>
+        <span className="text-[9px] font-mono text-drs-text leading-none">
           {label}
         </span>
       </div>
@@ -75,14 +69,11 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
       <div
         data-node={id}
         onClick={onClick}
+        className="absolute cursor-pointer select-none flex items-center justify-center bg-transparent"
         style={{
           ...baseStyle,
           width: size,
           height: size,
-          background: 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
           opacity: isInactive ? 0.3 : 1,
         }}
       >
@@ -99,17 +90,7 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
             ['--node-color' as string]: clusterColor,
           }}
         />
-        <span
-          style={{
-            position: 'absolute',
-            fontSize: 9,
-            fontFamily: 'monospace',
-            color: '#F0F1F6',
-            textAlign: 'center',
-            whiteSpace: 'pre-line',
-            pointerEvents: 'none',
-          }}
-        >
+        <span className="absolute text-[9px] font-mono text-drs-text text-center whitespace-pre-line pointer-events-none">
           {label}
         </span>
       </div>
@@ -121,6 +102,7 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
     <div
       data-node={id}
       onClick={onClick}
+      className="absolute cursor-pointer select-none flex flex-col items-center justify-center px-[8px] py-[4px] rounded-card transition-[box-shadow,border-color,opacity] duration-200"
       style={{
         ...baseStyle,
         background: `${clusterColor}15`,
@@ -132,14 +114,8 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
                 ? `${clusterColor}55`
                 : `${clusterColor}66`
           }`,
-        borderRadius: 8,
         borderStyle: isSatellite ? 'dashed' : 'solid',
         opacity: isInactive ? 0.3 : 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '4px 8px',
         boxShadow: isRunning
           ? `0 0 8px ${clusterColor}, 0 0 24px ${clusterColor}40`
           : isSelected
@@ -147,51 +123,25 @@ export function AgentNode({ definition, state, isSelected, onClick }: AgentNodeP
             : 'none',
         animation: isRunning ? 'pulse-glow 1.5s ease-in-out infinite' : 'none',
         ['--node-color' as string]: clusterColor,
-        transition: 'box-shadow 0.2s, border-color 0.2s, opacity 0.2s',
       }}
     >
       {/* Status dot — top-right */}
       <div
+        className="absolute top-[6px] right-[6px] w-[8px] h-[8px] rounded-full"
         style={{
-          position: 'absolute',
-          top: 6,
-          right: 6,
-          width: 8,
-          height: 8,
-          borderRadius: '50%',
           background: STATUS_DOT_COLORS[status] ?? '#50536A',
           boxShadow: isRunning ? `0 0 6px ${STATUS_DOT_COLORS['running']}` : 'none',
         }}
       />
 
       {/* Label */}
-      <span
-        style={{
-          fontSize: 11,
-          fontFamily: 'monospace',
-          color: '#F0F1F6',
-          textAlign: 'center',
-          whiteSpace: 'pre-line',
-          lineHeight: 1.3,
-        }}
-      >
+      <span className="text-[11px] font-mono text-drs-text text-center whitespace-pre-line leading-[1.3]">
         {label}
       </span>
 
       {/* Model badge — shown when running or selected */}
       {model && (isRunning || isSelected) && (
-        <span
-          style={{
-            fontSize: 8,
-            fontFamily: 'monospace',
-            color: '#8B8FA8',
-            marginTop: 2,
-            maxWidth: '100%',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <span className="text-[8px] font-mono text-drs-muted mt-[2px] max-w-full overflow-hidden text-ellipsis whitespace-nowrap">
           {model.split('/')[1] ?? model}
         </span>
       )}

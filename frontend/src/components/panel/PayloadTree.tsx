@@ -27,8 +27,8 @@ export function PayloadTree({ sections }: PayloadTreeProps) {
   if (!sections.length) return null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', letterSpacing: 1 }}>
+    <div className="flex flex-col gap-[4px]">
+      <div className="text-[10px] font-mono text-drs-faint tracking-[1px]">
         PAYLOAD INPUT
       </div>
       {sections.map((sec, i) => {
@@ -37,46 +37,21 @@ export function PayloadTree({ sections }: PayloadTreeProps) {
           <div key={i}>
             <button
               onClick={() => toggle(i)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                width: '100%',
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                padding: '3px 0',
-                textAlign: 'left',
-              }}
+              className="flex items-center gap-[6px] w-full bg-transparent border-none cursor-pointer py-[3px] px-0 text-left"
             >
-              <span style={{ fontSize: 10, color: '#50536A' }}>{isOpen ? '▾' : '▸'}</span>
-              <span style={{ fontSize: 11, fontFamily: 'monospace', color: '#8B8FA8' }}>
+              <span className="text-[10px] text-drs-faint">{isOpen ? '▾' : '▸'}</span>
+              <span className="text-[11px] font-mono text-drs-muted">
                 {sec.label}
               </span>
-              <span style={{ fontSize: 10, color: '#50536A' }}>
+              <span className="text-[10px] text-drs-faint">
                 ({formatK(sec.tokens)} tok)
               </span>
-              <span style={{ fontSize: 10, color: '#7C8CFF', marginLeft: 'auto' }}>
+              <span className="text-[10px] text-drs-accent ml-auto">
                 [espandi]
               </span>
             </button>
             {isOpen && (
-              <div
-                style={{
-                  background: '#0A0B0F',
-                  border: '1px solid #2A2D3A',
-                  borderRadius: 4,
-                  padding: '6px 8px',
-                  fontSize: 10,
-                  fontFamily: 'monospace',
-                  color: '#8B8FA8',
-                  maxHeight: 160,
-                  overflowY: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  lineHeight: 1.5,
-                }}
-              >
+              <div className="bg-drs-bg border border-drs-border rounded-input p-[6px_8px] text-[10px] font-mono text-drs-muted max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words leading-[1.5]">
                 {sec.content}
               </div>
             )}

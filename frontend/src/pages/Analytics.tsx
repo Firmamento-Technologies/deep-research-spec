@@ -69,18 +69,8 @@ export function Analytics() {
     setPresets(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])
 
   return (
-    <div
-      style={{
-        flex: 1,
-        background: '#0A0B0F',
-        overflowY: 'auto',
-        padding: '20px 28px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 24,
-      }}
-    >
-      <div style={{ fontSize: 18, color: '#F0F1F6', fontWeight: 700 }}>Analytics</div>
+    <div className="flex-1 bg-drs-bg overflow-y-auto px-[28px] py-[20px] flex flex-col gap-[24px]">
+      <div className="text-[18px] text-drs-text font-bold">Analytics</div>
 
       {/* Filter bar */}
       <FilterBar
@@ -90,22 +80,19 @@ export function Analytics() {
       />
 
       {error && (
-        <div style={{
-          background: '#EF444415', border: '1px solid #EF4444', borderRadius: 6,
-          padding: '8px 12px', fontSize: 12, color: '#EF4444', fontFamily: 'monospace',
-        }}>
+        <div className="bg-[#EF444415] border border-drs-red rounded-[6px] px-[12px] py-[8px] text-[12px] text-drs-red font-mono">
           Errore: {error}
         </div>
       )}
 
       {loading && !data && (
-        <div style={{ color: '#50536A', fontSize: 12, fontFamily: 'monospace' }}>Caricamento dati…</div>
+        <div className="text-drs-faint text-[12px] font-mono">Caricamento dati...</div>
       )}
 
       {data && (
         <>
           {/* KPI cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+          <div className="grid grid-cols-5 gap-[12px]">
             <KpiCard label="Runs completati"    value={data.kpis.total_runs.toString()} />
             <KpiCard label="Costo medio/doc"    value={`$${data.kpis.avg_cost_per_doc.toFixed(2)}`} color="#EAB308" />
             <KpiCard label="Parole totali"      value={data.kpis.total_words.toLocaleString()} color="#7C8CFF" />
@@ -114,7 +101,7 @@ export function Analytics() {
           </div>
 
           {/* 2×2 Chart grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="grid grid-cols-2 gap-[16px]">
             <ChartCard title="CSS Score nel Tempo">
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={data.css_over_time} margin={{ top: 8, right: 12, left: -10, bottom: 0 }}>
@@ -161,9 +148,9 @@ export function Analytics() {
                       if (!payload?.length) return null
                       const d = payload[0]?.payload
                       return (
-                        <div style={{ background: '#111318', border: '1px solid #2A2D3A', borderRadius: 6, padding: '6px 10px', fontSize: 11 }}>
-                          <div style={{ color: '#F0F1F6' }}>{d?.topic}</div>
-                          <div style={{ color: '#8B8FA8' }}>CSS: {d?.css?.toFixed(3)}  Costo: ${d?.cost?.toFixed(3)}</div>
+                        <div className="bg-drs-s1 border border-drs-border rounded-[6px] px-[10px] py-[6px] text-[11px]">
+                          <div className="text-drs-text">{d?.topic}</div>
+                          <div className="text-drs-muted">CSS: {d?.css?.toFixed(3)}  Costo: ${d?.cost?.toFixed(3)}</div>
                           <div style={{ color: PRESET_COLORS[d?.preset] ?? '#8B8FA8' }}>{d?.preset}</div>
                         </div>
                       )
@@ -178,7 +165,7 @@ export function Analytics() {
                     />
                   ))}
                   <Legend
-                    formatter={(value) => <span style={{ color: '#8B8FA8', fontSize: 10 }}>{value}</span>}
+                    formatter={(value) => <span className="text-drs-muted text-[10px]">{value}</span>}
                     wrapperStyle={{ paddingTop: 8 }}
                   />
                 </ScatterChart>
@@ -209,24 +196,15 @@ function FilterBar({
   onKeyword: (v: string) => void
   onRefresh: () => void
 }) {
-  const inputStyle: React.CSSProperties = {
-    background: '#111318',
-    border: '1px solid #2A2D3A',
-    borderRadius: 4,
-    color: '#F0F1F6',
-    fontSize: 12,
-    fontFamily: 'monospace',
-    padding: '5px 10px',
-    outline: 'none',
-  }
+  const inputClassName = 'bg-drs-s1 border border-drs-border rounded-input text-drs-text text-[12px] font-mono px-[10px] py-[5px] outline-none'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 11, color: '#50536A', fontFamily: 'monospace' }}>DA</span>
-      <input type="date" value={from} onChange={e => onFrom(e.target.value)} style={inputStyle} />
-      <span style={{ fontSize: 11, color: '#50536A', fontFamily: 'monospace' }}>A</span>
-      <input type="date" value={to} onChange={e => onTo(e.target.value)} style={inputStyle} />
+    <div className="flex items-center gap-[12px] flex-wrap">
+      <span className="text-[11px] text-drs-faint font-mono">DA</span>
+      <input type="date" value={from} onChange={e => onFrom(e.target.value)} className={inputClassName} />
+      <span className="text-[11px] text-drs-faint font-mono">A</span>
+      <input type="date" value={to} onChange={e => onTo(e.target.value)} className={inputClassName} />
 
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div className="flex gap-[6px]">
         {PRESET_OPTIONS.map(p => {
           const active = presets.includes(p)
           const color = PRESET_COLORS[p]
@@ -234,9 +212,8 @@ function FilterBar({
             <button
               key={p}
               onClick={() => onTogglePreset(p)}
+              className="px-[10px] py-[4px] rounded-input text-[11px] font-mono cursor-pointer"
               style={{
-                padding: '4px 10px', borderRadius: 4, fontSize: 11, fontFamily: 'monospace',
-                cursor: 'pointer',
                 background: active ? `${color}20` : 'transparent',
                 border: `1px solid ${active ? color : '#2A2D3A'}`,
                 color: active ? color : '#50536A',
@@ -252,23 +229,13 @@ function FilterBar({
         value={keyword}
         onChange={e => onKeyword(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') onRefresh() }}
-        placeholder="Cerca topic…"
-        style={{ ...inputStyle, width: 180 }}
+        placeholder="Cerca topic..."
+        className={`${inputClassName} w-[180px]`}
       />
 
       <button
         onClick={onRefresh}
-        style={{
-          background: '#7C8CFF',
-          border: 'none',
-          borderRadius: 4,
-          color: '#0A0B0F',
-          fontSize: 12,
-          fontFamily: 'monospace',
-          padding: '5px 14px',
-          cursor: 'pointer',
-          fontWeight: 700,
-        }}
+        className="bg-drs-accent border-none rounded-input text-drs-bg text-[12px] font-mono px-[14px] py-[5px] cursor-pointer font-bold"
       >
         Aggiorna
       </button>
@@ -281,18 +248,11 @@ function FilterBar({
 // ------------------------------------------------------------------ //
 function KpiCard({ label, value, color = '#F0F1F6' }: { label: string; value: string; color?: string }) {
   return (
-    <div
-      style={{
-        background: '#111318',
-        border: '1px solid #2A2D3A',
-        borderRadius: 8,
-        padding: '14px 16px',
-      }}
-    >
-      <div style={{ fontSize: 10, fontFamily: 'monospace', color: '#50536A', letterSpacing: 1, marginBottom: 6 }}>
+    <div className="bg-drs-s1 border border-drs-border rounded-card px-[16px] py-[14px]">
+      <div className="text-[10px] font-mono text-drs-faint tracking-[1px] mb-[6px]">
         {label.toUpperCase()}
       </div>
-      <div style={{ fontSize: 22, fontFamily: 'monospace', color, fontWeight: 700, lineHeight: 1 }}>
+      <div className="text-[22px] font-mono font-bold leading-none" style={{ color }}>
         {value}
       </div>
     </div>
@@ -304,15 +264,8 @@ function KpiCard({ label, value, color = '#F0F1F6' }: { label: string; value: st
 // ------------------------------------------------------------------ //
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        background: '#111318',
-        border: '1px solid #2A2D3A',
-        borderRadius: 8,
-        padding: '14px 16px',
-      }}
-    >
-      <div style={{ fontSize: 11, fontFamily: 'monospace', color: '#8B8FA8', marginBottom: 12, letterSpacing: 0.5 }}>
+    <div className="bg-drs-s1 border border-drs-border rounded-card px-[16px] py-[14px]">
+      <div className="text-[11px] font-mono text-drs-muted mb-[12px] tracking-[0.5px]">
         {title}
       </div>
       {children}
@@ -326,17 +279,8 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div
-      style={{
-        background: '#111318',
-        border: '1px solid #2A2D3A',
-        borderRadius: 6,
-        padding: '6px 10px',
-        fontSize: 11,
-        fontFamily: 'monospace',
-      }}
-    >
-      {label && <div style={{ color: '#8B8FA8', marginBottom: 4 }}>{label}</div>}
+    <div className="bg-drs-s1 border border-drs-border rounded-[6px] px-[10px] py-[6px] text-[11px] font-mono">
+      {label && <div className="text-drs-muted mb-[4px]">{label}</div>}
       {payload.map((p: any, i: number) => (
         <div key={i} style={{ color: p.color ?? '#F0F1F6' }}>
           {p.name ? `${p.name}: ` : ''}{typeof p.value === 'number' ? p.value.toFixed(3) : p.value}
@@ -356,8 +300,8 @@ function IterationsHeatmap({
 }) {
   if (!data.length) {
     return (
-      <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: 12, color: '#50536A', fontFamily: 'monospace' }}>Nessun dato.</span>
+      <div className="h-[220px] flex items-center justify-center">
+        <span className="text-[12px] text-drs-faint font-mono">Nessun dato.</span>
       </div>
     )
   }
@@ -372,12 +316,12 @@ function IterationsHeatmap({
   const CELL_H = 18
 
   return (
-    <div style={{ overflowX: 'auto', height: 220 }}>
-      <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 2, padding: '4px 0' }}>
+    <div className="overflow-x-auto h-[220px]">
+      <div className="inline-flex flex-col gap-[2px] py-[4px]">
         {/* Y axis label */}
         {Array.from({ length: maxIteration + 1 }, (_, iter) => (
-          <div key={iter} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#50536A', width: 16, textAlign: 'right', flexShrink: 0 }}>
+          <div key={iter} className="flex items-center gap-[4px]">
+            <span className="text-[9px] font-mono text-drs-faint w-[16px] text-right shrink-0">
               {iter + 1}
             </span>
             {Array.from({ length: maxSection + 1 }, (_, sec) => {
@@ -389,14 +333,12 @@ function IterationsHeatmap({
               return (
                 <div
                   key={sec}
-                  title={`§${sec + 1} — iter ${iter + 1}: ${count} run`}
+                  title={`\u00A7${sec + 1} \u2014 iter ${iter + 1}: ${count} run`}
+                  className="border border-drs-border rounded-[2px] shrink-0"
                   style={{
                     width: CELL_W,
                     height: CELL_H,
                     background: bg,
-                    border: '1px solid #2A2D3A',
-                    borderRadius: 2,
-                    flexShrink: 0,
                   }}
                 />
               )
@@ -404,10 +346,10 @@ function IterationsHeatmap({
           </div>
         ))}
         {/* X axis labels */}
-        <div style={{ display: 'flex', gap: 4, marginLeft: 20 }}>
+        <div className="flex gap-[4px] ml-[20px]">
           {Array.from({ length: maxSection + 1 }, (_, sec) => (
-            <div key={sec} style={{ width: CELL_W, textAlign: 'center', fontSize: 9, color: '#50536A', fontFamily: 'monospace', flexShrink: 0 }}>
-              §{sec + 1}
+            <div key={sec} className="text-center text-[9px] text-drs-faint font-mono shrink-0" style={{ width: CELL_W }}>
+              {'\u00A7'}{sec + 1}
             </div>
           ))}
         </div>

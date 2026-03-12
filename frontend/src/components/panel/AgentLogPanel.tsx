@@ -15,44 +15,19 @@ export function AgentLogPanel({ text, isLive }: AgentLogPanelProps) {
   }, [text, isLive])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div
-        style={{
-          fontSize: 10,
-          fontFamily: 'monospace',
-          color: '#50536A',
-          letterSpacing: 1,
-        }}
-      >
+    <div className="flex flex-col gap-[6px]">
+      <div className="text-[10px] font-mono text-drs-faint tracking-[1px]">
         {isLive ? 'OUTPUT LIVE' : 'OUTPUT'}
       </div>
       <div
-        style={{
-          background: '#0A0B0F',
-          border: '1px solid #2A2D3A',
-          borderRadius: 6,
-          padding: '8px 10px',
-          maxHeight: isLive ? 240 : 140,
-          overflowY: 'auto',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          color: '#F0F1F6',
-          lineHeight: 1.6,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-        }}
+        className="bg-drs-bg border border-drs-border rounded-[6px] px-[10px] py-[8px] text-[11px] font-mono text-drs-text leading-[1.6] whitespace-pre-wrap break-words overflow-y-auto"
+        style={{ maxHeight: isLive ? 240 : 140 }}
       >
-        {text || <span style={{ color: '#50536A' }}>In attesa di output…</span>}
+        {text || <span className="text-drs-faint">In attesa di output…</span>}
         {isLive && (
           <span
-            style={{
-              display: 'inline-block',
-              width: 7,
-              height: 13,
-              background: '#7C8CFF',
-              marginLeft: 2,
-              animation: 'blink 1s step-start infinite',
-            }}
+            className="inline-block w-[7px] h-[13px] bg-drs-accent ml-[2px]"
+            style={{ animation: 'blink 1s step-start infinite' }}
           />
         )}
         <div ref={bottomRef} />

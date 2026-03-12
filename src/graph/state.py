@@ -142,6 +142,37 @@ class SectionCSSReport(TypedDict):
     threshold_style: float
 
 
+# ── State Slices (§1.2 — reduce failure modes via decomposition) ──────────
+# These partition DocumentState into zones of responsibility per agent role.
+# Maintains LangGraph compatibility: DocumentState remains the global type,
+# slices are optional fields with defaults.
+# Ref: "Why Do Multi-Agent LLM Systems Fail?" (arXiv:2503.13657)
+
+class ResearchState(TypedDict):
+    """State managed by researcher_node and citation_verifier."""
+    sources: list[Source]
+    citations: list[dict]
+    diversity_report: dict[str, Any]
+
+
+class WriterState(TypedDict):
+    """State managed by writer_node and context_compressor."""
+    draft: str
+    shine_lora_adapters: list[str]
+    rlm_trace: dict[str, Any] | None
+    mow_drafts: list[str]
+    iteration: int
+
+
+class JuryState(TypedDict):
+    """State managed by jury_node and aggregator."""
+    verdicts: list[JudgeVerdict]
+    css_scores: list[float]
+    aggregator_verdict: AggregatorVerdict | None
+    panel_active: bool
+    panel_round: int
+
+
 # ── Main State ────────────────────────────────────────────────────────────
 
 class DocumentState(TypedDict):
@@ -265,6 +296,11 @@ class DocumentState(TypedDict):
     # writer_node() vedrebbe rlm_mode=False e userebbe il path standard
     # senza alcun errore visibile — bug silenzioso impossibile da debuggare.
     rlm_mode: bool
+
+    # ── State Slices (optional, for decomposed access) ─────────────────────────
+    research_state: ResearchState | None
+    writer_state: WriterState | None
+    jury_state: JuryState | None
 
     # ── Output ──────────────────────────────────────────────────────────────────
     output_paths: dict[str, str]

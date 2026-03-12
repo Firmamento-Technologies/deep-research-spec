@@ -6,6 +6,10 @@ from typing import Any
 
 from src.connectors.base import SourceConnector, SourceRanker, DiversityAnalyzer
 from src.connectors.memvid_connector import MemvidConnector
+from src.connectors.academic import AcademicConnector
+from src.connectors.institutional import InstitutionalConnector
+from src.connectors.web_general import WebGeneralConnector
+from src.connectors.social import SocialConnector
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +33,10 @@ def get_default_connectors(
     """
     return [
         MemvidConnector(knowledge_path=knowledge_path),  # LOCAL first
-        # TODO (Task 0.2+): add sonar-pro, tavily, brave connectors
+        AcademicConnector(),       # CrossRef → Semantic Scholar → ArXiv
+        InstitutionalConnector(),  # Tavily with .gov/.eu domain filter
+        WebGeneralConnector(),     # Tavily + Brave fallback
+        SocialConnector(),         # Reddit (opt-in, disabled by default)
     ]
 
 

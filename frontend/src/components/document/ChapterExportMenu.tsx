@@ -33,60 +33,21 @@ export function ChapterExportMenu({ docId, sectionIdx, label = 'Esporta' }: Chap
   }
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <div ref={ref} className="relative inline-block">
       <button
         onClick={() => setOpen(o => !o)}
-        style={{
-          background: '#1A1D27',
-          border: '1px solid #2A2D3A',
-          borderRadius: 4,
-          color: '#8B8FA8',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          padding: '4px 10px',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-        }}
+        className="bg-drs-s2 border border-drs-border rounded-input text-drs-muted text-[11px] font-mono p-[4px_10px] cursor-pointer flex items-center gap-[4px]"
       >
-        ⬇ {label} <span style={{ fontSize: 9 }}>▾</span>
+        ⬇ {label} <span className="text-[9px]">▾</span>
       </button>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '100%',
-            left: 0,
-            marginBottom: 4,
-            background: '#111318',
-            border: '1px solid #2A2D3A',
-            borderRadius: 6,
-            overflow: 'hidden',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-            zIndex: 30,
-            minWidth: 140,
-          }}
-        >
+        <div className="absolute bottom-full left-0 mb-[4px] bg-drs-s1 border border-drs-border rounded-[6px] overflow-hidden shadow-[0_4px_16px_rgba(0,0,0,0.5)] z-30 min-w-[140px]">
           {FORMATS.map(f => (
             <button
               key={f.id}
               onClick={() => handleDownload(f.id)}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                padding: '7px 12px',
-                background: 'transparent',
-                border: 'none',
-                color: '#F0F1F6',
-                fontSize: 12,
-                fontFamily: 'monospace',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#1A1D27')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              className="block w-full text-left p-[7px_12px] bg-transparent border-none text-drs-text text-[12px] font-mono cursor-pointer hover:bg-drs-s2"
             >
               {f.label}
             </button>

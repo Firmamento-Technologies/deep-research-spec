@@ -160,7 +160,7 @@ class TestPipelineE2E:
 
     def test_deterministic_nodes_no_llm(self):
         """Verify deterministic nodes work without LLM."""
-        from src.graph.nodes.writer_memory import writer_memory_node
+        from src.graph.internals.writer_memory import writer_memory_node
         from src.graph.nodes.diff_merger import diff_merger_node
         from src.graph.nodes.oscillation_check import oscillation_check_node
 
