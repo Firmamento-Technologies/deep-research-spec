@@ -34,9 +34,9 @@ services:
     #   - /app/node_modules   # preserve container's node_modules
 
   postgres:
-    # Expose extra port for local DB tools (pgAdmin, DBeaver)
+    # Expose on 5433 to avoid conflicts with local PostgreSQL
     ports:
-      - "5432:5432"
+      - "5433:5432"
     # Enable query logging in dev
     command: >
       postgres

@@ -118,7 +118,16 @@ def install_deps() -> None:
     )
     ok("Backend dependencies installed")
 
-    # 2) Install root-level extras (test tools, linters) that aren't in backend
+    # 2) Install pipeline/LLM deps from root requirements.txt
+    root_reqs = ROOT / "requirements.txt"
+    if root_reqs.exists():
+        info("Installing pipeline & LLM dependencies ...")
+        subprocess.check_call(
+            [pip, "install", "-r", str(root_reqs)],
+        )
+        ok("Pipeline dependencies installed")
+
+    # 3) Install test & dev tools
     info("Installing test & dev tools ...")
     subprocess.check_call(
         [pip, "install",
@@ -131,17 +140,24 @@ def install_deps() -> None:
 
 
 def setup_env() -> None:
-    """Copy .env.example to .env if it doesn't exist."""
+    """Copy .env.example to .env (root and backend/) if it doesn't exist."""
     env_file = ROOT / ".env"
+    backend_env = ROOT / "backend" / ".env"
     example = ROOT / ".env.example"
+
     if env_file.exists():
         ok(".env already exists")
-        return
-    if not example.exists():
+    elif example.exists():
+        shutil.copy2(example, env_file)
+        ok(".env created from template — edit it to add your API keys")
+    else:
         warn(".env.example not found — skipping .env setup")
         return
-    shutil.copy2(example, env_file)
-    ok(".env created from template — edit it to add your API keys")
+
+    # Backend needs its own copy of .env (settings.py loads from backend/)
+    if env_file.exists():
+        shutil.copy2(env_file, backend_env)
+        ok(".env copied to backend/")
 
 
 def start_docker() -> None:

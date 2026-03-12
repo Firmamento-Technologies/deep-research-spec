@@ -17,6 +17,9 @@ import sys
 import uuid
 from pathlib import Path
 
+from dotenv import load_dotenv  # type: ignore
+load_dotenv()  # Load .env before any config/API key access
+
 import yaml  # type: ignore
 
 from src.config.schema import DRSYAMLConfig

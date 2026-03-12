@@ -25,6 +25,8 @@ Author: DRS Implementation Team
 Spec: §17 Knowledge Spaces, Task 2.3
 """
 
+from __future__ import annotations
+
 import logging
 import numpy as np
 from typing import Optional
@@ -53,7 +55,7 @@ DEFAULT_MODEL = "all-MiniLM-L6-v2"  # 384 dimensions, 22M parameters
 EMBEDDING_DIM = 384
 
 # Singleton model instance
-_model: Optional[SentenceTransformer] = None
+_model = None  # Optional[SentenceTransformer] when available
 _model_name: Optional[str] = None
 
 
