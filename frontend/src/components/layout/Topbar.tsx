@@ -1,11 +1,16 @@
 // Topbar — fixed top, h-12.
-// Left:   Logo ◈ DRS (accent colour, links to home)
-// Center: Active model badge (companion model, clickable)
-// Right:  System status dot + Settings icon ⚙ (toggles to/from /settings)
+// Left:   Logo + Navigation links
+// Right:  System status dot + Settings icon
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { ModelBadge } from '../ui/ModelBadge'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
+
+const NAV_ITEMS = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/new-research', label: 'Nuova Ricerca' },
+  { to: '/spaces', label: 'Spaces' },
+  { to: '/analytics', label: 'Analytics' },
+]
 
 export function Topbar() {
   const navigate = useNavigate()
@@ -14,7 +19,6 @@ export function Topbar() {
 
   const isSettings = location.pathname === '/settings'
 
-  // Health-check polling — every 10s
   const checkHealth = useCallback(async () => {
     try {
       const res = await fetch('/health', { method: 'GET', signal: AbortSignal.timeout(5000) })
@@ -38,38 +42,51 @@ export function Topbar() {
         'flex items-center px-4 gap-4'
       }
     >
-      {/* Left: logo — clickable, navigates to home */}
+      {/* Left: logo */}
       <button
-        onClick={() => navigate('/')}
+        onClick={() => navigate('/dashboard')}
         className="text-drs-accent font-mono text-sm font-semibold tracking-tight select-none shrink-0 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
       >
         ◈ DRS
       </button>
 
-      {/* Center: companion model badge */}
-      <div className="flex-1 flex justify-center">
-        <ModelBadge
-          model="anthropic/claude-sonnet-4"
-          onClick={() => { /* model change dropdown — wired in STEP 5 */ }}
-        />
-      </div>
+      {/* Navigation links */}
+      <nav className="flex items-center gap-1 ml-2">
+        {NAV_ITEMS.map((item) => {
+          const isActive = location.pathname === item.to ||
+            (item.to !== '/dashboard' && location.pathname.startsWith(item.to))
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={
+                'px-3 py-1.5 rounded text-xs font-medium transition-colors ' +
+                (isActive
+                  ? 'bg-drs-accent/15 text-drs-accent'
+                  : 'text-drs-muted hover:text-drs-text hover:bg-drs-s2')
+              }
+            >
+              {item.label}
+            </Link>
+          )
+        })}
+      </nav>
+
+      <div className="flex-1" />
 
       {/* Right: status dot + settings */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* System status dot */}
         <div className="flex items-center gap-1.5" title={isOnline ? 'Online' : 'Offline'}>
           <span
-            className={`w-2 h-2 rounded-full ${isOnline ? 'bg-drs-green' : 'bg-drs-red'
-              }`}
+            className={`w-2 h-2 rounded-full ${isOnline ? 'bg-drs-green' : 'bg-drs-red'}`}
           />
           <span className="text-xs text-drs-faint hidden md:block">
             {isOnline ? 'Online' : 'Offline'}
           </span>
         </div>
 
-        {/* Settings icon — toggles between / and /settings */}
         <button
-          onClick={() => navigate(isSettings ? '/' : '/settings')}
+          onClick={() => navigate(isSettings ? '/dashboard' : '/settings')}
           className={
             'w-8 h-8 flex items-center justify-center rounded ' +
             'transition-colors text-base ' +

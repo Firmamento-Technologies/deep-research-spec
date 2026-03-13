@@ -16,6 +16,7 @@ const SpaceSearch = lazy(() => import('./pages/SpaceSearch').then(m => ({ defaul
 const Analytics = lazy(() => import('./pages/Analytics').then(m => ({ default: m.Analytics })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then(m => ({ default: m.AdminUsers })));
+const NewResearch = lazy(() => import('./pages/NewResearch').then(m => ({ default: m.NewResearch })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -58,6 +59,7 @@ function App() {
                 {/* Protected routes — all wrapped in AppShell layout */}
                 <Route element={<ProtectedLayout />}>
                   <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/new-research" element={<NewResearch />} />
                   <Route path="/spaces" element={<KnowledgeSpaces />} />
                   <Route path="/spaces/:spaceId" element={<SpaceDetail />} />
                   <Route path="/spaces/:spaceId/search" element={<SpaceSearch />} />

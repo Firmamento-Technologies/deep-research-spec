@@ -2,149 +2,167 @@ import { useState, useEffect, type FC } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { api } from '../lib/api';
+import { useRunStore } from '../store/useRunStore';
+import { useAppStore } from '../store/useAppStore';
 
-interface RunSummary {
-  id: string;
+interface RunListItem {
   doc_id: string;
+  topic: string;
   status: string;
-  regime: string;
-  estimated_cost: number;
-  created_at: string;
-}
-
-interface DashboardStats {
-  total_runs: number;
+  quality_preset: string;
   total_cost: number;
-  active_runs: number;
+  created_at: string | null;
+  completed_at: string | null;
 }
 
 export const Dashboard: FC = () => {
-  const [recentRuns, setRecentRuns] = useState<RunSummary[]>([]);
-  const [stats, setStats] = useState<DashboardStats>({ total_runs: 0, total_cost: 0, active_runs: 0 });
+  const [runs, setRuns] = useState<RunListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const activeRun = useRunStore((s) => s.activeRun);
+  const setState = useAppStore((s) => s.setState);
 
   useEffect(() => {
-    async function fetchDashboard() {
+    async function fetchRuns() {
       try {
-        const [runsRes, statsRes] = await Promise.allSettled([
-          api.get('/api/runs', { params: { limit: 5, sort: 'created_at:desc' } }),
-          api.get('/api/runs/stats'),
-        ]);
-        if (runsRes.status === 'fulfilled') {
-          setRecentRuns(runsRes.value.data?.runs || []);
-        }
-        if (statsRes.status === 'fulfilled') {
-          setStats(statsRes.value.data);
-        }
+        const res = await api.get('/api/runs');
+        setRuns(Array.isArray(res.data) ? res.data : []);
       } catch {
-        // API not available — show empty state
+        // API not available
       } finally {
         setLoading(false);
       }
     }
-    fetchDashboard();
+    fetchRuns();
   }, []);
+
+  const statusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      completed: 'bg-drs-green/20 text-drs-green',
+      running: 'bg-drs-accent/20 text-drs-accent',
+      initializing: 'bg-yellow-500/20 text-yellow-400',
+      failed: 'bg-red-500/20 text-red-400',
+    };
+    return (
+      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${colors[status] || 'bg-drs-s3 text-drs-muted'}`}>
+        {status}
+      </span>
+    );
+  };
 
   return (
     <div className="mx-auto max-w-6xl p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-drs-text">Dashboard</h1>
-          <p className="mt-2 text-drs-muted">
-            Deep Research System overview
-          </p>
+          <p className="mt-2 text-drs-muted">Deep Research System</p>
         </div>
         <Link
-          to="/spaces"
-          className="rounded-lg bg-drs-accent px-4 py-2 text-white hover:brightness-110 transition"
+          to="/new-research"
+          className="rounded-lg bg-drs-accent px-4 py-2 text-white font-medium hover:brightness-110 transition"
         >
-          New Research
+          + Nuova Ricerca
         </Link>
       </div>
 
-      {/* Stats cards */}
+      {/* Active run banner */}
+      {activeRun && (
+        <Card className="border-drs-accent/30 bg-drs-accent/5">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-drs-green animate-pulse" />
+                <h3 className="font-semibold text-drs-text">Ricerca in corso</h3>
+              </div>
+              <p className="text-sm text-drs-muted mt-1">
+                {activeRun.topic}
+              </p>
+              <div className="flex gap-4 mt-2 text-xs text-drs-faint">
+                <span>Sezione {activeRun.currentSection}/{activeRun.totalSections}</span>
+                <span>Iterazione {activeRun.currentIteration}</span>
+                <span>${activeRun.budgetSpent.toFixed(2)} / ${activeRun.maxBudget}</span>
+                <span>Preset: {activeRun.qualityPreset}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setState('PROCESSING')}
+              className="rounded-lg bg-drs-accent px-4 py-2 text-white text-sm font-medium hover:brightness-110 transition"
+            >
+              Mostra Pipeline
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {/* Quick actions */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card>
-          <p className="text-sm text-drs-muted">Total Runs</p>
-          <p className="mt-1 text-2xl font-semibold text-drs-text">
-            {stats.total_runs}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-drs-muted">Total Cost</p>
-          <p className="mt-1 text-2xl font-semibold text-drs-text">
-            ${stats.total_cost.toFixed(2)}
-          </p>
-        </Card>
-        <Card>
-          <p className="text-sm text-drs-muted">Active Runs</p>
-          <p className="mt-1 text-2xl font-semibold text-drs-text">
-            {stats.active_runs}
-          </p>
-        </Card>
-      </div>
+        <Link to="/new-research">
+          <Card className="hover:border-drs-accent/30 transition-colors cursor-pointer">
+            <div className="text-2xl mb-2">+</div>
+            <h2 className="text-lg font-semibold text-drs-text">Nuova Ricerca</h2>
+            <p className="mt-1 text-sm text-drs-muted">
+              Configura topic, budget, preset e avvia
+            </p>
+          </Card>
+        </Link>
 
-      {/* Quick links */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="text-lg font-semibold text-drs-text">Knowledge Spaces</h2>
-          <p className="mt-2 text-sm text-drs-muted">
-            Upload and index documents for semantic research.
-          </p>
-          <Link className="mt-4 inline-block text-drs-accent hover:brightness-110" to="/spaces">
-            Open Spaces
-          </Link>
-        </Card>
+        <Link to="/spaces">
+          <Card className="hover:border-drs-accent/30 transition-colors cursor-pointer">
+            <div className="text-2xl mb-2">&#128194;</div>
+            <h2 className="text-lg font-semibold text-drs-text">Knowledge Spaces</h2>
+            <p className="mt-1 text-sm text-drs-muted">
+              Carica documenti come fonti per la ricerca
+            </p>
+          </Card>
+        </Link>
 
-        <Card>
-          <h2 className="text-lg font-semibold text-drs-text">Analytics</h2>
-          <p className="mt-2 text-sm text-drs-muted">
-            Monitor costs, quality metrics, and run status.
-          </p>
-          <Link className="mt-4 inline-block text-drs-accent hover:brightness-110" to="/analytics">
-            Go to Analytics
-          </Link>
-        </Card>
+        <Link to="/analytics">
+          <Card className="hover:border-drs-accent/30 transition-colors cursor-pointer">
+            <div className="text-2xl mb-2">&#128200;</div>
+            <h2 className="text-lg font-semibold text-drs-text">Analytics</h2>
+            <p className="mt-1 text-sm text-drs-muted">
+              Costi, qualita, metriche e stato dei run
+            </p>
+          </Card>
+        </Link>
       </div>
 
       {/* Recent runs */}
       <Card>
-        <h2 className="text-lg font-semibold text-drs-text">Recent Runs</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-drs-text">Ricerche recenti</h2>
+        </div>
         {loading ? (
-          <p className="mt-4 text-sm text-drs-faint">Loading...</p>
-        ) : recentRuns.length === 0 ? (
-          <p className="mt-4 text-sm text-drs-muted">
-            No runs yet. Start a new research to see results here.
-          </p>
+          <p className="text-sm text-drs-faint">Caricamento...</p>
+        ) : runs.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-drs-muted">
+              Nessuna ricerca ancora. Clicca "Nuova Ricerca" per iniziare.
+            </p>
+          </div>
         ) : (
-          <div className="mt-4 overflow-x-auto">
+          <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-drs-border text-left text-drs-muted">
-                  <th className="pb-2">Document</th>
-                  <th className="pb-2">Status</th>
-                  <th className="pb-2">Regime</th>
-                  <th className="pb-2">Cost</th>
-                  <th className="pb-2">Created</th>
+                  <th className="pb-2">Topic</th>
+                  <th className="pb-2">Stato</th>
+                  <th className="pb-2">Preset</th>
+                  <th className="pb-2">Costo</th>
+                  <th className="pb-2">Data</th>
                 </tr>
               </thead>
               <tbody>
-                {recentRuns.map((run) => (
-                  <tr key={run.id} className="border-b border-drs-border">
-                    <td className="py-2 text-drs-text">{run.doc_id}</td>
-                    <td className="py-2">
-                      <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
-                        run.status === 'completed' ? 'bg-drs-green/20 text-drs-green' :
-                        run.status === 'running' ? 'bg-drs-accent/20 text-drs-accent' :
-                        'bg-drs-s3 text-drs-muted'
-                      }`}>
-                        {run.status}
-                      </span>
+                {runs.map((run) => (
+                  <tr key={run.doc_id} className="border-b border-drs-border hover:bg-drs-s1/50">
+                    <td className="py-2 text-drs-text max-w-xs truncate">
+                      {run.topic || run.doc_id}
                     </td>
-                    <td className="py-2 text-drs-muted">{run.regime}</td>
-                    <td className="py-2 text-drs-muted">${run.estimated_cost.toFixed(2)}</td>
+                    <td className="py-2">{statusBadge(run.status)}</td>
+                    <td className="py-2 text-drs-muted">{run.quality_preset}</td>
+                    <td className="py-2 text-drs-muted">${run.total_cost.toFixed(2)}</td>
                     <td className="py-2 text-drs-faint">
-                      {new Date(run.created_at).toLocaleDateString()}
+                      {run.created_at ? new Date(run.created_at).toLocaleDateString() : '-'}
                     </td>
                   </tr>
                 ))}
