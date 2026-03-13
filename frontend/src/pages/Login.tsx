@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Lock, Mail, AlertCircle } from '../lib/icons';
 
 const inputClass =
-  'appearance-none block w-full pl-10 pr-3 py-2 bg-drs-s1 border border-drs-border rounded-md placeholder-drs-faint text-drs-text focus:outline-none focus:ring-drs-accent focus:border-drs-accent sm:text-sm';
+  'appearance-none block w-full pl-10 pr-3 py-2 bg-drs-s1 border border-drs-border rounded-md placeholder:text-drs-faint text-drs-text focus:outline-none focus:ring-drs-accent focus:border-drs-accent sm:text-sm';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();

@@ -34,6 +34,7 @@ export function DocumentSidebar() {
   const completedRuns = useRunStore((s) => s.completedRuns)
   const sendMessage = useConversationStore((s) => s.sendMessage)
   const setState = useAppStore((s) => s.setState)
+  const setActiveDocId = useAppStore((s) => s.setActiveDocId)
   const appState = useAppStore((s) => s.state)
 
   const handleNewDoc = () => {
@@ -116,10 +117,14 @@ export function DocumentSidebar() {
               {completedRuns.map((run) => (
                 <button
                   key={run.docId}
+                  onClick={() => {
+                    setActiveDocId(run.docId)
+                    setState('REVIEWING')
+                  }}
                   className={
                     'w-full text-left px-2 py-1.5 rounded text-xs ' +
                     'text-drs-muted hover:text-drs-text hover:bg-drs-s2 ' +
-                    'transition-colors truncate block'
+                    'transition-colors truncate block cursor-pointer'
                   }
                 >
                   ▸ {run.topic}

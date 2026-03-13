@@ -56,7 +56,7 @@ export const SpaceSearch: React.FC = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search your knowledge base..."
-            className="w-full pl-12 pr-4 py-3 bg-drs-s1 border border-drs-border rounded-lg text-drs-text placeholder-drs-faint focus:ring-2 focus:ring-drs-accent focus:border-drs-accent outline-none text-lg"
+            className="w-full pl-12 pr-4 py-3 bg-drs-s1 border border-drs-border rounded-lg text-drs-text placeholder:text-drs-faint focus:ring-2 focus:ring-drs-accent focus:border-drs-accent outline-none text-lg"
             autoFocus
           />
         </div>

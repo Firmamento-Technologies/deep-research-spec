@@ -131,6 +131,7 @@ export function useSSE(docId: string | null): UseSSEResult {
 
       case 'PIPELINE_FAILED':
         setRunStatus('failed')
+        appSetState('REVIEWING')
         pushActivity('✗', 'Pipeline fallita', data.error as string | undefined, '#EF4444')
         break
     }

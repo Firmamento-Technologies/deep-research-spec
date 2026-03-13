@@ -2,6 +2,7 @@
 // Updated by the useSSE hook in real-time.
 
 import { create } from 'zustand'
+import { useAppStore } from './useAppStore'
 import type { RunState, NodeState, CSSScores } from '../types/run'
 
 // Re-export types so consumers can import from this module
@@ -122,6 +123,11 @@ export const useRunStore = create<RunStore>((set) => ({
   archiveRun: () =>
     set((prev) => {
       if (!prev.activeRun) return prev
+      // Also reset app-level state tied to the run
+      const appStore = useAppStore.getState()
+      appStore.setActiveDocId(null)
+      appStore.closeHitl()
+      appStore.setSelectedNode(null)
       return {
         activeRun: null,
         completedRuns: [prev.activeRun, ...prev.completedRuns],

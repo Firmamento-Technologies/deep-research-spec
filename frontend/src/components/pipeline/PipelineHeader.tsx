@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { RunState } from '../../store/useRunStore'
 import { useAppStore } from '../../store/useAppStore'
 
@@ -74,7 +75,7 @@ function Divider() {
   return <div className="w-px h-4 bg-drs-border" />
 }
 
-function Chip({ children }: { children: React.ReactNode }) {
+function Chip({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5 bg-drs-s2/60 rounded-md px-2 py-1 text-[11px]">
       {children}

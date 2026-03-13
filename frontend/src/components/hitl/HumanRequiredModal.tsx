@@ -18,7 +18,9 @@ export function HumanRequiredModal() {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-[4px]"
       style={{ background: 'rgba(0,0,0,0.85)' }}
-    // NOT dismissible — no onClick on overlay
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="hitl-modal-title"
     >
       <div
         className="bg-drs-s1 border border-drs-border rounded-[12px] w-[90vw] max-h-[90vh] flex flex-col overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.7)]"
@@ -28,7 +30,7 @@ export function HumanRequiredModal() {
         {/* Modal header */}
         <div className="p-[14px_20px] border-b border-drs-border flex items-center gap-[10px] shrink-0">
           <span className="w-[10px] h-[10px] rounded-full bg-drs-orange inline-block shadow-[0_0_8px_#F97316]" />
-          <span className="text-[13px] font-mono text-drs-text font-bold">
+          <span id="hitl-modal-title" className="text-[13px] font-mono text-drs-text font-bold">
             {hitlType === 'outline_approval' && 'APPROVAZIONE OUTLINE'}
             {hitlType === 'section_approval' && 'REVISIONE SEZIONE'}
             {hitlType === 'escalation' && 'ESCALATION — AZIONE RICHIESTA'}

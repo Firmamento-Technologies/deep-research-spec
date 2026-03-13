@@ -77,7 +77,7 @@ export const KnowledgeSpaces: React.FC = () => {
     }
   };
 
-  if (isLoading && !isError) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-drs-accent" />
@@ -85,8 +85,19 @@ export const KnowledgeSpaces: React.FC = () => {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <p className="text-drs-red text-sm">Errore nel caricamento degli spazi.</p>
+        <Button variant="ghost" onClick={() => queryClient.invalidateQueries({ queryKey: ['spaces'] })}>
+          Riprova
+        </Button>
+      </div>
+    );
+  }
+
   const inputClass =
-    'w-full px-3 py-2 bg-drs-s1 border border-drs-border rounded-lg text-drs-text placeholder-drs-faint focus:ring-2 focus:ring-drs-accent focus:border-drs-accent outline-none';
+    'w-full px-3 py-2 bg-drs-s1 border border-drs-border rounded-lg text-drs-text placeholder:text-drs-faint focus:ring-2 focus:ring-drs-accent focus:border-drs-accent outline-none';
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">

@@ -107,7 +107,7 @@ export const NewResearch: FC = () => {
       navigate, setState, setActiveDocId, setActiveRun]);
 
   const inputClass =
-    'w-full px-3 py-2 bg-drs-s2 border border-drs-border rounded-lg text-drs-text placeholder-drs-faint focus:ring-2 focus:ring-drs-accent focus:border-drs-accent outline-none text-sm';
+    'w-full px-3 py-2 bg-drs-s2 border border-drs-border rounded-lg text-drs-text placeholder:text-drs-faint focus:ring-2 focus:ring-drs-accent focus:border-drs-accent outline-none text-sm';
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto">
