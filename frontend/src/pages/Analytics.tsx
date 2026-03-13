@@ -68,7 +68,7 @@ export function Analytics() {
     setPresets(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])
 
   return (
-    <div className="flex-1 bg-drs-bg overflow-y-auto px-[28px] py-[20px] flex flex-col gap-[24px]">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="text-[18px] text-drs-text font-bold">Analytics</div>
 
       {/* Filter bar */}
@@ -98,7 +98,7 @@ export function Analytics() {
       {data && (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-5 gap-[12px]">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-[12px]">
             <KpiCard label="Runs completati"    value={data.kpis.total_runs.toString()} />
             <KpiCard label="Costo medio/doc"    value={`$${data.kpis.avg_cost_per_doc.toFixed(2)}`} color="#EAB308" />
             <KpiCard label="Parole totali"      value={data.kpis.total_words.toLocaleString()} color="#7C8CFF" />
@@ -107,7 +107,7 @@ export function Analytics() {
           </div>
 
           {/* 2×2 Chart grid */}
-          <div className="grid grid-cols-2 gap-[16px]">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px]">
             <ChartCard title="CSS Score nel Tempo">
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={data.css_over_time} margin={{ top: 8, right: 12, left: -10, bottom: 0 }}>

@@ -123,14 +123,14 @@ export function Settings() {
 
   if (!data) {
     return (
-      <div className="flex-1 bg-drs-bg p-[28px] text-drs-faint text-[12px] font-mono">
+      <div className="p-6 max-w-5xl mx-auto text-drs-faint text-[12px] font-mono">
         {error ? `Errore: ${error}` : 'Caricamento impostazioni...'}
       </div>
     )
   }
 
   return (
-    <div className="flex-1 bg-drs-bg overflow-y-auto px-[28px] py-[20px]">
+    <div className="p-6 max-w-5xl mx-auto">
       {/* Header with back button */}
       <div className="flex items-center gap-[12px] mb-[24px]">
         <button
@@ -165,7 +165,7 @@ export function Settings() {
 
       {/* Model Assignments */}
       <Section title="Assegnazione Modelli">
-        <div className="grid grid-cols-[200px_1fr] gap-[8px] items-center">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-[8px] items-center">
           {Object.entries(DEFAULT_NODE_MODELS).map(([nodeId, defaultModel]) => {
             const current = data.model_assignments[nodeId] ?? defaultModel
             return (
@@ -190,7 +190,7 @@ export function Settings() {
 
       {/* Default Config */}
       <Section title="Configurazione di Default">
-        <div className="grid grid-cols-[200px_1fr] gap-[12px] items-center">
+        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-[12px] items-center">
           <Label>Preset predefinito</Label>
           <select
             value={data.default_config.preset}

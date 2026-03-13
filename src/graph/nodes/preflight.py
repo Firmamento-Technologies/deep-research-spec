@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 _REQUIRED_KEYS: list[str] = []  # No hard requirement — gracefully degrade
 _RECOMMENDED_KEYS: list[str] = [
+    "OPENROUTER_API_KEY",
     "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "GOOGLE_API_KEY",
@@ -65,6 +66,24 @@ def preflight_node(state: dict) -> dict:
             warnings.append(f"Missing recommended env var: {key}")
     if not available_keys:
         warnings.append("No LLM API keys found — pipeline will use fallback/stub modes")
+
+    # Quick validation of OpenRouter key (primary provider)
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if openrouter_key:
+        try:
+            import httpx
+            resp = httpx.get(
+                "https://openrouter.ai/api/v1/auth/key",
+                headers={"Authorization": f"Bearer {openrouter_key}"},
+                timeout=5.0,
+            )
+            if resp.status_code != 200:
+                warnings.append(
+                    f"OpenRouter API key validation failed (HTTP {resp.status_code}) "
+                    "— LLM calls will fail. Check your OPENROUTER_API_KEY."
+                )
+        except Exception:
+            warnings.append("Could not validate OpenRouter API key (network error)")
 
     # ── Normalize quality_preset — UNICO PUNTO DI NORMALIZZAZIONE ─────────────
     # Priorità: state > config.user > config > DEFAULT_PRESET

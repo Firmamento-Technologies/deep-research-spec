@@ -17,6 +17,7 @@ const Analytics = lazy(() => import('./pages/Analytics').then(m => ({ default: m
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then(m => ({ default: m.AdminUsers })));
 const NewResearch = lazy(() => import('./pages/NewResearch').then(m => ({ default: m.NewResearch })));
+const RunDetail = lazy(() => import('./pages/RunDetail').then(m => ({ default: m.RunDetail })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -63,6 +64,7 @@ function App() {
                   <Route path="/spaces" element={<KnowledgeSpaces />} />
                   <Route path="/spaces/:spaceId" element={<SpaceDetail />} />
                   <Route path="/spaces/:spaceId/search" element={<SpaceSearch />} />
+                  <Route path="/runs/:docId" element={<RunDetail />} />
                   <Route path="/analytics" element={<Analytics />} />
                   <Route path="/settings" element={<Settings />} />
                 </Route>

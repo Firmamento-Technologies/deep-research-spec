@@ -156,7 +156,12 @@ export const Dashboard: FC = () => {
                 {runs.map((run) => (
                   <tr key={run.doc_id} className="border-b border-drs-border hover:bg-drs-s1/50">
                     <td className="py-2 text-drs-text max-w-xs truncate">
-                      {run.topic || run.doc_id}
+                      <Link
+                        to={`/runs/${run.doc_id}`}
+                        className="hover:text-drs-accent transition-colors"
+                      >
+                        {run.topic || run.doc_id}
+                      </Link>
                     </td>
                     <td className="py-2">{statusBadge(run.status)}</td>
                     <td className="py-2 text-drs-muted">{run.quality_preset}</td>

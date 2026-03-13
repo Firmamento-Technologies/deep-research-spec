@@ -397,6 +397,42 @@ async def approve_section(
     return {"status": "ok", "message": "Section approval received"}
 
 
+@router.get("/runs/{doc_id}/sections")
+async def get_run_sections(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """Get all sections for a completed run.
+
+    Returns section content for rendering the document preview.
+    """
+    from database.models import Section as SectionModel
+
+    result = await db.execute(
+        select(Run).where(Run.doc_id == doc_id)
+    )
+    run = result.scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    result = await db.execute(
+        select(SectionModel)
+        .where(SectionModel.doc_id == doc_id)
+        .order_by(SectionModel.section_idx)
+    )
+    sections = result.scalars().all()
+
+    return [
+        {
+            "idx": s.section_idx,
+            "title": s.title,
+            "content": s.content or "",
+            "status": s.status,
+        }
+        for s in sections
+    ]
+
+
 @router.delete("/runs/{doc_id}", status_code=204)
 async def cancel_run(
     doc_id: str,
