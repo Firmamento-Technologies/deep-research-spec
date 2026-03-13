@@ -27,7 +27,7 @@ export function AgentLogPanel({ text, isLive }: AgentLogPanelProps) {
         {isLive && (
           <span
             className="inline-block w-[7px] h-[13px] bg-drs-accent ml-[2px]"
-            style={{ animation: 'blink 1s step-start infinite' }}
+            style={{ animation: 'blink-cursor 1s step-start infinite' }}
           />
         )}
         <div ref={bottomRef} />

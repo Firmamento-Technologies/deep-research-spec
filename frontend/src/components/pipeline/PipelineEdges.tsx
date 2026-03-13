@@ -1,10 +1,8 @@
 import { useMemo } from 'react'
 import { PIPELINE_EDGES } from '../../constants/pipeline-edges'
 import { PIPELINE_NODES, CLUSTER_COLORS, NodeDefinition } from '../../constants/pipeline-layout'
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from './PipelineCanvas'
 import type { NodeState } from '../../store/useRunStore'
-
-const CANVAS_WIDTH = 2400
-const CANVAS_HEIGHT = 3200
 
 interface PipelineEdgesProps {
   nodeStates: Record<string, NodeState>
@@ -19,6 +17,11 @@ function getNodeCenter(node: NodeDefinition) {
   }
 }
 
+// Reuse arrow markers by color to reduce SVG defs from 110 to ~13
+function getColorKey(color: string) {
+  return color.replace('#', 'c')
+}
+
 export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: PipelineEdgesProps) {
   const nodeMap = useMemo(() => {
     const map: Record<string, NodeDefinition> = {}
@@ -31,30 +34,35 @@ export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: Pipeli
     [visibleNodeIds],
   )
 
+  // Collect unique colors for shared arrow markers
+  const uniqueColors = useMemo(() => {
+    const colors = new Set<string>()
+    visibleEdges.forEach(edge => {
+      const fromNode = nodeMap[edge.from]
+      if (fromNode) colors.add(CLUSTER_COLORS[fromNode.cluster])
+    })
+    return Array.from(colors)
+  }, [visibleEdges, nodeMap])
+
   return (
     <svg
       style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
       className="absolute top-0 left-0 pointer-events-none overflow-visible"
     >
       <defs>
-        {visibleEdges.map(edge => {
-          const fromNode = nodeMap[edge.from]
-          if (!fromNode) return null
-          const color = CLUSTER_COLORS[fromNode.cluster]
-          return (
-            <marker
-              key={`arrow-${edge.id}`}
-              id={`arrow-${edge.id}`}
-              markerWidth="6"
-              markerHeight="6"
-              refX="5"
-              refY="3"
-              orient="auto"
-            >
-              <path d="M0,0 L0,6 L6,3 z" fill={color} opacity={0.6} />
-            </marker>
-          )
-        })}
+        {uniqueColors.map(color => (
+          <marker
+            key={`arrow-${getColorKey(color)}`}
+            id={`arrow-${getColorKey(color)}`}
+            markerWidth="8"
+            markerHeight="8"
+            refX="6"
+            refY="4"
+            orient="auto"
+          >
+            <path d="M0,1 L0,7 L7,4 z" fill={color} opacity={0.7} />
+          </marker>
+        ))}
       </defs>
 
       {visibleEdges.map(edge => {
@@ -66,31 +74,41 @@ export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: Pipeli
         const to = getNodeCenter(toNode)
         const color = CLUSTER_COLORS[fromNode.cluster]
         const fromStatus = nodeStates[edge.from]?.status
+        const toStatus = nodeStates[edge.to]?.status
         const isActive = fromStatus === 'running' && edge.animated
-        const opacity = edge.type === 'dotted' ? 0.28 : 0.48
+        const isCompleted = fromStatus === 'completed' && toStatus === 'completed'
+
+        const opacity = edge.type === 'dotted' ? 0.2
+          : isActive ? 0.8
+          : isCompleted ? 0.5
+          : 0.35
 
         const dx = to.x - from.x
         const dy = to.y - from.y
         let pathD: string
 
-        if (Math.abs(dy) < 10 && Math.abs(dx) > 100) {
-          const cy = from.y - 40
+        if (Math.abs(dy) < 15 && Math.abs(dx) > 80) {
+          // Horizontal — gentle arc
+          const cy = from.y - 30
           pathD = `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${cy} ${to.x} ${to.y}`
-        } else if (dy < 0) {
-          const offset = 120
+        } else if (dy < -20) {
+          // Upward — loop around right side
+          const offset = Math.min(100, Math.abs(dx) + 60)
           pathD = `M ${from.x} ${from.y} C ${from.x + offset} ${from.y} ${to.x + offset} ${to.y} ${to.x} ${to.y}`
         } else {
-          const cy1 = from.y + dy * 0.4
-          const cy2 = from.y + dy * 0.6
-          pathD = `M ${from.x} ${from.y} C ${from.x} ${cy1} ${to.x} ${cy2} ${to.x} ${to.y}`
+          // Downward — smooth S-curve
+          const midY1 = from.y + dy * 0.35
+          const midY2 = from.y + dy * 0.65
+          pathD = `M ${from.x} ${from.y} C ${from.x} ${midY1} ${to.x} ${midY2} ${to.x} ${to.y}`
         }
 
         const strokeDasharray =
-          edge.type === 'dashed' ? '6 4' :
-            edge.type === 'dotted' ? '2 4' :
-              undefined
+          edge.type === 'dashed' ? '8 4' :
+          edge.type === 'dotted' ? '3 5' :
+          undefined
 
         const pathId = `path-${edge.id}`
+        const markerId = `arrow-${getColorKey(color)}`
 
         return (
           <g key={edge.id}>
@@ -98,33 +116,46 @@ export function PipelineEdges({ nodeStates, visibleNodeIds, showLabels }: Pipeli
               id={pathId}
               d={pathD}
               stroke={color}
-              strokeWidth={1.4}
+              strokeWidth={isActive ? 2 : 1.2}
               strokeDasharray={strokeDasharray}
               fill="none"
               opacity={opacity}
-              markerEnd={`url(#arrow-${edge.id})`}
+              markerEnd={`url(#${markerId})`}
             />
 
             {isActive && (
               <circle r="4" fill={color} opacity={0.9}>
-                <animateMotion dur="1.5s" repeatCount="indefinite">
+                <animateMotion dur="1.8s" repeatCount="indefinite">
                   <mpath href={`#${pathId}`} />
                 </animateMotion>
               </circle>
             )}
 
             {showLabels && edge.label && (
-              <text
-                x={(from.x + to.x) / 2}
-                y={(from.y + to.y) / 2 - 4}
-                fontSize={9}
-                fontFamily="monospace"
-                fill={color}
-                opacity={0.72}
-                textAnchor="middle"
-              >
-                {edge.label}
-              </text>
+              <g>
+                {/* Label background */}
+                <rect
+                  x={(from.x + to.x) / 2 - edge.label.length * 3.2}
+                  y={(from.y + to.y) / 2 - 12}
+                  width={edge.label.length * 6.4 + 4}
+                  height={14}
+                  rx={3}
+                  fill="#0A0B0F"
+                  opacity={0.85}
+                />
+                <text
+                  x={(from.x + to.x) / 2}
+                  y={(from.y + to.y) / 2 - 2}
+                  fontSize={9}
+                  fontFamily="monospace"
+                  fill={color}
+                  opacity={0.85}
+                  textAnchor="middle"
+                  fontWeight="600"
+                >
+                  {edge.label}
+                </text>
+              </g>
             )}
           </g>
         )

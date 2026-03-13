@@ -1,4 +1,4 @@
-// RlmCluster — optional RLM recursive language model overlay
+// RlmCluster — optional RLM recursive language model overlay (new coordinates)
 
 interface RlmClusterProps {
   active: boolean
@@ -6,41 +6,38 @@ interface RlmClusterProps {
 
 const RLM_COLOR = '#818CF8'
 
-export function RlmCluster({ active }: RlmClusterProps) {
-  const opacity = active ? 1 : 0.3
+const NODES = [
+  { id: 'rlm_adapter', label: 'RLM ADAPT.', x: 1280, y: 1160 },
+  { id: 'deep_research_lm', label: 'DEEP RES. LM', x: 1280, y: 1230 },
+  { id: 'section_budget_guard', label: 'SEC. BUDGET', x: 1280, y: 1300 },
+]
 
-  const nodes = [
-    { id: 'rlm_adapter', label: 'RLM ADAPTER', x: 1700, y: 1400 },
-    { id: 'deep_research_lm', label: 'DEEP RESEARCH LM', x: 1700, y: 1480 },
-    { id: 'section_budget_guard', label: 'SECTION BUDGET', x: 1700, y: 1560 },
-  ]
+export function RlmCluster({ active }: RlmClusterProps) {
+  const opacity = active ? 1 : 0.25
 
   return (
     <>
-      {/* Cluster label */}
       <div
-        className="absolute text-[9px] font-mono text-drs-node-rlm tracking-[1px]"
-        style={{ left: 1700, top: 1360, opacity }}
+        className="absolute text-[10px] font-mono font-semibold tracking-wider"
+        style={{ left: 1280, top: 1135, opacity, color: `${RLM_COLOR}AA` }}
       >
         RLM
       </div>
 
-      {nodes.map(node => (
+      {NODES.map(node => (
         <div
           key={node.id}
-          className="absolute w-[160px] h-[56px] rounded-card flex items-center justify-center transition-[opacity,border-color] duration-400"
+          className="absolute w-[140px] h-[52px] rounded-lg flex items-center justify-center transition-all duration-300"
           style={{
             left: node.x,
             top: node.y,
-            background: `${RLM_COLOR}10`,
-            border: `1px dashed ${RLM_COLOR}${active ? 'AA' : '44'}`,
+            background: `${RLM_COLOR}0C`,
+            border: `1.5px dashed ${RLM_COLOR}${active ? '80' : '30'}`,
             opacity,
-            boxShadow: active ? `0 0 12px ${RLM_COLOR}40` : 'none',
+            boxShadow: active ? `0 0 10px ${RLM_COLOR}30` : 'none',
           }}
         >
-          <span className="text-[10px] font-mono text-drs-text">
-            {node.label}
-          </span>
+          <span className="text-[10px] font-mono text-drs-text">{node.label}</span>
         </div>
       ))}
     </>

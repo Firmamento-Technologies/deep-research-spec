@@ -1,4 +1,4 @@
-// ShineCluster — optional SHINE LoRA serving overlay
+// ShineCluster — optional SHINE LoRA serving overlay (new coordinates)
 
 interface ShineClusterProps {
   active: boolean
@@ -6,41 +6,38 @@ interface ShineClusterProps {
 
 const SHINE_COLOR = '#14B8A6'
 
-export function ShineCluster({ active }: ShineClusterProps) {
-  const opacity = active ? 1 : 0.3
+const NODES = [
+  { id: 'shine_singleton', label: 'SHINE', x: 1280, y: 610 },
+  { id: 'shine_hypernetwork', label: 'HYPERNET', x: 1280, y: 680 },
+  { id: 'shine_lora', label: 'LORA', x: 1280, y: 750 },
+]
 
-  const nodes = [
-    { id: 'shine_singleton', label: 'SHINE SINGLETON', x: 1700, y: 800 },
-    { id: 'shine_hypernetwork', label: 'SHINE HYPERNET', x: 1700, y: 880 },
-    { id: 'shine_lora', label: 'LORA WEIGHTS', x: 1700, y: 960 },
-  ]
+export function ShineCluster({ active }: ShineClusterProps) {
+  const opacity = active ? 1 : 0.25
 
   return (
     <>
-      {/* Cluster label */}
       <div
-        className="absolute text-[9px] font-mono text-drs-node-shine tracking-[1px]"
-        style={{ left: 1690, top: 760, opacity }}
+        className="absolute text-[10px] font-mono font-semibold tracking-wider"
+        style={{ left: 1280, top: 585, opacity, color: `${SHINE_COLOR}AA` }}
       >
         SHINE
       </div>
 
-      {nodes.map(node => (
+      {NODES.map(node => (
         <div
           key={node.id}
-          className="absolute w-[160px] h-[56px] rounded-card flex items-center justify-center transition-[opacity,border-color] duration-400"
+          className="absolute w-[140px] h-[52px] rounded-lg flex items-center justify-center transition-all duration-300"
           style={{
             left: node.x,
             top: node.y,
-            background: `${SHINE_COLOR}10`,
-            border: `1px dashed ${SHINE_COLOR}${active ? 'AA' : '44'}`,
+            background: `${SHINE_COLOR}0C`,
+            border: `1.5px dashed ${SHINE_COLOR}${active ? '80' : '30'}`,
             opacity,
-            boxShadow: active ? `0 0 12px ${SHINE_COLOR}40` : 'none',
+            boxShadow: active ? `0 0 10px ${SHINE_COLOR}30` : 'none',
           }}
         >
-          <span className="text-[10px] font-mono text-drs-text">
-            {node.label}
-          </span>
+          <span className="text-[10px] font-mono text-drs-text">{node.label}</span>
         </div>
       ))}
     </>

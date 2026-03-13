@@ -26,7 +26,7 @@ export const Button: FC<PropsWithChildren<ButtonProps>> = ({
     <Tag
       {...props}
       {...(as === 'button' ? { disabled } : {})}
-      className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${variantClass[variant]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-drs-accent disabled:opacity-50 disabled:cursor-not-allowed ${variantClass[variant]} ${className}`}
     >
       {children}
     </Tag>
