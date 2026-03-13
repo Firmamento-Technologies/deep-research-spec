@@ -21,7 +21,7 @@ function StatusIcon({ status }: { status: SectionStatus }) {
     <span
       title="In esecuzione"
       className="inline-block w-[8px] h-[8px] rounded-full bg-drs-green align-middle shadow-[0_0_6px_#22C55E]"
-      style={{ animation: 'dot-pulse 1s ease-in-out infinite' }}
+      style={{ animation: 'dot-pulse 1.5s ease-in-out infinite' }}
     />
   )
 }
