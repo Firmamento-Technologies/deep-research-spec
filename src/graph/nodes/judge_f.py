@@ -111,7 +111,7 @@ Return your evaluation as the JSON structure specified in the system prompt."""
         consulted: list[str] = []
         for claim in claims:
             try:
-                model = route_model("jury_f", self._preset if hasattr(self, "_preset") else "balanced")
+                model = route_model("jury_f", getattr(self, "preset", "balanced"))
                 response = llm_client.call(
                     model=model,
                     messages=[{

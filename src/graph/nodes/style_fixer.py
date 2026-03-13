@@ -44,7 +44,8 @@ def style_fixer_node(state: dict) -> dict:
 
     # 2. L2 fixes — LLM-powered revision
     if l2_violations:
-        fixed_draft = _apply_l2_fixes(fixed_draft, l2_violations)
+        quality_preset = state.get("quality_preset", "balanced")
+        fixed_draft = _apply_l2_fixes(fixed_draft, l2_violations, quality_preset)
 
     changes = len(violations)
     logger.info("StyleFixer: applied %d fixes (%d L1, %d L2)",
@@ -77,7 +78,7 @@ def _apply_l1_fixes(draft: str, violations: list[dict]) -> str:
     return fixed
 
 
-def _apply_l2_fixes(draft: str, violations: list[dict]) -> str:
+def _apply_l2_fixes(draft: str, violations: list[dict], quality_preset: str = "balanced") -> str:
     """Use LLM to fix L2 style violations."""
     try:
         violation_text = "\n".join(
@@ -86,7 +87,7 @@ def _apply_l2_fixes(draft: str, violations: list[dict]) -> str:
         )
 
         response = llm_client.call(
-            model=route_model("style_fixer", state.get("quality_preset", "balanced")),
+            model=route_model("style_fixer", quality_preset),
             messages=[{
                 "role": "user",
                 "content": f"""\

@@ -11,7 +11,7 @@ Replaces the pure LLM-based §14 ContextCompressor with a hybrid strategy:
     → Token savings: ~70–80% reduction on Writer/Jury/Reflector input
 
   STRUCTURED_SUMMARY tier (distance 3–5):
-    → LLM compression via qwen/qwen3-7b (§14.5)
+    → LLM compression via route_model("context_compressor") (§14.5)
     → Max 120 words, key claims + thesis preserved
     → Already small impact; LLM cost is negligible here
 
@@ -265,7 +265,7 @@ async def _llm_compress(content: str, title: str, tier: str) -> str:
             max_tokens=max_words * 3,
             temperature=0.1,
         )
-        summary = result.get("content", "").strip()
+        summary = result.get("text", result.get("content", "")).strip()
         if summary:
             return summary
     except Exception as e:
