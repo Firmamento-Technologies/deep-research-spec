@@ -10,7 +10,7 @@ interface RunListItem {
   topic: string;
   status: string;
   quality_preset: string;
-  total_cost: number;
+  total_cost: number | null;
   created_at: string | null;
   completed_at: string | null;
 }
@@ -175,7 +175,7 @@ export const Dashboard: FC = () => {
                     </td>
                     <td className="py-2">{statusBadge(run.status)}</td>
                     <td className="py-2 text-drs-muted">{run.quality_preset}</td>
-                    <td className="py-2 text-drs-muted">${run.total_cost.toFixed(2)}</td>
+                    <td className="py-2 text-drs-muted">${run.total_cost?.toFixed(2) ?? '0.00'}</td>
                     <td className="py-2 text-drs-faint">
                       {run.created_at ? new Date(run.created_at).toLocaleDateString() : '-'}
                     </td>
