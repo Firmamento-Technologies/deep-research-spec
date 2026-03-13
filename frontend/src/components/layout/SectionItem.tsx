@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
+import { useRunStore } from '../../store/useRunStore'
 
 export type SectionStatus = 'waiting' | 'running' | 'completed' | 'failed'
 
@@ -27,7 +28,8 @@ function StatusIcon({ status }: { status: SectionStatus }) {
 
 export function SectionItem({ idx, title, status, docId, collapsed }: SectionItemProps) {
   const [hovered, setHovered] = useState(false)
-  const { setState, setActiveDocId } = useAppStore()
+  const { setState, setActiveDocId, setSelectedNode } = useAppStore()
+  const { activeRun } = useRunStore()
 
   const handleClick = () => {
     if (status === 'completed') {
@@ -49,7 +51,10 @@ export function SectionItem({ idx, title, status, docId, collapsed }: SectionIte
 
   const handleLog = (e: React.MouseEvent) => {
     e.stopPropagation()
-    // navigate to log — sets selected node context
+    if (activeRun) {
+      setSelectedNode(`writer_single`)
+      setState('PROCESSING')
+    }
   }
 
   if (collapsed) {
@@ -75,7 +80,7 @@ export function SectionItem({ idx, title, status, docId, collapsed }: SectionIte
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={handleClick}
-      className="flex items-center gap-[8px] p-[4px_8px] rounded-input relative transition-[background] duration-150"
+      className="flex items-center gap-[8px] p-[4px_8px] rounded-input relative transition-colors duration-150"
       style={{
         cursor: status === 'completed' ? 'pointer' : 'default',
         background: hovered ? '#1A1D2740' : 'transparent',

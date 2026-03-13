@@ -47,8 +47,8 @@ export const KnowledgeSpaces: React.FC = () => {
       setNewSpaceDesc('');
       setCreateError(null);
     },
-    onError: (err: any) => {
-      setCreateError(err?.message || 'Failed to create space. Please try again.');
+    onError: (err: unknown) => {
+      setCreateError(err instanceof Error ? err.message : 'Failed to create space. Please try again.');
     },
   });
 

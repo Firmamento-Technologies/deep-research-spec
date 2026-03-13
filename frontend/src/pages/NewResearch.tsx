@@ -45,6 +45,14 @@ export const NewResearch: FC = () => {
 
   const handleSubmit = useCallback(async () => {
     if (!topic.trim()) return;
+    if (targetWords < 1000 || targetWords > 50000) {
+      setError('Il target parole deve essere tra 1.000 e 50.000.');
+      return;
+    }
+    if (maxBudget < 1 || maxBudget > 1000) {
+      setError('Il budget massimo deve essere tra $1 e $1.000.');
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
 
@@ -90,8 +98,8 @@ export const NewResearch: FC = () => {
 
       // Navigate to dashboard where pipeline will show
       navigate('/dashboard');
-    } catch (err: any) {
-      setError(err?.message || 'Errore durante la creazione della ricerca.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Errore durante la creazione della ricerca.');
     } finally {
       setIsSubmitting(false);
     }

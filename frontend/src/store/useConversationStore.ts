@@ -131,6 +131,10 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         runStore.setActiveRun(buildInitialRunState(runResp.data.doc_id, params))
 
       } else if (action?.type === 'SHOW_SECTION') {
+        const sectionIdx = action.sectionIdx as number | undefined
+        if (sectionIdx != null) {
+          appStore.setSelectedNode(`section_${sectionIdx}`)
+        }
         appStore.setState('REVIEWING')
 
       } else if (action?.type === 'CANCEL_RUN') {

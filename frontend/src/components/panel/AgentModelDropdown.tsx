@@ -39,7 +39,9 @@ export function AgentModelDropdown({ nodeId, currentModel }: AgentModelDropdownP
     <div ref={ref} className="relative inline-block">
       <button
         onClick={() => setOpen(o => !o)}
-        className="bg-drs-s2 border border-drs-border rounded-input text-drs-muted text-[11px] font-mono px-[8px] py-[2px] cursor-pointer flex items-center gap-[4px]"
+        className="bg-drs-s2 border border-drs-border rounded-input text-drs-muted text-[11px] font-mono px-[8px] py-[2px] cursor-pointer flex items-center gap-[4px] hover:border-drs-border-bright transition-colors"
+        aria-label={`Cambia modello per ${nodeId}`}
+        title={`Modello: ${currentModel}`}
       >
         {saving ? 'Salvataggio…' : shortName}
         <span className="text-[9px]">▾</span>

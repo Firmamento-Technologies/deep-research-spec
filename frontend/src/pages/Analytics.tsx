@@ -282,12 +282,18 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 // ------------------------------------------------------------------ //
 // Custom Recharts tooltip
 // ------------------------------------------------------------------ //
-function CustomTooltip({ active, payload, label }: any) {
+interface TooltipPayloadEntry {
+  name?: string
+  value: string | number
+  color?: string
+}
+
+function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: TooltipPayloadEntry[]; label?: string }) {
   if (!active || !payload?.length) return null
   return (
     <div className="bg-drs-s1 border border-drs-border rounded-[6px] px-[10px] py-[6px] text-[11px] font-mono">
       {label && <div className="text-drs-muted mb-[4px]">{label}</div>}
-      {payload.map((p: any, i: number) => (
+      {payload.map((p: TooltipPayloadEntry, i: number) => (
         <div key={i} style={{ color: p.color ?? '#F0F1F6' }}>
           {p.name ? `${p.name}: ` : ''}{typeof p.value === 'number' ? p.value.toFixed(3) : p.value}
         </div>

@@ -73,8 +73,8 @@ export const SpaceDetail: React.FC = () => {
       setUploadProgress(new Map());
       setUploadError(null);
     },
-    onError: (err: any) => {
-      setUploadError(err?.message || 'Upload failed. Please try again.');
+    onError: (err: unknown) => {
+      setUploadError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
       setUploadProgress(new Map());
     },
   });

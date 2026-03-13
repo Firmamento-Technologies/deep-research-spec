@@ -56,8 +56,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       // Close modal
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Export failed. Please try again.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Export failed. Please try again.');
     } finally {
       setIsExporting(false);
     }

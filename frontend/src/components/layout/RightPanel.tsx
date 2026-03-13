@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
-import type { RunState } from '../../store/useRunStore'
+import type { RunState, NodeState } from '../../store/useRunStore'
 import { PIPELINE_NODES, CLUSTER_COLORS } from '../../constants/pipeline-layout'
 import { AgentLogPanel } from '../panel/AgentLogPanel'
 import { TokenMeter } from '../panel/TokenMeter'
@@ -48,7 +48,9 @@ export function RightPanel() {
           </span>
           <button
             onClick={toggleRightPanel}
-            className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] leading-none"
+            className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] leading-none hover:text-drs-muted transition-colors"
+            aria-label="Chiudi pannello"
+            title="Chiudi pannello"
           >
             ×
           </button>
@@ -311,7 +313,7 @@ function ReflectorFeedback({ output }: { output: unknown }) {
   )
 }
 
-function buildPayloadSections(nodeState: any) {
+function buildPayloadSections(nodeState: NodeState | undefined) {
   if (!nodeState?.output || typeof nodeState.output !== 'object') return []
   const out = nodeState.output as Record<string, unknown>
   const sections = []

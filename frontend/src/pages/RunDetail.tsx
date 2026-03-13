@@ -38,8 +38,8 @@ export const RunDetail: FC = () => {
         ])
         setRun(runRes.data)
         setSections(secRes.data)
-      } catch (e: any) {
-        setError(e?.message || 'Errore nel caricamento')
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Errore nel caricamento')
       } finally {
         setLoading(false)
       }

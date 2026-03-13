@@ -37,7 +37,8 @@ export function PayloadTree({ sections }: PayloadTreeProps) {
           <div key={i}>
             <button
               onClick={() => toggle(i)}
-              className="flex items-center gap-[6px] w-full bg-transparent border-none cursor-pointer py-[3px] px-0 text-left"
+              className="flex items-center gap-[6px] w-full bg-transparent border-none cursor-pointer py-[3px] px-0 text-left transition-colors hover:bg-drs-s2/30 rounded"
+              aria-label={`${isOpen ? 'Comprimi' : 'Espandi'} ${sec.label}`}
             >
               <span className="text-[10px] text-drs-faint">{isOpen ? '▾' : '▸'}</span>
               <span className="text-[11px] font-mono text-drs-muted">

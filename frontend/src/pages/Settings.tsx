@@ -103,8 +103,8 @@ export function Settings() {
     setData(prev => {
       if (!prev) return prev
       const copy = JSON.parse(JSON.stringify(prev))
-      let ref: any = copy
-      for (let i = 0; i < path.length - 1; i++) ref = ref[path[i]]
+      let ref: Record<string, unknown> = copy
+      for (let i = 0; i < path.length - 1; i++) ref = ref[path[i]] as Record<string, unknown>
       ref[path[path.length - 1]] = value
       return copy
     })
