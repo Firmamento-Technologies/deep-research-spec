@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
 export function Topbar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, logout } = useAuth()
   const [isOnline, setIsOnline] = useState(false)
 
   const isSettings = location.pathname === '/settings'
@@ -93,6 +95,12 @@ export function Topbar() {
           </span>
         </div>
 
+        {user && (
+          <span className="text-xs text-drs-muted hidden md:block truncate max-w-[120px]">
+            {user.username}
+          </span>
+        )}
+
         <button
           onClick={() => navigate(isSettings ? '/dashboard' : '/settings')}
           className={
@@ -107,6 +115,20 @@ export function Topbar() {
         >
           {isSettings ? '✕' : '⚙'}
         </button>
+
+        {user && (
+          <button
+            onClick={async () => {
+              await logout()
+              navigate('/login')
+            }}
+            className="w-8 h-8 flex items-center justify-center rounded text-drs-muted hover:text-drs-red hover:bg-drs-s2 transition-colors text-sm bg-transparent border-none cursor-pointer"
+            aria-label="Logout"
+            title="Logout"
+          >
+            ⏻
+          </button>
+        )}
       </div>
     </header>
   )
