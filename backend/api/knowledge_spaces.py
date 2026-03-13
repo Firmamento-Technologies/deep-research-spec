@@ -261,11 +261,26 @@ async def upload_source(
     if not space:
         raise HTTPException(status_code=404, detail="Space not found")
     
+    # Infer MIME type from extension when browser sends generic octet-stream
+    content_type = file.content_type or "application/octet-stream"
+    if content_type == "application/octet-stream" and file.filename:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        ext_map = {
+            "md": "text/markdown",
+            "markdown": "text/markdown",
+            "txt": "text/plain",
+            "html": "text/html",
+            "htm": "text/html",
+            "pdf": "application/pdf",
+            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+        content_type = ext_map.get(ext, content_type)
+
     # Validate file
-    if file.content_type not in ALLOWED_MIME_TYPES:
+    if content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {file.content_type}. "
+            detail=f"Unsupported file type: {content_type}. "
                    f"Allowed: {', '.join(ALLOWED_MIME_TYPES)}"
         )
     
@@ -293,7 +308,7 @@ async def upload_source(
         id=source_id,
         space_id=space_id,
         filename=file.filename,
-        mime_type=file.content_type,
+        mime_type=content_type,
         file_size=len(content),
         storage_path=str(storage_path),
         status="pending",
@@ -310,7 +325,7 @@ async def upload_source(
             session,
             source_id,
             str(storage_path),
-            file.content_type,
+            content_type,
         )
         
         return IndexingResultResponse(**result)
