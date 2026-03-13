@@ -10,6 +10,7 @@
 //
 // Collapsed (48px): coloured dots for each doc + tooltip on hover.
 
+import { useEffect } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 import { useConversationStore } from '../../store/useConversationStore'
@@ -18,6 +19,17 @@ import { SectionItem } from './SectionItem'
 export function DocumentSidebar() {
   const collapsed = useAppStore((s) => s.sidebarCollapsed)
   const toggle = useAppStore((s) => s.toggleSidebar)
+  const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    const handler = (e: MediaQueryListEvent) => {
+      if (e.matches) setSidebarCollapsed(true)
+    }
+    if (mq.matches) setSidebarCollapsed(true)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [setSidebarCollapsed])
   const activeRun = useRunStore((s) => s.activeRun)
   const completedRuns = useRunStore((s) => s.completedRuns)
   const sendMessage = useConversationStore((s) => s.sendMessage)

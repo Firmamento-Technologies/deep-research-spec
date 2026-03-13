@@ -50,7 +50,7 @@ export const Dashboard: FC = () => {
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-6 space-y-6">
+    <div className="mx-auto max-w-6xl p-4 md:p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

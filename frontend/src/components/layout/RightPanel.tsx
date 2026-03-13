@@ -25,7 +25,7 @@ export function RightPanel() {
   }
 
   return (
-    <div className="w-[320px] shrink-0 h-full bg-drs-s1 border-l border-drs-border flex flex-col overflow-hidden transition-[width] duration-200 ease-out">
+    <div className="hidden md:flex w-[320px] shrink-0 h-full bg-drs-s1 border-l border-drs-border flex-col overflow-hidden transition-[width] duration-200 ease-out">
       {/* Header */}
       <div className="h-[40px] flex items-center justify-between px-[12px] border-b border-drs-border shrink-0">
         <span className="text-[11px] font-mono text-drs-faint tracking-[1px]">

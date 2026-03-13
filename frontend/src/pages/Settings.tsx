@@ -123,14 +123,14 @@ export function Settings() {
 
   if (!data) {
     return (
-      <div className="p-6 max-w-5xl mx-auto text-drs-faint text-[12px] font-mono">
+      <div className="p-4 md:p-6 max-w-5xl mx-auto text-drs-faint text-[12px] font-mono">
         {error ? `Errore: ${error}` : 'Caricamento impostazioni...'}
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* Header with back button */}
       <div className="flex items-center gap-[12px] mb-[24px]">
         <button

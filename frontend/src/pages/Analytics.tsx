@@ -68,7 +68,7 @@ export function Analytics() {
     setPresets(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
       <div className="text-[18px] text-drs-text font-bold">Analytics</div>
 
       {/* Filter bar */}
@@ -98,7 +98,7 @@ export function Analytics() {
       {data && (
         <>
           {/* KPI cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-[12px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-[12px]">
             <KpiCard label="Runs completati"    value={data.kpis.total_runs.toString()} />
             <KpiCard label="Costo medio/doc"    value={`$${data.kpis.avg_cost_per_doc.toFixed(2)}`} color="#EAB308" />
             <KpiCard label="Parole totali"      value={data.kpis.total_words.toLocaleString()} color="#7C8CFF" />

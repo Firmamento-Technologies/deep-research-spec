@@ -34,7 +34,7 @@ export function AppShell() {
       <Topbar />
 
       {/* Content area — fills remaining height between topbar and chat input */}
-      <div className="flex flex-1 overflow-hidden pt-12 pb-20">
+      <div className="flex flex-1 overflow-hidden pt-12 pb-16 md:pb-20">
         <DocumentSidebar />
         <MainArea />
         <RightPanel />

@@ -117,7 +117,7 @@ export const SpaceDetail: React.FC = () => {
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-drs-text">
@@ -148,7 +148,7 @@ export const SpaceDetail: React.FC = () => {
           }}
           onDragLeave={() => setIsDragOver(false)}
           onDrop={handleDrop}
-          className={`border-2 border-dashed rounded-lg p-12 text-center transition ${
+          className={`border-2 border-dashed rounded-lg p-6 md:p-12 text-center transition ${
             isDragOver ? 'border-drs-accent bg-drs-accent/10' : 'border-drs-border'
           }`}
         >

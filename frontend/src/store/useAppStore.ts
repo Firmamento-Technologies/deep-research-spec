@@ -29,6 +29,7 @@ interface AppStore {
   setActiveDocId: (id: string | null) => void
   setSelectedNode: (nodeId: string | null) => void
   toggleSidebar: () => void
+  setSidebarCollapsed: (collapsed: boolean) => void
   toggleRightPanel: () => void
   openHitl: (type: AppStore['hitlType'], payload: unknown) => void
   closeHitl: () => void
@@ -47,6 +48,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setActiveDocId: (id) => set({ activeDocId: id }),
   setSelectedNode: (nodeId) => set({ selectedNodeId: nodeId }),
   toggleSidebar: () => set((prev) => ({ sidebarCollapsed: !prev.sidebarCollapsed })),
+  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   toggleRightPanel: () => set((prev) => ({ rightPanelCollapsed: !prev.rightPanelCollapsed })),
   openHitl: (type, payload) => set({ hitlType: type, hitlPayload: payload }),
   closeHitl: () => set({ hitlType: null, hitlPayload: null }),

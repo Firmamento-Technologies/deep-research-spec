@@ -50,8 +50,16 @@ export function Topbar() {
         ◈ DRS
       </button>
 
-      {/* Navigation links */}
-      <nav className="flex items-center gap-1 ml-2">
+      {/* Hamburger button — mobile only */}
+      <button
+        className="sm:hidden flex items-center justify-center w-8 h-8 rounded text-drs-muted hover:text-drs-text hover:bg-drs-s2 transition-colors bg-transparent border-none text-base cursor-pointer"
+        aria-label="Menu"
+      >
+        ☰
+      </button>
+
+      {/* Navigation links — hidden on mobile */}
+      <nav className="hidden sm:flex items-center gap-1 ml-2">
         {NAV_ITEMS.map((item) => {
           const isActive = location.pathname === item.to ||
             (item.to !== '/dashboard' && location.pathname.startsWith(item.to))

@@ -44,7 +44,7 @@ export function ChatInput() {
   return (
     <div
       className={
-        'fixed bottom-0 left-0 right-0 z-40 h-20 ' +
+        'fixed bottom-0 left-0 right-0 z-40 h-16 md:h-20 ' +
         'bg-drs-s1 border-t border-drs-border ' +
         'flex items-center px-4 gap-3'
       }
