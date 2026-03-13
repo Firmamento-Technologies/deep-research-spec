@@ -5,6 +5,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  type DragEndEvent,
   } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -32,7 +33,7 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
   const { setState } = useAppStore()
 
   const [sections, setSections] = useState<OutlineSection[]>(() => {
-    const raw = (activeRun as any)?.hitlPayload?.sections ?? []
+    const raw = (activeRun?.hitlPayload?.sections as OutlineSection[] | undefined) ?? []
     return raw.length > 0
       ? raw
       : [
@@ -47,7 +48,7 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
-  const handleDragEnd = (event: any) => {
+  const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
       const oldIdx = sections.findIndex(s => s.id === active.id)

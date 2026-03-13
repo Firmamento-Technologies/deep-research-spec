@@ -16,11 +16,7 @@ export function HumanRequiredModal() {
 
   if (appState !== 'AWAITING_HUMAN' || !activeDocId) return null
 
-  const hitlType = (activeRun as any)?.hitlType as
-    | 'outline_approval'
-    | 'section_approval'
-    | 'escalation'
-    | undefined
+  const hitlType = activeRun?.hitlType
 
   return (
     <div

@@ -94,4 +94,8 @@ export interface RunState {
   outputPaths?: Record<string, string>
   /** Live draft text buffer — appended by DRAFT_CHUNK SSE events */
   liveDraft?: string
+  /** HITL (Human-In-The-Loop) payload set by HUMAN_REQUIRED SSE event */
+  hitlPayload?: Record<string, unknown>
+  /** HITL type: which approval screen to show */
+  hitlType?: 'outline_approval' | 'section_approval' | 'escalation'
 }

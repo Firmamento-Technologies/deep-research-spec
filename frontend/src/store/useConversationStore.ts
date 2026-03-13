@@ -113,7 +113,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         role: 'companion',
         content: resp.data.reply,
         timestamp: new Date(),
-        chips: resp.data.chips?.map((c: any) => ({ label: c.label, value: c.value })) ?? undefined,
+        chips: resp.data.chips?.map((c: { label: string; value: string }) => ({ label: c.label, value: c.value })) ?? undefined,
       })
 
       // ── Handle action ─────────────────────────────────────────────

@@ -25,7 +25,7 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
   const { setState } = useAppStore()
   const { activeRun } = useRunStore()
 
-  const payload = (activeRun as any)?.hitlPayload ?? {}
+  const payload = activeRun?.hitlPayload ?? {}
   const draft: string = payload.draft ?? ''
   const violations: Violation[] = payload.violations ?? []
   const feedback: FeedbackItem[] = (payload.feedbackItems ?? []).sort(

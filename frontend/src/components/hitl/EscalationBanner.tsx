@@ -11,7 +11,7 @@ export function EscalationBanner({ docId }: EscalationBannerProps) {
   const { setState } = useAppStore()
   const { activeRun } = useRunStore()
 
-  const payload = (activeRun as any)?.hitlPayload ?? {}
+  const payload = activeRun?.hitlPayload ?? {}
   const escalationType: string = payload.escalationType ?? 'ESCALATION'
   const description: string = payload.description ?? 'Azione richiesta per risolvere un conflitto nella pipeline.'
 

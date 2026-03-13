@@ -201,7 +201,7 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: RunState }) {
         <JuryVerdictGrid
           verdicts={
             run.juryVerdicts
-              ?.flatMap((jv: any) => (jv as any).judges ?? [])
+              ?.flatMap((jv) => jv.judges ?? [])
             ?? []
           }
         />
@@ -214,7 +214,7 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: RunState }) {
 
       {/* RESEARCHER special case */}
       {isResearcher && nodeState?.output ? (
-        <SourceList sources={(nodeState.output as any)?.sources ?? []} />
+        <SourceList sources={(nodeState.output as Record<string, unknown>)?.sources as Array<{ url: string; title: string; reliability: number }> ?? []} />
       ) : null}
 
       {/* Live output */}
@@ -270,7 +270,7 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: RunState }) {
 /* ------------------------------------------------------------------ */
 function ReflectorFeedback({ output }: { output: unknown }) {
   const items: Array<{ severity: string; category: string; text: string }> =
-    (output as any)?.feedbackItems ?? []
+    (output as Record<string, unknown>)?.feedbackItems as Array<{ severity: string; category: string; text: string }> ?? []
 
   const severityColor = (s: string) =>
     s === 'HIGH' ? '#EF4444' : s === 'MEDIUM' ? '#F97316' : '#EAB308'
