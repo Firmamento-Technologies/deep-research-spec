@@ -144,7 +144,7 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
           (action.docId as string | undefined) ?? appStore.activeDocId
         if (docId) {
           await api.delete(`/api/runs/${docId}`)
-          appStore.setActiveDocId(null)
+          runStore.archiveRun()
           appStore.setState('CONVERSING')
         }
       }
