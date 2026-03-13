@@ -8,9 +8,19 @@ import type { RunState, NodeState, CSSScores } from '../types/run'
 export type { RunState, NodeState, CSSScores }
 export type { SectionResult, NodeStatus, RunStatus, QualityPreset, JudgeVerdict, JuryVerdict } from '../types/run'
 
+export interface ActivityEntry {
+  id: number
+  ts: Date
+  icon: string
+  text: string
+  detail?: string
+  color?: string
+}
+
 interface RunStore {
   activeRun: RunState | null
   completedRuns: RunState[]
+  activityFeed: ActivityEntry[]
   // Core mutations (called by useSSE)
   setActiveRun: (run: RunState) => void
   updateNode: (nodeId: string, update: Partial<NodeState>) => void
@@ -24,6 +34,9 @@ interface RunStore {
   // Live draft streaming
   appendDraftChunk: (chunk: string) => void
   clearDraft: () => void
+  // Activity feed
+  pushActivity: (icon: string, text: string, detail?: string, color?: string) => void
+  clearActivity: () => void
   // Archive
   archiveRun: () => void
 }
@@ -36,11 +49,14 @@ function patchRun(
   return { activeRun: { ...prev.activeRun, ...patch } }
 }
 
+let _activitySeq = 0
+
 export const useRunStore = create<RunStore>((set) => ({
   activeRun: null,
   completedRuns: [],
+  activityFeed: [],
 
-  setActiveRun: (run) => set({ activeRun: run }),
+  setActiveRun: (run) => set({ activeRun: run, activityFeed: [] }),
 
   updateNode: (nodeId, update) =>
     set((prev) => {
@@ -96,12 +112,20 @@ export const useRunStore = create<RunStore>((set) => ({
   clearDraft: () =>
     set((prev) => patchRun(prev, { liveDraft: '' })),
 
+  pushActivity: (icon, text, detail, color) =>
+    set((prev) => ({
+      activityFeed: [...prev.activityFeed, { id: ++_activitySeq, ts: new Date(), icon, text, detail, color }],
+    })),
+
+  clearActivity: () => set({ activityFeed: [] }),
+
   archiveRun: () =>
     set((prev) => {
       if (!prev.activeRun) return prev
       return {
         activeRun: null,
         completedRuns: [prev.activeRun, ...prev.completedRuns],
+        activityFeed: [],
       }
     }),
 }))

@@ -23,14 +23,12 @@ export const RegisterPage: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Password validation
-  const passwordErrors = [];
-  if (formData.password.length > 0 && formData.password.length < 8) {
-    passwordErrors.push('At least 8 characters');
-  }
-  if (formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword) {
-    passwordErrors.push('Passwords do not match');
-  }
+  // Form validation
+  const isFormValid =
+    formData.email.length > 0 &&
+    formData.username.length >= 3 &&
+    formData.password.length >= 8 &&
+    formData.password === formData.confirmPassword;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,7 +205,7 @@ export const RegisterPage: React.FC = () => {
           {/* Submit */}
           <button
             type="submit"
-            disabled={isLoading || passwordErrors.length > 0}
+            disabled={isLoading || !isFormValid}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-drs-accent hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-drs-accent disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Creating account...' : 'Create account'}

@@ -36,6 +36,7 @@ export function useSSE(docId: string | null): UseSSEResult {
   const setRunStatus     = useRunStore((s) => s.setRunStatus)
   const appendDraftChunk = useRunStore((s) => s.appendDraftChunk)
   const setHardStop      = useRunStore((s) => s.setHardStop)
+  const pushActivity     = useRunStore((s) => s.pushActivity)
 
   const dispatch = useCallback((raw: string) => {
     let parsed: SSEEvent
@@ -45,29 +46,39 @@ export function useSSE(docId: string | null): UseSSEResult {
     const { event, data } = parsed
     const now = new Date()
 
+    const nodeName = (id: string) => id.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
     switch (event) {
       case 'NODE_STARTED':
         updateNode(data.node as string, { status: 'running', startedAt: now })
+        pushActivity('●', `${nodeName(data.node as string)} avviato...`, undefined, '#22C55E')
         break
 
-      case 'NODE_COMPLETED':
+      case 'NODE_COMPLETED': {
+        const dur = data.duration_s as number
+        const cost = data.cost_usd as number | undefined
         updateNode(data.node as string, {
           status: 'completed',
           completedAt: now,
-          durationMs: (data.duration_s as number) * 1_000,
+          durationMs: dur * 1_000,
           output: data.output,
           tokensIn:  data.tokens_in  as number | undefined,
           tokensOut: data.tokens_out as number | undefined,
-          costUsd:   data.cost_usd   as number | undefined,
+          costUsd:   cost,
         })
+        const detail = cost != null ? `${dur.toFixed(1)}s · $${cost.toFixed(4)}` : `${dur.toFixed(1)}s`
+        pushActivity('✓', `${nodeName(data.node as string)} completato`, detail, '#4F6EF7')
         break
+      }
 
       case 'NODE_FAILED':
         updateNode(data.node as string, { status: 'failed', error: data.error as string })
+        pushActivity('✗', `${nodeName(data.node as string)} fallito`, data.error as string, '#EF4444')
         break
 
       case 'SECTION_APPROVED':
         approveSection(data.section_idx as number)
+        pushActivity('✓', `Sezione ${(data.section_idx as number) + 1} approvata`, undefined, '#22C55E')
         break
 
       case 'CSS_UPDATE':
@@ -76,10 +87,12 @@ export function useSSE(docId: string | null): UseSSEResult {
           style:   data.style   as number,
           source:  data.source  as number,
         })
+        pushActivity('◆', 'CSS aggiornato', `C:${(data.content as number).toFixed(2)} S:${(data.style as number).toFixed(2)} R:${(data.source as number).toFixed(2)}`, '#8B8FA8')
         break
 
       case 'BUDGET_UPDATE':
         updateBudget(data.spent as number, data.remaining_pct as number)
+        pushActivity('$', `Budget: $${(data.spent as number).toFixed(3)}`, `${(data.remaining_pct as number).toFixed(0)}% rimanente`, '#EAB308')
         break
 
       case 'HUMAN_REQUIRED':
@@ -88,37 +101,42 @@ export function useSSE(docId: string | null): UseSSEResult {
           data.type as 'outline_approval' | 'section_approval' | 'escalation',
           data.payload,
         )
+        pushActivity('⚠', 'Approvazione richiesta', data.type as string, '#F97316')
         break
 
       case 'OSCILLATION_DETECTED':
         setOscillation(true, data.type as string)
+        pushActivity('⚠', 'Oscillazione rilevata', data.type as string, '#F97316')
         break
 
       case 'HARD_STOP':
         setHardStop(true)
+        pushActivity('■', 'Hard stop attivato', 'Budget esaurito', '#EF4444')
         break
 
       case 'DRAFT_CHUNK':
         appendDraftChunk(data.chunk as string)
         break
 
-
       case 'RUN_RESUMED':
         appSetState('PROCESSING')
+        pushActivity('▶', 'Pipeline ripresa', undefined, '#22C55E')
         break
 
       case 'PIPELINE_DONE':
         setRunStatus('completed')
         appSetState('REVIEWING')
+        pushActivity('✓', 'Pipeline completata!', undefined, '#22C55E')
         break
 
       case 'PIPELINE_FAILED':
         setRunStatus('failed')
+        pushActivity('✗', 'Pipeline fallita', data.error as string | undefined, '#EF4444')
         break
     }
   }, [
     appSetState, openHitl, updateNode, updateBudget, updateCSS,
-    approveSection, setOscillation, setRunStatus, appendDraftChunk, setHardStop,
+    approveSection, setOscillation, setRunStatus, appendDraftChunk, setHardStop, pushActivity,
   ])
 
   // Real EventSource connection with exponential-backoff reconnect

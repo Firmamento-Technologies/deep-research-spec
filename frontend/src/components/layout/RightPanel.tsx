@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { useRunStore } from '../../store/useRunStore'
 import type { RunState } from '../../store/useRunStore'
@@ -9,14 +9,21 @@ import { JuryVerdictGrid } from '../panel/JuryVerdictGrid'
 import { SourceList } from '../panel/SourceList'
 import { PayloadTree } from '../panel/PayloadTree'
 import { AgentModelDropdown } from '../panel/AgentModelDropdown'
+import { ActivityFeed } from '../panel/ActivityFeed'
 
 const JURY_NODES = new Set(['jury', 'r1', 'r2', 'r3', 'f1', 'f2', 'f3', 's1', 's2', 's3', 'aggregator'])
 const RESEARCHER_NODES = new Set(['researcher', 'researcher_targeted'])
 const REFLECTOR_NODES = new Set(['reflector'])
 
+type PanelTab = 'activity' | 'detail'
+
 export function RightPanel() {
   const { rightPanelCollapsed, selectedNodeId, toggleRightPanel } = useAppStore()
+  const appState = useAppStore((s) => s.state)
   const { activeRun } = useRunStore()
+  const [tab, setTab] = useState<PanelTab>('activity')
+
+  const isPipelineActive = appState === 'PROCESSING' || appState === 'AWAITING_HUMAN' || appState === 'REVIEWING'
 
   if (rightPanelCollapsed) {
     return (
@@ -24,29 +31,66 @@ export function RightPanel() {
     )
   }
 
+  // Determine what to show
+  const showNodeDetail = selectedNodeId && activeRun && tab === 'detail'
+  const showActivityFeed = isPipelineActive && !showNodeDetail
+
   return (
     <div className="hidden md:flex w-[320px] shrink-0 h-full bg-drs-s1 border-l border-drs-border flex-col overflow-hidden transition-[width] duration-200 ease-out">
-      {/* Header */}
-      <div className="h-[40px] flex items-center justify-between px-[12px] border-b border-drs-border shrink-0">
-        <span className="text-[11px] font-mono text-drs-faint tracking-[1px]">
-          {selectedNodeId ? selectedNodeId.toUpperCase().replace('_', ' ') : 'OVERVIEW'}
-        </span>
-        <button
-          onClick={toggleRightPanel}
-          className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] leading-none"
-        >
-          ×
-        </button>
+      {/* Header with tabs */}
+      <div className="shrink-0 border-b border-drs-border">
+        <div className="h-[40px] flex items-center justify-between px-[12px]">
+          <span className="text-[11px] font-mono text-drs-faint tracking-[1px]">
+            {showNodeDetail
+              ? selectedNodeId!.toUpperCase().replace(/_/g, ' ')
+              : isPipelineActive ? 'ACTIVITY' : 'OVERVIEW'
+            }
+          </span>
+          <button
+            onClick={toggleRightPanel}
+            className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] leading-none"
+          >
+            ×
+          </button>
+        </div>
+        {/* Tab bar — only during pipeline */}
+        {isPipelineActive && (
+          <div className="flex px-[12px] gap-[4px] pb-[6px]">
+            <TabButton active={tab === 'activity'} onClick={() => setTab('activity')}>
+              Feed
+            </TabButton>
+            <TabButton active={tab === 'detail'} onClick={() => setTab('detail')}>
+              {selectedNodeId ? 'Nodo' : 'Overview'}
+            </TabButton>
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-[12px] flex flex-col gap-[12px]">
-        {selectedNodeId && activeRun
-          ? <NodeDetail nodeId={selectedNodeId} run={activeRun} />
-          : <RunOverview run={activeRun} />
+        {showActivityFeed
+          ? <ActivityFeed />
+          : showNodeDetail
+            ? <NodeDetail nodeId={selectedNodeId!} run={activeRun!} />
+            : <RunOverview run={activeRun} />
         }
       </div>
     </div>
+  )
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-[10px] font-mono px-[8px] py-[3px] rounded-[4px] border-none cursor-pointer transition-colors ${
+        active
+          ? 'bg-drs-accent/20 text-drs-accent'
+          : 'bg-transparent text-drs-faint hover:text-drs-muted'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 
