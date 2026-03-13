@@ -126,9 +126,11 @@ export const useConversationStore = create<ConversationStore>((set, get) => ({
         }
 
         const runResp = await api.post('/api/runs', params)
-        appStore.setActiveDocId(runResp.data.doc_id)
+        const docId = runResp.data?.doc_id
+        if (!docId) throw new Error('Backend did not return doc_id')
+        appStore.setActiveDocId(docId)
         appStore.setState('PROCESSING')
-        runStore.setActiveRun(buildInitialRunState(runResp.data.doc_id, params))
+        runStore.setActiveRun(buildInitialRunState(docId, params))
 
       } else if (action?.type === 'SHOW_SECTION') {
         const sectionIdx = action.sectionIdx as number | undefined

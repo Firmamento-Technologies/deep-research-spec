@@ -67,7 +67,8 @@ export const NewResearch: FC = () => {
       };
 
       const res = await api.post('/api/runs', params);
-      const docId = res.data.doc_id;
+      const docId = res.data?.doc_id;
+      if (!docId) throw new Error('Il backend non ha restituito un doc_id valido.');
 
       // Update app state to show pipeline
       setActiveDocId(docId);

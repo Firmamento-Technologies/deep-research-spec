@@ -57,7 +57,14 @@ export const useRunStore = create<RunStore>((set) => ({
   completedRuns: [],
   activityFeed: [],
 
-  setActiveRun: (run) => set({ activeRun: run, activityFeed: [] }),
+  setActiveRun: (run) => set((prev) => ({
+    activeRun: run,
+    activityFeed: [],
+    // Archive the previous run if it exists
+    completedRuns: prev.activeRun
+      ? [prev.activeRun, ...prev.completedRuns]
+      : prev.completedRuns,
+  })),
 
   updateNode: (nodeId, update) =>
     set((prev) => {

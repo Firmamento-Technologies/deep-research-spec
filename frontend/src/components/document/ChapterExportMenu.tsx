@@ -26,7 +26,7 @@ export function ChapterExportMenu({ docId, sectionIdx, label = 'Esporta' }: Chap
   }, [])
 
   const handleDownload = (format: string) => {
-    const base = `/api/runs/${docId}/output/${format}`
+    const base = `/api/runs/${docId}/export/${format}`
     const url = sectionIdx != null ? `${base}?section=${sectionIdx}` : base
     window.open(url, '_blank')
     setOpen(false)

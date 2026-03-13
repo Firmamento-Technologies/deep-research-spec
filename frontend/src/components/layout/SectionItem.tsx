@@ -40,13 +40,16 @@ export function SectionItem({ idx, title, status, docId, collapsed }: SectionIte
 
   const handleExport = async (e: React.MouseEvent, format: 'docx') => {
     e.stopPropagation()
-    window.open(`/api/runs/${docId}/output/${format}`, '_blank')
+    window.open(`/api/runs/${docId}/export/${format}`, '_blank')
   }
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    // copy section title as placeholder — real impl copies markdown content
-    await navigator.clipboard.writeText(`§${idx + 1} ${title}`)
+    try {
+      await navigator.clipboard.writeText(`§${idx + 1} ${title}`)
+    } catch {
+      // Clipboard API may fail if document is not focused or HTTPS is required
+    }
   }
 
   const handleLog = (e: React.MouseEvent) => {

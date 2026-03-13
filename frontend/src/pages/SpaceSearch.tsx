@@ -21,7 +21,7 @@ export const SpaceSearch: React.FC = () => {
   const debouncedQuery = useDebounce(query, 500);
 
   // Search query
-  const { data: results, isLoading } = useQuery<SearchResult[]>({
+  const { data: results, isLoading, isError } = useQuery<SearchResult[]>({
     queryKey: ['search', spaceId, debouncedQuery],
     queryFn: async () => {
       if (!debouncedQuery.trim()) return [];
@@ -64,7 +64,11 @@ export const SpaceSearch: React.FC = () => {
 
       {/* Results */}
       <div>
-        {isLoading ? (
+        {isError ? (
+          <div className="text-center py-12">
+            <p className="text-drs-red text-sm">Errore durante la ricerca. Riprova.</p>
+          </div>
+        ) : isLoading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-drs-accent" />
           </div>

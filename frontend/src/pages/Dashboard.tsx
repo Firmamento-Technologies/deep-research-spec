@@ -84,12 +84,22 @@ export const Dashboard: FC = () => {
                 <span>Preset: {activeRun.qualityPreset}</span>
               </div>
             </div>
-            <button
-              onClick={() => setState('PROCESSING')}
-              className="rounded-lg bg-drs-accent px-4 py-2 text-white text-sm font-medium hover:brightness-110 transition"
-            >
-              Mostra Pipeline
-            </button>
+            {activeRun.status !== 'completed' && activeRun.status !== 'failed' && (
+              <button
+                onClick={() => setState('PROCESSING')}
+                className="rounded-lg bg-drs-accent px-4 py-2 text-white text-sm font-medium hover:brightness-110 transition"
+              >
+                Mostra Pipeline
+              </button>
+            )}
+            {(activeRun.status === 'completed' || activeRun.status === 'failed') && (
+              <Link
+                to={`/runs/${activeRun.docId}`}
+                className="rounded-lg bg-drs-s2 border border-drs-border px-4 py-2 text-drs-text text-sm font-medium hover:bg-drs-s3 transition"
+              >
+                Vedi Risultati
+              </Link>
+            )}
           </div>
         </Card>
       )}
