@@ -133,12 +133,21 @@ export function DocumentSidebar() {
             </div>
           )}
 
-          {/* Export all — sticky bottom */}
-          <div className="mt-auto border-t border-drs-border p-3">
-            <button className="w-full text-left text-xs text-drs-faint hover:text-drs-muted transition-colors">
-              ⬇ Esporta tutto
-            </button>
-          </div>
+          {/* Export all — sticky bottom, only when there are completed runs */}
+          {completedRuns.length > 0 && (
+            <div className="mt-auto border-t border-drs-border p-3">
+              <button
+                onClick={() => {
+                  // Export the most recent completed run
+                  const docId = completedRuns[0].docId
+                  window.open(`/api/runs/${docId}/export/docx`, '_blank')
+                }}
+                className="w-full text-left text-xs text-drs-faint hover:text-drs-muted transition-colors cursor-pointer"
+              >
+                ⬇ Esporta tutto
+              </button>
+            </div>
+          )}
         </>
       )}
 

@@ -30,7 +30,7 @@ export const SpaceDetail: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Fetch space details
-  const { data: space } = useQuery<Space>({
+  const { data: space, isError: isSpaceError } = useQuery<Space>({
     queryKey: ['space', spaceId],
     queryFn: async () => {
       const res = await api.get(`/api/spaces/${spaceId}`);
@@ -39,7 +39,7 @@ export const SpaceDetail: React.FC = () => {
   });
 
   // Fetch sources (poll every 5s during processing)
-  const { data: sources } = useQuery<Source[]>({
+  const { data: sources, isError: isSourcesError } = useQuery<Source[]>({
     queryKey: ['sources', spaceId],
     queryFn: async () => {
       const res = await api.get(`/api/spaces/${spaceId}/sources`);
@@ -119,9 +119,15 @@ export const SpaceDetail: React.FC = () => {
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto">
       {/* Header */}
+      {isSpaceError && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+          Errore nel caricamento dello spazio.
+        </div>
+      )}
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-drs-text">
-          {space?.name || 'Loading...'}
+          {space?.name || (isSpaceError ? 'Errore' : 'Caricamento...')}
         </h1>
         {space?.description && (
           <p className="mt-2 text-drs-muted">
@@ -210,6 +216,11 @@ export const SpaceDetail: React.FC = () => {
         <h2 className="text-xl font-semibold text-drs-text mb-4">
           Sources ({sources?.length || 0})
         </h2>
+        {isSourcesError && (
+          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            Errore nel caricamento dei documenti.
+          </div>
+        )}
         {sources && sources.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
             {sources.map((source) => (

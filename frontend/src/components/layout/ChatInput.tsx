@@ -13,6 +13,7 @@ export function ChatInput() {
   const handleSend = useCallback(async () => {
     const trimmed = text.trim()
     if (!trimmed) return
+    if (appState === 'PROCESSING' || appState === 'AWAITING_HUMAN') return
     setText('')
     // Reset textarea height
     if (textareaRef.current) {
@@ -39,7 +40,8 @@ export function ChatInput() {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`
   }
 
-  const canSend = text.trim().length > 0
+  const isBlocked = appState === 'PROCESSING' || appState === 'AWAITING_HUMAN'
+  const canSend = text.trim().length > 0 && !isBlocked
 
   return (
     <div

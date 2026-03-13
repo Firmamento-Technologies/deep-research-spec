@@ -28,6 +28,8 @@ export function AgentModelDropdown({ nodeId, currentModel }: AgentModelDropdownP
     setOpen(false)
     try {
       await api.patch(`/api/runs/${activeDocId}/config`, { nodeId, newModel: modelId })
+    } catch (err) {
+      console.warn('[AgentModelDropdown] failed to update model:', err)
     } finally {
       setSaving(false)
     }

@@ -123,6 +123,12 @@ export function useSSE(docId: string | null): UseSSEResult {
         pushActivity('▶', 'Pipeline ripresa', undefined, '#22C55E')
         break
 
+      case 'RUN_ABORTED':
+        setRunStatus('failed')
+        appSetState('REVIEWING')
+        pushActivity('■', 'Pipeline annullata', data.reason as string | undefined, '#EF4444')
+        break
+
       case 'PIPELINE_DONE':
         setRunStatus('completed')
         appSetState('REVIEWING')

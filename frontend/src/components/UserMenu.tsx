@@ -86,17 +86,6 @@ export const UserMenu: React.FC = () => {
               }}
               className="w-full flex items-center px-4 py-2 text-sm text-drs-muted hover:bg-drs-s3 hover:text-drs-text"
             >
-              <User className="h-4 w-4 mr-3" />
-              Profile
-            </button>
-
-            <button
-              onClick={() => {
-                navigate('/settings');
-                setIsOpen(false);
-              }}
-              className="w-full flex items-center px-4 py-2 text-sm text-drs-muted hover:bg-drs-s3 hover:text-drs-text"
-            >
               <Settings className="h-4 w-4 mr-3" />
               Settings
             </button>

@@ -278,7 +278,11 @@ export function Settings() {
         {saved && <span className="text-[11px] text-drs-green font-mono">✓ Salvato</span>}
         <div className="ml-auto flex gap-[8px]">
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              api.get('/api/settings')
+                .then(res => { setData(res.data); setError(null) })
+                .catch(e => setError(`Errore: ${(e as Error).message}`))
+            }}
             className="bg-transparent border border-drs-border rounded-[6px] text-drs-muted text-[12px] font-mono px-[16px] py-[8px] cursor-pointer"
           >
             Annulla

@@ -105,6 +105,14 @@ async function request(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', url:
 
   const payload = await parseResponse(response, config.responseType);
   if (!response.ok) {
+    // On 401, clear stale tokens and redirect to login
+    if (response.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.href = '/login';
+      }
+    }
     throw new ApiError(response.status, toErrorMessage(response.status, payload), payload);
   }
 
