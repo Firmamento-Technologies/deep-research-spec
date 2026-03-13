@@ -50,29 +50,31 @@ export const SpaceDetail: React.FC = () => {
     },
   });
 
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (files: FileList) => {
-      const promises = Array.from(files).map(async (file) => {
+      const results = [];
+      for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append('file', file);
 
-        return api.post(`/api/spaces/${spaceId}/sources`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          onUploadProgress: (event: { loaded: number; total?: number }) => {
-            if (event.total) {
-              const progress = (event.loaded / event.total) * 100;
-              setUploadProgress(prev => new Map(prev).set(file.name, progress));
-            }
-          },
-        });
-      });
-
-      return Promise.all(promises);
+        setUploadProgress(prev => new Map(prev).set(file.name, 0));
+        const res = await api.post(`/api/spaces/${spaceId}/sources`, formData);
+        setUploadProgress(prev => new Map(prev).set(file.name, 100));
+        results.push(res);
+      }
+      return results;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sources', spaceId] });
       queryClient.invalidateQueries({ queryKey: ['space', spaceId] });
+      setUploadProgress(new Map());
+      setUploadError(null);
+    },
+    onError: (err: any) => {
+      setUploadError(err?.message || 'Upload failed. Please try again.');
       setUploadProgress(new Map());
     },
   });
@@ -195,6 +197,13 @@ export const SpaceDetail: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {/* Upload Error */}
+      {uploadError && (
+        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+          {uploadError}
+        </div>
+      )}
 
       {/* Sources List */}
       <div>
