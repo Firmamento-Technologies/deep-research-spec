@@ -32,11 +32,10 @@ ENV/
 *.swo
 *~
 
-# Environment variables (SECURITY)
-.env
+# Environment variables
+# .env is tracked intentionally for portability
 .env.local
 .env.production
-backend/.env
 
 # Docker
 .dockerignore
