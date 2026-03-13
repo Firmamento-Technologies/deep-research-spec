@@ -48,7 +48,7 @@ export function RightPanel() {
           </span>
           <button
             onClick={toggleRightPanel}
-            className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] leading-none hover:text-drs-muted transition-colors"
+            className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] leading-none hover:text-drs-muted focus:outline-none focus:ring-2 focus:ring-drs-accent rounded transition-colors"
             aria-label="Chiudi pannello"
             title="Chiudi pannello"
           >

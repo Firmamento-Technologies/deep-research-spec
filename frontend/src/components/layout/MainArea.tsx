@@ -42,7 +42,7 @@ export function MainArea() {
       {canToggle && (
         <button
           onClick={() => setState(showPipeline ? 'CONVERSING' : 'PROCESSING')}
-          className="absolute top-3 right-3 z-30 rounded border border-drs-border bg-drs-s2 px-3 py-1 text-xs text-drs-text hover:bg-drs-s1"
+          className="absolute top-3 right-3 z-30 rounded border border-drs-border bg-drs-s2 px-3 py-1 text-xs text-drs-text hover:bg-drs-s1 focus:outline-none focus:ring-2 focus:ring-drs-accent"
         >
           {showPipeline ? 'Torna alla pagina' : 'Mostra Pipeline'}
         </button>

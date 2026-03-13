@@ -47,14 +47,14 @@ export function Topbar() {
       {/* Left: logo */}
       <button
         onClick={() => navigate('/dashboard')}
-        className="text-drs-accent font-mono text-sm font-semibold tracking-tight select-none shrink-0 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none"
+        className="text-drs-accent font-mono text-sm font-semibold tracking-tight select-none shrink-0 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-drs-accent focus:ring-offset-1 focus:ring-offset-drs-bg rounded transition-opacity cursor-pointer bg-transparent border-none"
       >
         ◈ DRS
       </button>
 
       {/* Hamburger button — mobile only */}
       <button
-        className="sm:hidden flex items-center justify-center w-8 h-8 rounded text-drs-muted hover:text-drs-text hover:bg-drs-s2 transition-colors bg-transparent border-none text-base cursor-pointer"
+        className="sm:hidden flex items-center justify-center w-8 h-8 rounded text-drs-muted hover:text-drs-text hover:bg-drs-s2 focus:outline-none focus:ring-2 focus:ring-drs-accent transition-colors bg-transparent border-none text-base cursor-pointer"
         aria-label="Menu"
       >
         ☰
@@ -105,7 +105,7 @@ export function Topbar() {
           onClick={() => navigate(isSettings ? '/dashboard' : '/settings')}
           className={
             'w-8 h-8 flex items-center justify-center rounded ' +
-            'transition-colors text-base ' +
+            'transition-colors text-base focus:outline-none focus:ring-2 focus:ring-drs-accent ' +
             (isSettings
               ? 'text-drs-accent bg-drs-s2'
               : 'text-drs-muted hover:text-drs-text hover:bg-drs-s2')
@@ -122,7 +122,7 @@ export function Topbar() {
               await logout()
               navigate('/login')
             }}
-            className="w-8 h-8 flex items-center justify-center rounded text-drs-muted hover:text-drs-red hover:bg-drs-s2 transition-colors text-sm bg-transparent border-none cursor-pointer"
+            className="w-8 h-8 flex items-center justify-center rounded text-drs-muted hover:text-drs-red hover:bg-drs-s2 focus:outline-none focus:ring-2 focus:ring-drs-accent transition-colors text-sm bg-transparent border-none cursor-pointer"
             aria-label="Logout"
             title="Logout"
           >

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, type FC } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { api } from '../lib/api';
+import { api, ApiError } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 import { useRunStore } from '../store/useRunStore';
 import type { QualityPreset, RunState } from '../types/run';
@@ -99,7 +99,7 @@ export const NewResearch: FC = () => {
       // Navigate to dashboard where pipeline will show
       navigate('/dashboard');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Errore durante la creazione della ricerca.');
+      setError(err instanceof ApiError ? err.message : err instanceof Error ? err.message : 'Errore durante la creazione della ricerca.');
     } finally {
       setIsSubmitting(false);
     }
