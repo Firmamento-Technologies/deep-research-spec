@@ -99,7 +99,7 @@ export function useSSE(docId: string | null): UseSSEResult {
         appSetState('AWAITING_HUMAN')
         openHitl(
           data.type as 'outline_approval' | 'section_approval' | 'escalation',
-          data.payload,
+          (data.payload as Record<string, unknown>) ?? null,
         )
         pushActivity('⚠', 'Approvazione richiesta', data.type as string, '#F97316')
         break

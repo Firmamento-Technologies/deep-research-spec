@@ -1,4 +1,3 @@
-import React from 'react'
 import { NodeDefinition, CLUSTER_COLORS } from '../../constants/pipeline-layout'
 import type { NodeState } from '../../store/useRunStore'
 

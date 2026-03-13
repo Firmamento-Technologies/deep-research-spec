@@ -1,5 +1,4 @@
 import { useAppStore } from '../../store/useAppStore'
-import { useRunStore } from '../../store/useRunStore'
 import { OutlineDragList } from './OutlineDragList'
 import { SectionReviewSplit } from './SectionReviewSplit'
 import { EscalationBanner } from './EscalationBanner'
@@ -8,15 +7,12 @@ import { EscalationBanner } from './EscalationBanner'
  * HumanRequiredModal
  * Triggered when appState === 'AWAITING_HUMAN'.
  * Full-screen overlay — NOT dismissible by clicking outside or pressing Escape.
- * Type is read from activeRun.hitlType (set by useSSE when HUMAN_REQUIRED fires).
+ * hitlType is read from useAppStore (set by openHitl via useSSE).
  */
 export function HumanRequiredModal() {
-  const { state: appState, activeDocId } = useAppStore()
-  const { activeRun } = useRunStore()
+  const { state: appState, activeDocId, hitlType } = useAppStore()
 
   if (appState !== 'AWAITING_HUMAN' || !activeDocId) return null
-
-  const hitlType = activeRun?.hitlType
 
   return (
     <div

@@ -214,7 +214,14 @@ function NodeDetail({ nodeId, run }: { nodeId: string; run: RunState }) {
 
       {/* RESEARCHER special case */}
       {isResearcher && nodeState?.output ? (
-        <SourceList sources={(nodeState.output as Record<string, unknown>)?.sources as Array<{ url: string; title: string; reliability: number }> ?? []} />
+        <SourceList sources={
+          (((nodeState.output as Record<string, unknown>)?.sources as Array<Record<string, unknown>>) ?? []).map(s => ({
+            url: String(s.url ?? ''),
+            title: String(s.title ?? ''),
+            snippet: String(s.snippet ?? ''),
+            reliabilityScore: Number(s.reliabilityScore ?? s.reliability ?? 0),
+          }))
+        } />
       ) : null}
 
       {/* Live output */}

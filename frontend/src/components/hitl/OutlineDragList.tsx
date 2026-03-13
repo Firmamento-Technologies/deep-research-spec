@@ -5,7 +5,6 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  type DragEndEvent,
   } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -15,7 +14,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '../../store/useAppStore'
-import { useRunStore } from '../../store/useRunStore'
+import { api } from '../../lib/api'
 
 export interface OutlineSection {
   id: string
@@ -29,11 +28,10 @@ interface OutlineDragListProps {
 }
 
 export function OutlineDragList({ docId }: OutlineDragListProps) {
-  const { activeRun } = useRunStore()
-  const { setState } = useAppStore()
+  const { setState, hitlPayload, closeHitl } = useAppStore()
 
   const [sections, setSections] = useState<OutlineSection[]>(() => {
-    const raw = (activeRun?.hitlPayload?.sections as OutlineSection[] | undefined) ?? []
+    const raw = ((hitlPayload as Record<string, unknown> | null)?.sections as OutlineSection[] | undefined) ?? []
     return raw.length > 0
       ? raw
       : [
@@ -48,7 +46,7 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = (event: { active: { id: string | number }; over: { id: string | number } | null }) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
       const oldIdx = sections.findIndex(s => s.id === active.id)
@@ -76,12 +74,8 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch(`/api/runs/${docId}/approve-outline`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sections }),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await api.post(`/api/runs/${docId}/approve-outline`, { sections })
+      closeHitl()
       setState('PROCESSING')
     } catch (e) {
       setError((e as Error).message)
@@ -94,11 +88,8 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
     setSubmitting(true)
     setError(null)
     try {
-      await fetch(`/api/runs/${docId}/approve-outline`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sections, action: 'regenerate' }),
-      })
+      await api.post(`/api/runs/${docId}/approve-outline`, { sections, action: 'regenerate' })
+      closeHitl()
       setState('PROCESSING')
     } catch (e) {
       setError((e as Error).message)

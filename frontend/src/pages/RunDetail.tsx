@@ -22,7 +22,7 @@ interface SectionData {
 }
 
 export const RunDetail: FC = () => {
-  const { docId } = useParams<{ docId: string }>()
+  const { docId } = useParams() as { docId: string }
   const [run, setRun] = useState<RunInfo | null>(null)
   const [sections, setSections] = useState<SectionData[]>([])
   const [loading, setLoading] = useState(true)

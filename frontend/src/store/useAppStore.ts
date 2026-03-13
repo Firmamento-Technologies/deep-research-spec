@@ -23,7 +23,7 @@ interface AppStore {
   selectedNodeId: string | null          // drives right panel context
   /** HITL modal type — set by SSE HUMAN_REQUIRED, cleared after resolution */
   hitlType: 'outline_approval' | 'section_approval' | 'escalation' | null
-  hitlPayload: unknown
+  hitlPayload: Record<string, unknown> | null
   // Actions
   setState: (s: AppState) => void
   setActiveDocId: (id: string | null) => void
@@ -31,7 +31,7 @@ interface AppStore {
   toggleSidebar: () => void
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleRightPanel: () => void
-  openHitl: (type: AppStore['hitlType'], payload: unknown) => void
+  openHitl: (type: AppStore['hitlType'], payload: Record<string, unknown> | null) => void
   closeHitl: () => void
 }
 

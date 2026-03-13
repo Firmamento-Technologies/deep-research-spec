@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-import { useRunStore } from '../../store/useRunStore'
 import { api } from '../../lib/api'
 
 interface EscalationBannerProps {
@@ -8,12 +7,11 @@ interface EscalationBannerProps {
 }
 
 export function EscalationBanner({ docId }: EscalationBannerProps) {
-  const { setState } = useAppStore()
-  const { activeRun } = useRunStore()
+  const { setState, hitlPayload, closeHitl } = useAppStore()
 
-  const payload = activeRun?.hitlPayload ?? {}
-  const escalationType: string = payload.escalationType ?? 'ESCALATION'
-  const description: string = payload.description ?? 'Azione richiesta per risolvere un conflitto nella pipeline.'
+  const payload = hitlPayload ?? {}
+  const escalationType = String(payload.escalationType ?? 'ESCALATION')
+  const description = String(payload.description ?? 'Azione richiesta per risolvere un conflitto nella pipeline.')
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,6 +24,7 @@ export function EscalationBanner({ docId }: EscalationBannerProps) {
         action,
         ...(resolution ? { resolution } : {}),
       })
+      closeHitl()
       setState('PROCESSING')
     } catch (e) {
       setError((e as Error).message)
@@ -48,11 +47,11 @@ export function EscalationBanner({ docId }: EscalationBannerProps) {
       </div>
 
       {/* Context detail */}
-      {payload.detail && (
+      {payload.detail ? (
         <div className="bg-drs-s1 border border-drs-border rounded-[6px] p-[12px_14px] text-[12px] font-mono text-drs-muted leading-[1.6] whitespace-pre-wrap break-words">
-          {payload.detail}
+          {String(payload.detail)}
         </div>
-      )}
+      ) : null}
 
       {error && (
         <div className="text-[11px] text-drs-red font-mono">{error}</div>

@@ -1,7 +1,7 @@
 import type React from 'react'
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
-import { useRunStore } from '../../store/useRunStore'
+import { api } from '../../lib/api'
 import { Source, SourceList } from '../panel/SourceList'
 
 interface Violation {
@@ -22,16 +22,15 @@ interface SectionReviewSplitProps {
 }
 
 export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
-  const { setState } = useAppStore()
-  const { activeRun } = useRunStore()
+  const { setState, hitlPayload, closeHitl } = useAppStore()
 
-  const payload = activeRun?.hitlPayload ?? {}
-  const draft: string = payload.draft ?? ''
-  const violations: Violation[] = payload.violations ?? []
-  const feedback: FeedbackItem[] = (payload.feedbackItems ?? []).sort(
+  const payload = (hitlPayload ?? {}) as Record<string, unknown>
+  const draft: string = (payload.draft as string) ?? ''
+  const violations: Violation[] = (payload.violations as Violation[]) ?? []
+  const feedback: FeedbackItem[] = ((payload.feedbackItems as FeedbackItem[]) ?? []).sort(
     (a: FeedbackItem, b: FeedbackItem) => severityOrder(b.severity) - severityOrder(a.severity)
   )
-  const sources: Source[] = payload.sources ?? []
+  const sources: Source[] = (payload.sources as Source[]) ?? []
 
   const [manualEdit, setManualEdit] = useState(false)
   const [manualText, setManualText] = useState(draft)
@@ -47,12 +46,8 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
         action,
       }
       if (editContent !== undefined) body.edit_content = editContent
-      const res = await fetch(`/api/runs/${docId}/approve-section`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await api.post(`/api/runs/${docId}/approve-section`, body)
+      closeHitl()
       setState('PROCESSING')
     } catch (e) {
       setError((e as Error).message)
