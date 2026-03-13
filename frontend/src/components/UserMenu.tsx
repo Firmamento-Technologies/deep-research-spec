@@ -39,6 +39,8 @@ export const UserMenu: React.FC = () => {
       {/* Trigger button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Menu utente"
+        aria-expanded={isOpen}
         className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-drs-s2 transition-colors"
       >
         {/* Avatar */}

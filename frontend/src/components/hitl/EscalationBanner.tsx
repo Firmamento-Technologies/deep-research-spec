@@ -1,3 +1,4 @@
+import type React from 'react'
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
@@ -98,15 +99,21 @@ function EscalationBtn({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex-1 min-w-[160px] p-[14px_16px] rounded-card text-left transition-[background,border-color] duration-150 ${
+      aria-label={label}
+      className={`group flex-1 min-w-[160px] p-[14px_16px] rounded-card text-left transition-[background,border-color] duration-150 ${
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
       }`}
-      style={{
-        background: `${color}10`,
-        border: `1px solid ${color}60`,
-      }}
-      onMouseEnter={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = `${color}20` }}
-      onMouseLeave={e => { if (!disabled) (e.currentTarget as HTMLButtonElement).style.background = `${color}10` }}
+      style={
+        {
+          '--btn-color': color,
+          background: `${color}10`,
+          border: `1px solid ${color}60`,
+        } as React.CSSProperties
+      }
+      onFocus={e => { if (!disabled) e.currentTarget.style.background = `${color}20` }}
+      onBlur={e => { if (!disabled) e.currentTarget.style.background = `${color}10` }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = `${color}20` }}
+      onMouseLeave={e => { if (!disabled) e.currentTarget.style.background = `${color}10` }}
     >
       <div className="text-[12px] font-mono font-bold mb-[4px]" style={{ color }}>
         {label}

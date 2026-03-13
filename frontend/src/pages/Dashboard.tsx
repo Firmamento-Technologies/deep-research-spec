@@ -26,8 +26,8 @@ export const Dashboard: FC = () => {
       try {
         const res = await api.get('/api/runs');
         setRuns(Array.isArray(res.data) ? res.data : []);
-      } catch {
-        // API not available
+      } catch (err) {
+        console.warn('[Dashboard] failed to load runs:', err)
       } finally {
         setLoading(false);
       }

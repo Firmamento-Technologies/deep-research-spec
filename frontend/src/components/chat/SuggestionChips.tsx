@@ -31,6 +31,7 @@ export function SuggestionChips({ chips }: SuggestionChipsProps) {
         <button
           key={i}
           onClick={() => handleChip(chip.value)}
+          aria-label={`Suggerimento: ${chip.label}`}
           className={
             'px-3 py-1 rounded-full text-xs ' +
             'border border-drs-accent text-drs-accent ' +

@@ -19,8 +19,8 @@ export const AdminUsers: FC = () => {
       try {
         const res = await api.get('/api/admin/users');
         setUsers(res.data?.users || []);
-      } catch {
-        // API not available
+      } catch (err) {
+        console.warn('[AdminUsers] failed to load users:', err)
       } finally {
         setLoading(false);
       }
@@ -34,8 +34,8 @@ export const AdminUsers: FC = () => {
       setUsers(prev =>
         prev.map(u => u.id === userId ? { ...u, active: !active } : u)
       );
-    } catch {
-      // Handle error
+    } catch (err) {
+      console.warn('[AdminUsers] failed to toggle user:', err)
     }
   };
 

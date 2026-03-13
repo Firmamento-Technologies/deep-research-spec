@@ -122,6 +122,7 @@ function MicroBtn({
   return (
     <button
       title={title}
+      aria-label={title}
       onClick={onClick}
       className="bg-drs-s2 border border-drs-border rounded-[3px] text-drs-muted text-[9px] font-mono p-[2px_5px] cursor-pointer leading-none"
     >

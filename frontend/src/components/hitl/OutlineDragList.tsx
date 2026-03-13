@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -15,6 +15,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
+import { HitlActionBtn } from './HitlActionBtn'
 
 export interface OutlineSection {
   id: string
@@ -130,12 +131,12 @@ export function OutlineDragList({ docId }: OutlineDragListProps) {
           <span className="text-[11px] text-drs-red font-mono flex-1">{error}</span>
         )}
         <div className="ml-auto flex gap-[8px]">
-          <ActionBtn onClick={handleRegenerate} disabled={submitting} variant="ghost">
+          <HitlActionBtn onClick={handleRegenerate} disabled={submitting} variant="ghost">
             Rigenera
-          </ActionBtn>
-          <ActionBtn onClick={handleApprove} disabled={submitting} variant="primary">
+          </HitlActionBtn>
+          <HitlActionBtn onClick={handleApprove} disabled={submitting} variant="primary">
             {submitting ? 'Invio…' : 'Approva Outline'}
-          </ActionBtn>
+          </HitlActionBtn>
         </div>
       </div>
     </div>
@@ -175,6 +176,7 @@ function SortableRow({
       <span
         {...attributes}
         {...listeners}
+        aria-label="Trascina per riordinare"
         className="cursor-grab text-drs-faint text-[14px] shrink-0 leading-none"
       >
         ☰
@@ -218,37 +220,10 @@ function SortableRow({
         onClick={() => onRemove(section.id)}
         className="bg-transparent border-none text-drs-faint cursor-pointer text-[14px] shrink-0 leading-none"
         title="Rimuovi sezione"
+        aria-label="Rimuovi sezione"
       >
         ×
       </button>
     </div>
-  )
-}
-
-function ActionBtn({
-  children,
-  onClick,
-  disabled,
-  variant,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-  variant: 'primary' | 'ghost'
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`p-[8px_18px] rounded-[6px] text-[12px] font-mono ${
-        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
-      } ${
-        variant === 'primary'
-          ? 'border-none bg-drs-accent text-drs-bg font-bold'
-          : 'border border-drs-border bg-transparent text-drs-muted font-normal'
-      }`}
-    >
-      {children}
-    </button>
   )
 }

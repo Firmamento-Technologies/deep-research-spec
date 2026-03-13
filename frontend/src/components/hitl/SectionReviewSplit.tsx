@@ -1,8 +1,8 @@
-import type React from 'react'
 import { useState } from 'react'
 import { useAppStore } from '../../store/useAppStore'
 import { api } from '../../lib/api'
 import { Source, SourceList } from '../panel/SourceList'
+import { HitlActionBtn } from './HitlActionBtn'
 
 interface Violation {
   start: number
@@ -56,9 +56,6 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
     }
   }
 
-  // Highlight violations in markdown text
-  const highlightedDraft = applyViolationHighlights(draft, violations)
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 flex overflow-hidden">
@@ -75,10 +72,7 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
               className="w-full min-h-[400px] bg-drs-bg border border-drs-border rounded-[6px] text-drs-text text-[12px] font-mono p-[12px] resize-y outline-none leading-[1.7]"
             />
           ) : (
-            <div
-              className="text-[13px] leading-[1.8] text-drs-text"
-              dangerouslySetInnerHTML={{ __html: highlightedDraft }}
-            />
+            <HighlightedDraft text={draft} violations={violations} />
           )}
         </div>
 
@@ -108,21 +102,21 @@ export function SectionReviewSplit({ docId }: SectionReviewSplitProps) {
           <span className="text-[11px] text-drs-red font-mono">{error}</span>
         )}
         <div className="ml-auto flex gap-[8px]">
-          <ActionBtn variant="ghost" disabled={submitting}
+          <HitlActionBtn variant="ghost" disabled={submitting}
             onClick={() => manualEdit ? post('edit', manualText) : setManualEdit(true)}>
             {manualEdit ? 'Invia Modifica' : 'Modifica Manuale'}
-          </ActionBtn>
+          </HitlActionBtn>
           {manualEdit && (
-            <ActionBtn variant="ghost" disabled={submitting} onClick={() => setManualEdit(false)}>
+            <HitlActionBtn variant="ghost" disabled={submitting} onClick={() => setManualEdit(false)}>
               Annulla
-            </ActionBtn>
+            </HitlActionBtn>
           )}
-          <ActionBtn variant="ghost" disabled={submitting} onClick={() => post('regenerate')}>
+          <HitlActionBtn variant="ghost" disabled={submitting} onClick={() => post('regenerate')}>
             Rigenera
-          </ActionBtn>
-          <ActionBtn variant="primary" disabled={submitting} onClick={() => post('approve')}>
+          </HitlActionBtn>
+          <HitlActionBtn variant="primary" disabled={submitting} onClick={() => post('approve')}>
             {submitting ? 'Invio…' : 'Approva'}
-          </ActionBtn>
+          </HitlActionBtn>
         </div>
       </div>
     </div>
@@ -177,45 +171,42 @@ function severityOrder(s: string) {
   return s === 'HIGH' ? 3 : s === 'MEDIUM' ? 2 : 1
 }
 
-function applyViolationHighlights(text: string, violations: Violation[]): string {
-  if (!violations.length) return escapeHtml(text)
+function HighlightedDraft({ text, violations }: { text: string; violations: Violation[] }) {
+  if (!violations.length) {
+    return (
+      <pre className="whitespace-pre-wrap break-words text-[13px] leading-[1.8] text-drs-text font-[inherit]">
+        {text}
+      </pre>
+    )
+  }
+
   const sorted = [...violations].sort((a, b) => a.start - b.start)
-  let result = ''
+  const segments: Array<{ text: string; violation?: Violation }> = []
   let cursor = 0
+
   for (const v of sorted) {
-    if (v.start > cursor) result += escapeHtml(text.slice(cursor, v.start))
-    result += `<mark style="background:rgba(202,138,4,0.25);border-radius:2px;" title="${escapeHtml(v.reason)}">${escapeHtml(text.slice(v.start, v.end))}</mark>`
+    if (v.start > cursor) segments.push({ text: text.slice(cursor, v.start) })
+    segments.push({ text: text.slice(v.start, v.end), violation: v })
     cursor = v.end
   }
-  if (cursor < text.length) result += escapeHtml(text.slice(cursor))
-  return `<pre style="white-space:pre-wrap;word-break:break-word;font-size:13px;line-height:1.8;color:#F0F1F6;font-family:inherit">${result}</pre>`
-}
+  if (cursor < text.length) segments.push({ text: text.slice(cursor) })
 
-function escapeHtml(s: string) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-}
-
-function ActionBtn({
-  children, onClick, disabled, variant,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-  variant: 'primary' | 'ghost'
-}) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`p-[8px_16px] rounded-[6px] text-[12px] font-mono ${
-        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer opacity-100'
-      } ${
-        variant === 'primary'
-          ? 'border-none bg-drs-accent text-drs-bg font-bold'
-          : 'border border-drs-border bg-transparent text-drs-muted font-normal'
-      }`}
-    >
-      {children}
-    </button>
+    <pre className="whitespace-pre-wrap break-words text-[13px] leading-[1.8] text-drs-text font-[inherit]">
+      {segments.map((seg, i) =>
+        seg.violation ? (
+          <mark
+            key={i}
+            title={seg.violation.reason}
+            style={{ background: 'rgba(202,138,4,0.25)', borderRadius: '2px' }}
+          >
+            {seg.text}
+          </mark>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        )
+      )}
+    </pre>
   )
 }
+

@@ -69,6 +69,8 @@ export function JuryVerdictGrid({ verdicts }: JuryVerdictGridProps) {
                 <button
                   key={judgeId}
                   onClick={() => setExpanded(expanded === judgeId ? null : judgeId)}
+                  aria-label={`Giudice ${judgeId.toUpperCase()}: ${v == null ? 'in attesa' : isVeto ? 'VETO' : isPass ? 'approvato' : 'rifiutato'}`}
+                  aria-expanded={isSelected}
                   className="flex-1 flex flex-col items-center gap-[1px] rounded-input cursor-pointer"
                   style={{
                     padding: '4px 2px',

@@ -40,7 +40,7 @@ export const NewResearch: FC = () => {
   useEffect(() => {
     api.get('/api/spaces')
       .then((res) => setSpaces(res.data ?? []))
-      .catch(() => {});
+      .catch((err) => { console.warn('[NewResearch] failed to load spaces:', err) });
   }, []);
 
   const handleSubmit = useCallback(async () => {
