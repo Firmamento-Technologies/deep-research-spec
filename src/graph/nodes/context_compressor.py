@@ -257,8 +257,10 @@ async def _llm_compress(content: str, title: str, tier: str) -> str:
 
     try:
         from src.llm.client import llm_client
+        from src.llm.routing import route_model
+        model = route_model("context_compressor", "economy")
         result = llm_client.call(
-            model="qwen/qwen3-7b",
+            model=model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=max_words * 3,
             temperature=0.1,

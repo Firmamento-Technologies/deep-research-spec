@@ -19,9 +19,9 @@ def post_qa_node(state: dict) -> dict:
     Returns:
         Partial state with ``qa_passed``, ``qa_issues``.
     """
-    approved = state.get("approved_sections", [])
-    outline = state.get("outline", [])
-    config = state.get("config", {})
+    approved = state.get("approved_sections") or []
+    outline = state.get("outline") or []
+    config = state.get("config") or {}
 
     issues: list[dict] = []
 
@@ -37,6 +37,13 @@ def post_qa_node(state: dict) -> dict:
 
     # Check for empty sections
     for i, section in enumerate(approved):
+        if not isinstance(section, dict):
+            issues.append({
+                "type": "invalid_section",
+                "severity": "high",
+                "message": f"Section {i} is not a valid dict (got {type(section).__name__})",
+            })
+            continue
         content = section.get("content", section.get("draft", ""))
         if not content or len(content.strip()) < 50:
             issues.append({

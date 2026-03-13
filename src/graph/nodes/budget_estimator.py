@@ -71,15 +71,15 @@ REGIME_PARAMS: dict[str, dict] = {
 }
 
 
-# Primary model assignments per §28.2
+# Primary model assignments per §28.2 (OpenRouter-compatible)
 DEFAULT_MODELS: dict[str, str] = {
-    "planner": "google/gemini-2.5-pro",
-    "researcher": "perplexity/sonar-pro",
+    "planner": "openrouter/google/gemini-2.5-pro",
+    "researcher": "openrouter/google/gemini-2.5-pro",
     "writer_wa": "anthropic/claude-opus-4-5",
-    "judge_r1": "deepseek/deepseek-r1",
-    "judge_f1": "perplexity/sonar",
-    "judge_s1": "openai/gpt-4.5",  # $150/M out — was the 18x bug
-    "reflector": "openai/o3",
+    "judge_r1": "openrouter/openai/o3-mini",
+    "judge_f1": "openrouter/google/gemini-2.5-flash",
+    "judge_s1": "openrouter/anthropic/claude-sonnet-4",
+    "reflector": "openrouter/google/gemini-2.5-pro",
 }
 
 
@@ -125,7 +125,7 @@ def estimate_run_cost(
 
     # FIX BUG #1+#3+#4: Real per-slot pricing with input tokens and jury_size
     base_jury_cost = sum(
-        cost_usd(models.get(slot, "qwen/qwq-32b"), tok_judge_in, tok_judge_out)
+        cost_usd(models.get(slot, "openrouter/google/gemini-2.5-flash"), tok_judge_in, tok_judge_out)
         for slot in ["judge_r1", "judge_f1", "judge_s1"]
     )
     jury_t1_cost = base_jury_cost * jury_size
@@ -143,12 +143,12 @@ def estimate_run_cost(
     )
 
     reflector_cost_per_iter = cost_usd(
-        models.get("reflector", "openai/o3"),
+        models.get("reflector", "openrouter/google/gemini-2.5-pro"),
         tok_reflector_in, tok_reflector_out,
     )
 
     researcher_cost_per_iter = cost_usd(
-        models.get("researcher", "perplexity/sonar-pro"),
+        models.get("researcher", "openrouter/google/gemini-2.5-pro"),
         tok_researcher_in, tok_researcher_out,
     )
 

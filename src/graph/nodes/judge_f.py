@@ -102,15 +102,18 @@ Return your evaluation as the JSON structure specified in the system prompt."""
         return "\n\n".join(lines)
 
     def _micro_search(self, claims: list[str]) -> list[str]:
-        """§8.2 micro-search: use Perplexity Sonar to verify suspicious claims.
+        """§8.2 micro-search: verify suspicious claims via LLM.
 
         Returns list of consulted source URLs/descriptions.
         """
+        from src.llm.routing import route_model
+
         consulted: list[str] = []
         for claim in claims:
             try:
+                model = route_model("jury_f", self._preset if hasattr(self, "_preset") else "balanced")
                 response = llm_client.call(
-                    model="perplexity/sonar",
+                    model=model,
                     messages=[{
                         "role": "user",
                         "content": f"Is this claim true or false? Provide evidence: {claim}",

@@ -262,8 +262,16 @@ async def upload_source(
         raise HTTPException(status_code=404, detail="Space not found")
     
     # Infer MIME type from extension when browser sends generic octet-stream
-    content_type = file.content_type or "application/octet-stream"
-    if content_type == "application/octet-stream" and file.filename:
+    raw_content_type = file.content_type or "application/octet-stream"
+    # Strip parameters (e.g. "; charset=utf-8") for comparison
+    content_type = raw_content_type.split(";")[0].strip().lower()
+
+    logger.info(
+        "Upload: filename=%s, browser_content_type=%r, normalized=%r",
+        file.filename, raw_content_type, content_type,
+    )
+
+    if content_type in ("application/octet-stream", "") and file.filename:
         ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
         ext_map = {
             "md": "text/markdown",
@@ -274,7 +282,16 @@ async def upload_source(
             "pdf": "application/pdf",
             "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         }
-        content_type = ext_map.get(ext, content_type)
+        inferred = ext_map.get(ext)
+        if inferred:
+            logger.info("Upload: inferred MIME %s from extension .%s", inferred, ext)
+            content_type = inferred
+
+    # Normalize alternative MIME types
+    _MIME_ALIASES = {
+        "text/x-markdown": "text/markdown",
+    }
+    content_type = _MIME_ALIASES.get(content_type, content_type)
 
     # Validate file
     if content_type not in ALLOWED_MIME_TYPES:

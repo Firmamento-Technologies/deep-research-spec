@@ -67,16 +67,23 @@ def _determine_reason(state: dict) -> str:
         return f"oscillation_{osc_type}"
 
     ro = state.get("reflector_output") or {}
-    if ro.get("dominant_scope") == "FULL":
+    if isinstance(ro, dict) and ro.get("dominant_scope") == "FULL":
         return "structural_rewrite_needed"
 
-    conflicts = state.get("coherence_conflicts", [])
-    hard = [c for c in conflicts if c.get("level") == "HARD"]
+    conflicts = state.get("coherence_conflicts") or []
+    hard = [c for c in conflicts if isinstance(c, dict) and c.get("level") == "HARD"]
     if hard:
         return f"coherence_hard_conflict ({len(hard)} conflicts)"
 
-    budget = state.get("budget", {})
-    if budget.get("hard_stop_fired"):
+    budget = state.get("budget") or {}
+    if isinstance(budget, dict) and budget.get("hard_stop_fired"):
         return "budget_exhausted"
+
+    # PostQA failure — QA routed here due to high-severity issues
+    qa_issues = state.get("qa_issues") or []
+    if qa_issues:
+        high = [i for i in qa_issues if isinstance(i, dict) and i.get("severity") == "high"]
+        if high:
+            return f"post_qa_failure ({len(high)} high-severity issues)"
 
     return "unknown_escalation"

@@ -37,36 +37,36 @@ class ModelCascadeController:
     3. If oscillation > 2 → flag RLM mode for advanced reasoning
     """
 
-    # Base models per role per preset
+    # Base models per role per preset (OpenRouter-compatible)
     BASE_MODELS: dict[str, dict[str, str]] = {
         "writer": {
-            "economy":  "qwen/qwen3.5-9b-instruct",
-            "balanced": "qwen/qwen3.5-35b-a3b",
-            "premium":  "anthropic/claude-3.7-sonnet",
+            "economy":  "openrouter/google/gemini-2.5-flash",
+            "balanced": "openrouter/anthropic/claude-sonnet-4",
+            "premium":  "anthropic/claude-opus-4-5",
         },
         "reflector": {
-            "economy":  "qwen/qwen3.5-4b",
-            "balanced": "qwen/qwen3.5-9b-instruct",
-            "premium":  "openai/o3-mini",
+            "economy":  "openrouter/google/gemini-2.5-flash",
+            "balanced": "openrouter/google/gemini-2.5-pro",
+            "premium":  "openrouter/openai/o3-mini",
         },
         "researcher": {
-            "economy":  "qwen/qwen3.5-4b",
-            "balanced": "qwen/qwen3.5-9b-instruct",
-            "premium":  "perplexity/sonar-pro",
+            "economy":  "openrouter/google/gemini-2.5-flash",
+            "balanced": "openrouter/google/gemini-2.5-pro",
+            "premium":  "openrouter/google/gemini-2.5-pro",
         },
     }
 
     # Escalation targets (one tier up from base)
     ESCALATION_MODELS: dict[str, dict[str, str]] = {
         "writer": {
-            "economy":  "qwen/qwen3.5-35b-a3b",
-            "balanced": "deepseek/deepseek-r1",
+            "economy":  "openrouter/anthropic/claude-sonnet-4",
+            "balanced": "openrouter/openai/o3-mini",
             "premium":  "anthropic/claude-opus-4-5",
         },
         "reflector": {
-            "economy":  "qwen/qwen3.5-9b-instruct",
-            "balanced": "openai/o3-mini",
-            "premium":  "openai/o3",
+            "economy":  "openrouter/google/gemini-2.5-pro",
+            "balanced": "openrouter/openai/o3-mini",
+            "premium":  "openrouter/openai/o3",
         },
     }
 
@@ -88,7 +88,7 @@ class ModelCascadeController:
         base = self.BASE_MODELS.get(role, {}).get(preset)
         if base is None:
             logger.warning("No cascade config for role=%s preset=%s", role, preset)
-            return ("qwen/qwen3.5-9b-instruct", False)
+            return ("openrouter/google/gemini-2.5-flash", False)
 
         rlm_mode = False
 
