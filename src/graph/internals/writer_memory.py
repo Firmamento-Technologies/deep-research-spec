@@ -79,6 +79,29 @@ def writer_memory_node(state: dict) -> dict:
     return {"writer_memory": memory}
 
 
+def update_writer_memory(
+    existing: dict,
+    new_verdicts: list[dict],
+    new_violations: list[dict],
+    section_idx: int,
+    draft: str,
+) -> dict:
+    """Functional wrapper for section_checkpoint integration.
+
+    Unlike writer_memory_node (which reads from graph state), this takes
+    explicit parameters so it can be called from section_checkpoint.
+    """
+    state = {
+        "writer_memory": existing,
+        "current_draft": draft,
+        "jury_verdicts": new_verdicts,
+        "citations_used": [],
+        "citation_map": {},
+    }
+    result = writer_memory_node(state)
+    return result.get("writer_memory", existing)
+
+
 def _classify_error(claim: str) -> str:
     """Classify a failed claim into an error category."""
     claim_lower = claim.lower() if isinstance(claim, str) else ""
