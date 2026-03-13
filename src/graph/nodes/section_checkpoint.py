@@ -461,11 +461,22 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
     doc_id: str = state["doc_id"]
     run_id: str = state.get("run_id", state.get("doc_id", "default"))
     section_idx: int = state["current_section_idx"]
+    outline: list[dict] = state["outline"]
+    total_sections: int = state["total_sections"]
+
+    # Guard: if section_idx is out of range (e.g. post_qa escalation loop),
+    # skip the checkpoint entirely — there's nothing to save.
+    if section_idx >= len(outline) or section_idx >= total_sections:
+        logger.warning(
+            "[checkpoint] section_idx=%d out of range (outline=%d, total=%d) — skipping checkpoint",
+            section_idx, len(outline), total_sections,
+        )
+        return {**state, "force_approve": False}  # type: ignore[return-value]
+
     content: str = state.get("current_draft", "") or ""
 
     # If force_approve was triggered but no draft was produced, generate placeholder
     if not content.strip() and state.get("force_approve", False):
-        outline = state.get("outline", [])
         section_meta = outline[section_idx] if section_idx < len(outline) else {}
         scope = section_meta.get("scope", "")
         content = f"(This section could not be fully generated due to budget or iteration constraints. Intended scope: {scope})"
@@ -476,8 +487,6 @@ async def run(state: DocumentState) -> DocumentState:  # type: ignore[return]
     css_history: list[float] = state.get("css_history", [])
     all_verdicts: list[list[dict]] = state.get("all_verdicts_history", [])
     style_violations: list[dict] = state.get("style_lint_violations", [])
-    outline: list[dict] = state["outline"]
-    total_sections: int = state["total_sections"]
     db_dsn: str = state.get("config", {}).get("db_dsn", "")
     output_dir: str = state.get("config", {}).get("output_dir", DEFAULT_OUTPUT_DIR)
 

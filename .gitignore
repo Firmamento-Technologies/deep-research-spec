@@ -66,3 +66,9 @@ htmlcov/
 alembic/versions/*.pyc
 # Frontend deps
 frontend/node_modules/
+frontend/dist/
+
+# Pipeline output & temp files
+output/
+*.tmp
+*.tmp.*
